@@ -388,6 +388,8 @@ export default function MedicalEquipment({ role }: Props) {
   const [eqSearch, setEqSearch] = useState("");
   const [drugCat, setDrugCat]   = useState("All");
   const [drugSearch, setDrugSearch] = useState("");
+  // Inline-editable drug expiry + batch overrides
+  const [drugEdits, setDrugEdits] = useState<Record<string, { expiryDate?: string; batchNo?: string }>>({});
   const [showAlertOnly, setShowAlertOnly] = useState(false);
   const [expandedEq, setExpandedEq] = useState<string | null>(null);
 
@@ -411,7 +413,35 @@ export default function MedicalEquipment({ role }: Props) {
   });
 
   // Filtered drugs
-  const filteredDrugs = DRUGS.filter(d => {
+  // Merge drugEdits into DRUGS — recompute daysToExpiry + status from edited date
+  function drugDaysToExpiry(isoDate: string): number {
+    if (!isoDate) return 999;
+    const diff = new Date(isoDate).getTime() - new Date().setHours(0,0,0,0);
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  }
+  function drugComputedStatus(d: DrugItem, editedExpiry: string): DrugItem["status"] {
+    const days = drugDaysToExpiry(editedExpiry);
+    if (days <= 0)  return "expiring";   // expired
+    if (days <= 30) return "expiring";
+    if (d.qty < d.minQty) return "low";
+    if (d.qty === 0) return "out";
+    return "stocked";
+  }
+  const resolvedDrugs: DrugItem[] = DRUGS.map(d => {
+    const edit = drugEdits[d.id];
+    if (!edit) return d;
+    const expiry = edit.expiryDate ?? d.expiryDate;
+    const days   = drugDaysToExpiry(expiry);
+    return {
+      ...d,
+      expiryDate:   expiry,
+      batchNo:      edit.batchNo ?? d.batchNo,
+      daysToExpiry: days,
+      status:       drugComputedStatus(d, expiry),
+    };
+  });
+
+  const filteredDrugs = resolvedDrugs.filter(d => {
     if (drugCat !== "All" && d.category !== drugCat) return false;
     if (drugSearch && !d.name.toLowerCase().includes(drugSearch.toLowerCase())) return false;
     if (showAlertOnly && d.status === "stocked") return false;
@@ -850,6 +880,44 @@ export default function MedicalEquipment({ role }: Props) {
             </button>
           </div>
 
+          {/* Expiring drugs alert banner */}
+          {(() => {
+            const expiring = resolvedDrugs.filter(d => d.daysToExpiry <= 90);
+            if (expiring.length === 0) return null;
+            const hasExpired  = expiring.some(d => d.daysToExpiry <= 0);
+            const hasCritical = expiring.some(d => d.daysToExpiry > 0 && d.daysToExpiry <= 30);
+            return (
+              <div className={`rounded-xl border p-3 ${
+                hasExpired  ? "bg-red-500/10 border-red-500/30" :
+                hasCritical ? "bg-red-500/8 border-red-500/25" :
+                              "bg-amber-500/10 border-amber-500/30"
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle size={13} className={hasExpired || hasCritical ? "text-red-400" : "text-amber-400"} />
+                  <span className={`text-xs font-semibold ${hasExpired || hasCritical ? "text-red-300" : "text-amber-400"}`}
+                    style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                    {expiring.length} drug{expiring.length > 1 ? "s" : ""} expiring within 90 days
+                  </span>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-1.5">
+                  {expiring.sort((a,b) => a.daysToExpiry - b.daysToExpiry).map(d => (
+                    <div key={d.id} className="flex items-center gap-2 text-xs">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ${
+                        d.daysToExpiry <= 0  ? "bg-red-500/20 text-red-300" :
+                        d.daysToExpiry <= 30 ? "bg-red-500/15 text-red-400" :
+                                               "bg-amber-500/15 text-amber-300"
+                      }`}>
+                        {d.daysToExpiry <= 0 ? "EXPIRED" : `${d.daysToExpiry}d`}
+                      </span>
+                      <span className="font-medium text-foreground/80 truncate">{d.name}</span>
+                      <span className="text-muted-foreground shrink-0 ml-auto">{d.expiryDate}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* S8 Controlled Drugs banner */}
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-center gap-3">
             <Lock size={14} className="text-amber-400 flex-shrink-0" />
@@ -891,12 +959,37 @@ export default function MedicalEquipment({ role }: Props) {
                         {d.usedToday > 0 && <div className="text-blue-400 mt-0.5">Used today: {d.usedToday}</div>}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={d.daysToExpiry <= 30 ? (d.daysToExpiry <= 7 ? "text-red-400 font-medium" : "text-amber-400") : "text-foreground"}>
-                          {d.expiryDate}
-                          {d.daysToExpiry <= 30 && <span className="block text-muted-foreground">({d.daysToExpiry}d)</span>}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <input
+                            type="date"
+                            value={d.expiryDate ? (() => { try { return new Date(d.expiryDate).toISOString().split('T')[0]; } catch { return ""; } })() : ""}
+                            onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), expiryDate: e.target.value } }))}
+                            className={`w-30 bg-background/50 border rounded-md px-1.5 py-0.5 text-[11px] focus:outline-none shrink-0 ${
+                              d.daysToExpiry <= 0  ? "border-red-500/50 text-red-400 focus:border-red-400" :
+                              d.daysToExpiry <= 30 ? "border-red-500/30 text-red-400 focus:border-red-400" :
+                              d.daysToExpiry <= 90 ? "border-amber-500/30 text-amber-400 focus:border-amber-400" :
+                              "border-card-border text-foreground focus:border-cyan-400/40"
+                            }`}
+                          />
+                          {d.daysToExpiry <= 90 && (
+                            <span className={`text-[10px] font-semibold ${
+                              d.daysToExpiry <= 0  ? "text-red-400" :
+                              d.daysToExpiry <= 30 ? "text-red-400" :
+                              "text-amber-400"
+                            }`}>
+                              {d.daysToExpiry <= 0 ? "EXPIRED" : `${d.daysToExpiry}d`}
+                            </span>
+                          )}
+                        </div>
                       </td>
-                      <td className="px-3 py-2.5 text-muted-foreground font-mono">{d.batchNo}</td>
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="text"
+                          value={d.batchNo}
+                          onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), batchNo: e.target.value } }))}
+                          className="w-28 bg-background/50 border border-card-border rounded-md px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground focus:outline-none focus:border-cyan-400/40"
+                        />
+                      </td>
                       <td className="px-3 py-2.5 text-muted-foreground">{d.storage}</td>
                       <td className="px-3 py-2.5">
                         <div className="flex flex-col gap-1">
@@ -923,7 +1016,34 @@ export default function MedicalEquipment({ role }: Props) {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div><span className="text-muted-foreground">Stock: </span><span className={d.qty < d.minQty ? "text-amber-400 font-medium" : "text-foreground"}>{d.qty}/{d.minQty} {d.unit}</span></div>
                     <div><span className="text-muted-foreground">Sched: </span><span className={`font-bold ${d.schedule === "S8" ? "text-red-400" : "text-amber-400"}`}>{d.schedule}</span></div>
-                    <div><span className="text-muted-foreground">Expiry: </span><span className={d.daysToExpiry <= 30 ? "text-amber-400" : "text-foreground"}>{d.expiryDate}</span></div>
+                    <div className="col-span-2 flex items-center gap-2 flex-wrap">
+                      <span className="text-muted-foreground">Expiry:</span>
+                      <input
+                        type="date"
+                        value={d.expiryDate ? (() => { try { return new Date(d.expiryDate).toISOString().split('T')[0]; } catch { return ""; } })() : ""}
+                        onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), expiryDate: e.target.value } }))}
+                        className={`bg-background/50 border rounded px-1.5 py-0.5 text-[11px] focus:outline-none ${
+                          d.daysToExpiry <= 0  ? "border-red-500/40 text-red-400" :
+                          d.daysToExpiry <= 30 ? "border-red-500/30 text-red-400" :
+                          d.daysToExpiry <= 90 ? "border-amber-500/30 text-amber-400" :
+                          "border-card-border text-foreground"
+                        }`}
+                      />
+                      {d.daysToExpiry <= 90 && (
+                        <span className={`text-[10px] font-bold ${
+                          d.daysToExpiry <= 0 ? "text-red-400" :
+                          d.daysToExpiry <= 30 ? "text-red-400" : "text-amber-400"
+                        }`}>{d.daysToExpiry <= 0 ? "EXPIRED" : `${d.daysToExpiry}d`}</span>
+                      )}
+                    </div>
+                    <div><span className="text-muted-foreground">Batch:</span>
+                      <input
+                        type="text"
+                        value={d.batchNo}
+                        onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), batchNo: e.target.value } }))}
+                        className="ml-1 bg-background/50 border border-card-border rounded px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground focus:outline-none focus:border-cyan-400/40 w-24"
+                      />
+                    </div>
                     <div><span className="text-muted-foreground">Storage: </span><span className="text-foreground">{d.storage}</span></div>
                     {d.usedToday > 0 && <div className="col-span-2 text-blue-400">Used today: {d.usedToday}</div>}
                   </div>
