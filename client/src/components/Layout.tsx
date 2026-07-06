@@ -1,13 +1,173 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { ROLES, type UserRole } from "@/lib/data";
 import {
   ChevronDown, ChevronRight, Activity, Users, Shield, Settings,
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
-  Moon, Sun, Menu, X, PanelLeftClose, PanelLeftOpen
+  Moon, Sun, Menu, X, PanelLeftClose, PanelLeftOpen,
+  Bell, BellRing, CheckCheck, ExternalLink,
 } from "lucide-react";
 import EmergencyButton from "@/components/EmergencyButton";
 import { FEATURES } from "@/lib/config";
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface AppNotification {
+  id: number;
+  type: string;
+  title: string;
+  body: string;
+  taskRef: string | null;
+  taskId: number | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+function fmtAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1)  return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)  return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+// ─── Notification Bell ────────────────────────────────────────────────────────
+function NotificationBell({ role }: { role: UserRole }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const { data: notifications = [] } = useQuery<AppNotification[]>({
+    queryKey: ["/api/notifications"],
+    refetchInterval: 15_000,
+  });
+
+  const unread = notifications.filter(n => !n.readAt);
+  const hasUnread = unread.length > 0;
+
+  const readOneMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/notifications/${id}/read`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
+
+  const readAllMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/notifications/read-all", {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/notifications"] }),
+  });
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={`relative p-2 rounded-lg border transition-all ${
+          hasUnread
+            ? "border-violet-400/50 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20"
+            : "border-card-border text-muted-foreground hover:text-foreground hover:border-white/20"
+        }`}
+        title="Notifications"
+      >
+        {hasUnread ? <BellRing size={15} /> : <Bell size={15} />}
+        {hasUnread && (
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 flex items-center justify-center rounded-full bg-violet-500 text-white text-[9px] font-bold px-0.5">
+            {unread.length > 9 ? "9+" : unread.length}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-2 z-[200] w-80 bg-[#0f1623] border border-card-border rounded-2xl shadow-2xl overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-card-border">
+            <div className="flex items-center gap-2">
+              <BellRing size={13} className="text-violet-400" />
+              <span className="text-xs font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Notifications</span>
+              {hasUnread && (
+                <span className="text-[10px] bg-violet-500/20 text-violet-300 border border-violet-500/30 rounded-full px-1.5 py-0.5 font-semibold">
+                  {unread.length} new
+                </span>
+              )}
+            </div>
+            {hasUnread && (
+              <button
+                onClick={() => readAllMutation.mutate()}
+                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                title="Mark all read"
+              >
+                <CheckCheck size={11} /> Mark all read
+              </button>
+            )}
+          </div>
+
+          {/* List */}
+          <div className="max-h-72 overflow-y-auto divide-y divide-card-border/50">
+            {notifications.length === 0 && (
+              <div className="px-4 py-6 text-center text-[11px] text-muted-foreground">
+                <Bell size={18} className="mx-auto mb-1.5 opacity-30" />
+                No notifications
+              </div>
+            )}
+            {notifications.map(n => (
+              <div
+                key={n.id}
+                className={`px-4 py-3 transition-colors ${
+                  !n.readAt ? "bg-violet-500/5 hover:bg-violet-500/10" : "hover:bg-white/3"
+                }`}
+              >
+                <div className="flex items-start gap-2.5">
+                  {/* Unread dot */}
+                  <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ${
+                    !n.readAt ? "bg-violet-400" : "bg-transparent"
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className={`text-[11px] font-semibold ${
+                        !n.readAt ? "text-violet-300" : "text-foreground/70"
+                      }`}>{n.title}</span>
+                      <span className="text-[9px] text-muted-foreground shrink-0">{fmtAgo(n.createdAt)}</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{n.body}</p>
+                    {n.taskRef && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <Link href="/nept-tasking">
+                          <a
+                            className="flex items-center gap-1 text-[10px] text-cyan-400 hover:text-cyan-300 transition-colors"
+                            onClick={() => { setOpen(false); if (!n.readAt) readOneMutation.mutate(n.id); }}
+                          >
+                            <ExternalLink size={9} /> {n.taskRef}
+                          </a>
+                        </Link>
+                        {!n.readAt && (
+                          <button
+                            onClick={() => readOneMutation.mutate(n.id)}
+                            className="text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            Dismiss
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface NavItem {
   label: string;
@@ -425,10 +585,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
             <span className="truncate hidden sm:inline">Aeromedical Operations</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="hidden sm:flex items-center gap-1.5 text-xs">
-              <AlertTriangle size={12} className="text-orange-400" />
-              <span className="text-orange-400 font-medium">1 pending release</span>
-            </div>
+            <NotificationBell role={role} />
             <div className="hidden md:block">
               <EmergencyButton role={role} />
             </div>

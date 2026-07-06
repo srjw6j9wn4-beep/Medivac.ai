@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -151,6 +151,20 @@ if (!neptColNames.includes("completed_at")) {
 if (!neptColNames.includes("sectors")) {
   sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN sectors TEXT");
 }
+
+// ── Notifications table ─────────────────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS notifications (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    type       TEXT NOT NULL,
+    title      TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    task_ref   TEXT,
+    task_id    INTEGER,
+    read_at    TEXT,
+    created_at TEXT NOT NULL
+  )
+`);
 
 export const db = drizzle(sqlite);
 
@@ -442,6 +456,41 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteNeptTask(id: number): Promise<void> {
     db.delete(neptTasks).where(eq(neptTasks.id, id)).run();
+  }
+
+  // ── Notifications ───────────────────────────────────────────────────────────────
+  createNotification(data: { type: string; title: string; body: string; taskRef?: string; taskId?: number }): Notification {
+    return db.insert(notifications).values({
+      type:      data.type,
+      title:     data.title,
+      body:      data.body,
+      taskRef:   data.taskRef ?? null,
+      taskId:    data.taskId ?? null,
+      readAt:    null,
+      createdAt: new Date().toISOString(),
+    }).returning().get()!;
+  }
+
+  listUnreadNotifications(): Notification[] {
+    // Return all notifications, most recent first, unread at top
+    return db.select().from(notifications).all()
+      .sort((a, b) => {
+        // unread first, then by createdAt desc
+        if (!a.readAt && b.readAt) return -1;
+        if (a.readAt && !b.readAt) return 1;
+        return b.createdAt.localeCompare(a.createdAt);
+      });
+  }
+
+  markNotificationRead(id: number): Notification | undefined {
+    return db.update(notifications)
+      .set({ readAt: new Date().toISOString() })
+      .where(eq(notifications.id, id))
+      .returning().get();
+  }
+
+  markAllNotificationsRead(): void {
+    sqlite.exec(`UPDATE notifications SET read_at = datetime('now') WHERE read_at IS NULL`);
   }
 
   listActiveMissions(): any[] {

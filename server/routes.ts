@@ -794,6 +794,10 @@ export async function registerRoutes(
     try {
       const id   = parseInt(req.params.id);
       const body = { ...req.body };
+
+      // Fetch current task so we can detect status transitions
+      const existing = await storage.getNeptTask(id);
+
       // Auto-stamp completedAt when status transitions to Complete
       if (body.status === "Complete" && !body.completedAt) {
         body.completedAt = new Date().toISOString();
@@ -802,9 +806,46 @@ export async function registerRoutes(
       if (body.status && body.status !== "Complete") {
         body.completedAt = null;
       }
+
       const task = await storage.updateNeptTask(id, body);
       if (!task) return res.status(404).json({ error: "Not found" });
+
+      // Fire notification when status transitions TO Released
+      if (body.status === "Released" && existing && existing.status !== "Released") {
+        const route = task.pickupLocation && task.destLocation
+          ? `${task.pickupLocation} → ${task.destLocation}`
+          : task.taskRef;
+        storage.createNotification({
+          type:    "task_released",
+          title:   `Task Released to Gate`,
+          body:    `${task.taskRef} — ${route}${ task.aircraftReg ? ` · ${task.aircraftReg}` : "" }`,
+          taskRef: task.taskRef,
+          taskId:  task.id,
+        });
+      }
+
       res.json(task);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  app.get("/api/notifications", (_req: Request, res: Response) => {
+    try {
+      res.json(storage.listUnreadNotifications());
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  app.post("/api/notifications/:id/read", (req: Request, res: Response) => {
+    try {
+      const n = storage.markNotificationRead(parseInt(req.params.id));
+      res.json(n ?? { ok: true });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  app.post("/api/notifications/read-all", (_req: Request, res: Response) => {
+    try {
+      storage.markAllNotificationsRead();
+      res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 

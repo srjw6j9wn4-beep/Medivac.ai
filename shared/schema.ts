@@ -120,3 +120,17 @@ export const neptTasks = sqliteTable("nept_tasks", {
 export const insertNeptTaskSchema = createInsertSchema(neptTasks).omit({ id: true });
 export type InsertNeptTask = z.infer<typeof insertNeptTaskSchema>;
 export type NeptTask = typeof neptTasks.$inferSelect;
+
+// ── Notifications ────────────────────────────────────────────────────────────
+export const notifications = sqliteTable("notifications", {
+  id:        integer("id").primaryKey({ autoIncrement: true }),
+  type:      text("type").notNull(),          // e.g. "task_released"
+  title:     text("title").notNull(),
+  body:      text("body").notNull(),
+  taskRef:   text("task_ref"),                // NEPT-YYYY-NNNN
+  taskId:    integer("task_id"),
+  readAt:    text("read_at"),                 // ISO datetime — null = unread
+  createdAt: text("created_at").notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
