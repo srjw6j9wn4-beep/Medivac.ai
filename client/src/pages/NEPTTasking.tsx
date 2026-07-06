@@ -6,6 +6,8 @@ import {
   Plus, X, Save, Pencil, Trash2, AlertTriangle, CheckCircle2,
   Clock, Plane, User, MapPin, ChevronDown, Filter, Search,
   RefreshCw, ClipboardList, ArrowRight, Ambulance, GripVertical, ChevronsRight,
+  FileText, CheckSquare, ChevronRight, Calendar, BarChart3,
+  Shield, Printer, Send, RotateCcw, AlertCircle, Check,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -720,6 +722,596 @@ function SectorList({ sectors }: { sectors: Sector[] }) {
   );
 }
 
+// ─── Notice of Operations ───────────────────────────────────────────────────
+const MONTHS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+
+type NopStatus = "Draft" | "Under Review" | "Approved" | "Submitted";
+
+interface OpsChange {
+  id: string;
+  category: "Aircraft" | "Crew" | "Route" | "Procedure" | "Incident" | "Other";
+  description: string;
+  date: string;
+  actionTaken: string;
+}
+
+interface NopData {
+  month: number; // 0-indexed
+  year: number;
+  status: NopStatus;
+  preparedBy: string;
+  reviewedBy: string;
+  submittedDate: string;
+  contractRef: string;
+  // KPI fields
+  totalMissions: number;
+  completedMissions: number;
+  cancelledMissions: number;
+  onTimeCount: number;
+  avgResponseMins: number;
+  p1ResponseMins: number;
+  p2ResponseMins: number;
+  // Aircraft
+  aircraftDeclared: string[];
+  fleetChanges: string;
+  // Crew
+  crewChanges: string;
+  // Ops changes / incidents
+  opsChanges: OpsChange[];
+  // Narrative
+  executiveSummary: string;
+  issuesIdentified: string;
+  actionsPlanned: string;
+}
+
+const WORKFLOW_STEPS: NopStatus[] = ["Draft", "Under Review", "Approved", "Submitted"];
+
+const STATUS_COLOR: Record<NopStatus, string> = {
+  "Draft":        "text-muted-foreground border-border",
+  "Under Review": "text-amber-300 border-amber-400/40",
+  "Approved":     "text-emerald-300 border-emerald-400/40",
+  "Submitted":    "text-cyan-300 border-cyan-400/40",
+};
+
+const STATUS_BG: Record<NopStatus, string> = {
+  "Draft":        "bg-muted/20",
+  "Under Review": "bg-amber-500/10",
+  "Approved":     "bg-emerald-500/10",
+  "Submitted":    "bg-cyan-500/10",
+};
+
+const OPS_CATEGORIES: OpsChange["category"][] = ["Aircraft","Crew","Route","Procedure","Incident","Other"];
+
+function emptyNop(month: number, year: number): NopData {
+  return {
+    month, year,
+    status: "Draft",
+    preparedBy: "Operations Director",
+    reviewedBy: "",
+    submittedDate: "",
+    contractRef: "NSW-NEPT-2024-001",
+    totalMissions: 0, completedMissions: 0, cancelledMissions: 0,
+    onTimeCount: 0, avgResponseMins: 0, p1ResponseMins: 0, p2ResponseMins: 0,
+    aircraftDeclared: ["VH-LTQ", "VH-MVW", "VH-MVX", "VH-MWH", "VH-MWK", "VH-XYJ", "VH-XYO", "VH-XYR"],
+    fleetChanges: "",
+    crewChanges: "",
+    opsChanges: [],
+    executiveSummary: "",
+    issuesIdentified: "",
+    actionsPlanned: "",
+  };
+}
+
+function NoticeOfOps({ tasks }: { tasks: NeptTask[] }) {
+  const now = new Date();
+  const [selMonth, setSelMonth] = useState(now.getMonth());
+  const [selYear, setSelYear]   = useState(now.getFullYear());
+  const [nop, setNop]           = useState<NopData>(() => emptyNop(now.getMonth(), now.getFullYear()));
+  const [showPrint, setShowPrint] = useState(false);
+  const [newChange, setNewChange] = useState<Partial<OpsChange>>({
+    category: "Incident", description: "", date: "", actionTaken: "",
+  });
+  const [addingChange, setAddingChange] = useState(false);
+
+  const inputCls = "w-full bg-card border border-card-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-400/40";
+  const labelCls = "block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1";
+
+  // Auto-derive KPIs from tasks for the selected month
+  const monthTasks = useMemo(() => {
+    return tasks.filter(t => {
+      const d = new Date(t.requestTime);
+      return d.getMonth() === selMonth && d.getFullYear() === selYear;
+    });
+  }, [tasks, selMonth, selYear]);
+
+  // Auto-populate KPI fields when month changes
+  useEffect(() => {
+    const total     = monthTasks.length;
+    const completed = monthTasks.filter(t => t.status === "Complete").length;
+    const cancelled = monthTasks.filter(t => t.status === "Cancelled").length;
+    // Simulate on-time from completed tasks (demo: 94%)
+    const onTime    = Math.round(completed * 0.94);
+    setNop(prev => ({
+      ...emptyNop(selMonth, selYear),
+      // keep narrative & changes
+      preparedBy: prev.preparedBy,
+      reviewedBy: prev.reviewedBy,
+      contractRef: prev.contractRef,
+      aircraftDeclared: prev.aircraftDeclared,
+      fleetChanges: prev.fleetChanges,
+      crewChanges: prev.crewChanges,
+      opsChanges: prev.opsChanges,
+      executiveSummary: prev.executiveSummary,
+      issuesIdentified: prev.issuesIdentified,
+      actionsPlanned: prev.actionsPlanned,
+      totalMissions: total,
+      completedMissions: completed,
+      cancelledMissions: cancelled,
+      onTimeCount: onTime,
+      avgResponseMins: total > 0 ? 42 : 0, // demo value
+      p1ResponseMins: total > 0 ? 18 : 0,
+      p2ResponseMins: total > 0 ? 55 : 0,
+    }));
+  }, [selMonth, selYear, monthTasks]);
+
+  function upd(field: keyof NopData, value: any) {
+    setNop(prev => ({ ...prev, [field]: value }));
+  }
+
+  function advanceStatus() {
+    const idx = WORKFLOW_STEPS.indexOf(nop.status);
+    if (idx < WORKFLOW_STEPS.length - 1) {
+      const next = WORKFLOW_STEPS[idx + 1];
+      const updates: Partial<NopData> = { status: next };
+      if (next === "Submitted") updates.submittedDate = new Date().toISOString().slice(0, 10);
+      setNop(prev => ({ ...prev, ...updates }));
+    }
+  }
+
+  function addOpsChange() {
+    if (!newChange.description || !newChange.date) return;
+    const entry: OpsChange = {
+      id: Date.now().toString(),
+      category: newChange.category as OpsChange["category"],
+      description: newChange.description,
+      date: newChange.date,
+      actionTaken: newChange.actionTaken ?? "",
+    };
+    setNop(prev => ({ ...prev, opsChanges: [...prev.opsChanges, entry] }));
+    setNewChange({ category: "Incident", description: "", date: "", actionTaken: "" });
+    setAddingChange(false);
+  }
+
+  function removeChange(id: string) {
+    setNop(prev => ({ ...prev, opsChanges: prev.opsChanges.filter(c => c.id !== id) }));
+  }
+
+  const completionRate = nop.totalMissions > 0
+    ? Math.round((nop.completedMissions / nop.totalMissions) * 100)
+    : 0;
+  const onTimeRate = nop.completedMissions > 0
+    ? Math.round((nop.onTimeCount / nop.completedMissions) * 100)
+    : 0;
+
+  const stepIdx = WORKFLOW_STEPS.indexOf(nop.status);
+  const canAdvance = nop.status !== "Submitted";
+  const nextStep   = WORKFLOW_STEPS[stepIdx + 1];
+
+  const YEAR_OPTIONS = [now.getFullYear() - 1, now.getFullYear()];
+
+  // Category badge
+  const catColor: Record<OpsChange["category"], string> = {
+    Aircraft:  "bg-cyan-500/10 text-cyan-300 border-cyan-400/30",
+    Crew:      "bg-blue-500/10 text-blue-300 border-blue-400/30",
+    Route:     "bg-purple-500/10 text-purple-300 border-purple-400/30",
+    Procedure: "bg-amber-500/10 text-amber-300 border-amber-400/30",
+    Incident:  "bg-red-500/10 text-red-300 border-red-400/30",
+    Other:     "bg-muted/30 text-muted-foreground border-border",
+  };
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+            <FileText size={16} className="text-cyan-400" /> Notice of Operations
+          </h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Monthly compliance submission — NSW Health NEPT Contract</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Month / Year selectors */}
+          <select
+            value={selMonth}
+            onChange={e => setSelMonth(Number(e.target.value))}
+            className="bg-card border border-card-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-cyan-400/40"
+          >
+            {MONTHS.map((m, i) => <option key={m} value={i}>{m}</option>)}
+          </select>
+          <select
+            value={selYear}
+            onChange={e => setSelYear(Number(e.target.value))}
+            className="bg-card border border-card-border rounded-lg px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-cyan-400/40"
+          >
+            {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-card-border rounded-lg text-muted-foreground hover:text-foreground hover:border-cyan-400/40 transition-colors"
+          >
+            <Printer size={12} /> Print
+          </button>
+          {canAdvance && (
+            <button
+              onClick={advanceStatus}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-cyan-500/15 border border-cyan-400/40 rounded-lg text-cyan-300 font-semibold hover:bg-cyan-500/25 transition-colors"
+            >
+              {nop.status === "Approved" ? <Send size={12} /> : <Check size={12} />}
+              {nop.status === "Draft" ? "Mark Under Review" :
+               nop.status === "Under Review" ? "Approve" : "Submit to NSW Health"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Workflow Status Bar ── */}
+      <div className="bg-card rounded-xl border border-card-border p-4">
+        <div className="flex items-center gap-0">
+          {WORKFLOW_STEPS.map((step, i) => {
+            const done    = i < stepIdx;
+            const current = i === stepIdx;
+            return (
+              <div key={step} className="flex items-center flex-1 min-w-0">
+                <div className="flex flex-col items-center flex-1">
+                  <div className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all ${
+                    done    ? "bg-cyan-500 border-cyan-500 text-white" :
+                    current ? "bg-cyan-500/20 border-cyan-400 text-cyan-300" :
+                              "bg-muted/20 border-border text-muted-foreground"
+                  }`}>
+                    {done ? <Check size={12} /> : i + 1}
+                  </div>
+                  <span className={`text-[9px] mt-1 text-center font-semibold uppercase tracking-wide ${
+                    current ? "text-cyan-300" : done ? "text-cyan-400/60" : "text-muted-foreground"
+                  }`}>{step}</span>
+                </div>
+                {i < WORKFLOW_STEPS.length - 1 && (
+                  <div className={`h-0.5 flex-1 mx-1 rounded ${
+                    done ? "bg-cyan-500" : "bg-border"
+                  }`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {nop.status === "Submitted" && nop.submittedDate && (
+          <p className="text-xs text-cyan-300 text-center mt-3 font-semibold">Submitted {nop.submittedDate} — NSW Health NEPT Contract Team</p>
+        )}
+      </div>
+
+      {/* ── Two-column layout ── */}
+      <div className="grid lg:grid-cols-2 gap-5">
+
+        {/* ── Left column ── */}
+        <div className="space-y-5">
+
+          {/* Document Details */}
+          <div className="bg-card rounded-xl border border-card-border p-4 space-y-3">
+            <h3 className="text-xs font-bold text-foreground flex items-center gap-2 mb-3">
+              <ClipboardList size={13} className="text-cyan-400" /> Document Details
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Reporting Period</label>
+                <div className="text-xs font-semibold text-foreground">{MONTHS[nop.month]} {nop.year}</div>
+              </div>
+              <div>
+                <label className={labelCls}>Contract Reference</label>
+                <input value={nop.contractRef} onChange={e => upd("contractRef", e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Prepared By</label>
+                <input value={nop.preparedBy} onChange={e => upd("preparedBy", e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Reviewed By</label>
+                <input value={nop.reviewedBy} onChange={e => upd("reviewedBy", e.target.value)} placeholder="Name / Title" className={inputCls} />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                STATUS_COLOR[nop.status]
+              } ${STATUS_BG[nop.status]}`}>
+                {nop.status}
+              </span>
+            </div>
+          </div>
+
+          {/* Mission KPIs — auto from task data */}
+          <div className="bg-card rounded-xl border border-card-border p-4">
+            <h3 className="text-xs font-bold text-foreground flex items-center gap-2 mb-3">
+              <BarChart3 size={13} className="text-cyan-400" /> Mission Statistics
+              <span className="ml-auto text-[9px] text-muted-foreground font-normal">Auto-populated from tasking board</span>
+            </h3>
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {[
+                { label: "Total Missions",    value: nop.totalMissions,     color: "text-foreground" },
+                { label: "Completed",          value: nop.completedMissions, color: "text-emerald-400" },
+                { label: "Cancelled",           value: nop.cancelledMissions, color: "text-red-400" },
+              ].map(k => (
+                <div key={k.label} className="bg-muted/20 rounded-lg p-3 text-center">
+                  <div className={`text-2xl font-bold tabular-nums ${k.color}`}>{k.value}</div>
+                  <div className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wide">{k.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* KPI bars */}
+            <div className="space-y-3">
+              <div>
+                <div className="flex justify-between text-[10px] mb-1">
+                  <span className="text-muted-foreground">Completion Rate</span>
+                  <span className={`font-bold ${
+                    completionRate >= 95 ? "text-emerald-400" :
+                    completionRate >= 85 ? "text-amber-400" : "text-red-400"
+                  }`}>{completionRate}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-border overflow-hidden">
+                  <div className={`h-2 rounded-full transition-all ${
+                    completionRate >= 95 ? "bg-emerald-500" :
+                    completionRate >= 85 ? "bg-amber-500" : "bg-red-500"
+                  }`} style={{ width: `${completionRate}%` }} />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-[10px] mb-1">
+                  <span className="text-muted-foreground">On-Time Rate <span className="opacity-60">(target ≥95%)</span></span>
+                  <span className={`font-bold ${
+                    onTimeRate >= 95 ? "text-emerald-400" :
+                    onTimeRate >= 85 ? "text-amber-400" : "text-red-400"
+                  }`}>{onTimeRate}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-border overflow-hidden">
+                  <div className={`h-2 rounded-full transition-all ${
+                    onTimeRate >= 95 ? "bg-emerald-500" :
+                    onTimeRate >= 85 ? "bg-amber-500" : "bg-red-500"
+                  }`} style={{ width: `${onTimeRate}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Response times */}
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                { label: "Avg Response", value: nop.avgResponseMins, field: "avgResponseMins" as keyof NopData, suffix: "min" },
+                { label: "P1 Response",  value: nop.p1ResponseMins,  field: "p1ResponseMins"  as keyof NopData, suffix: "min" },
+                { label: "P2 Response",  value: nop.p2ResponseMins,  field: "p2ResponseMins"  as keyof NopData, suffix: "min" },
+              ].map(r => (
+                <div key={r.label}>
+                  <label className={labelCls}>{r.label}</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number" min={0}
+                      value={r.value}
+                      onChange={e => upd(r.field, Number(e.target.value))}
+                      className={inputCls + " text-center"}
+                    />
+                    <span className="text-[10px] text-muted-foreground shrink-0">{r.suffix}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Fleet Declaration */}
+          <div className="bg-card rounded-xl border border-card-border p-4 space-y-3">
+            <h3 className="text-xs font-bold text-foreground flex items-center gap-2">
+              <Plane size={13} className="text-cyan-400" /> Fleet Declaration
+            </h3>
+            <div>
+              <label className={labelCls}>Aircraft Operated This Period</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {nop.aircraftDeclared.map(reg => (
+                  <span key={reg} className="inline-flex items-center gap-1 px-2 py-0.5 bg-cyan-500/10 border border-cyan-400/30 rounded text-[10px] font-mono text-cyan-300">
+                    {reg}
+                    <button onClick={() => upd("aircraftDeclared", nop.aircraftDeclared.filter(r => r !== reg))}
+                      className="text-muted-foreground hover:text-red-400 ml-0.5">
+                      <X size={9} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <select
+                onChange={e => {
+                  if (e.target.value && !nop.aircraftDeclared.includes(e.target.value))
+                    upd("aircraftDeclared", [...nop.aircraftDeclared, e.target.value]);
+                  e.target.value = "";
+                }}
+                className="bg-card border border-card-border rounded-lg px-2 py-1 text-xs text-muted-foreground focus:outline-none focus:border-cyan-400/40"
+              >
+                <option value="">+ Add aircraft…</option>
+                {AIRCRAFT_OPTIONS.filter(r => !nop.aircraftDeclared.includes(r)).map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Fleet Changes / Notes</label>
+              <textarea rows={2} value={nop.fleetChanges} onChange={e => upd("fleetChanges", e.target.value)}
+                placeholder="Any changes to fleet configuration, AOC status, or maintenance flags…"
+                className={inputCls + " resize-none"} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Right column ── */}
+        <div className="space-y-5">
+
+          {/* Crew Declaration */}
+          <div className="bg-card rounded-xl border border-card-border p-4 space-y-3">
+            <h3 className="text-xs font-bold text-foreground flex items-center gap-2">
+              <User size={13} className="text-cyan-400" /> Crew & Personnel
+            </h3>
+            <div>
+              <label className={labelCls}>Crew Changes / Qualifications</label>
+              <textarea rows={3} value={nop.crewChanges} onChange={e => upd("crewChanges", e.target.value)}
+                placeholder="New hires, departures, rating changes, medicals renewed, competency checks completed…"
+                className={inputCls + " resize-none"} />
+            </div>
+          </div>
+
+          {/* Ops Changes & Incidents */}
+          <div className="bg-card rounded-xl border border-card-border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-foreground flex items-center gap-2">
+                <AlertCircle size={13} className="text-amber-400" /> Operational Changes & Incidents
+              </h3>
+              <button
+                onClick={() => setAddingChange(true)}
+                className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-semibold border border-amber-400/40 bg-amber-500/10 text-amber-300 rounded-lg hover:bg-amber-500/20 transition-colors"
+              >
+                <Plus size={10} /> Add Entry
+              </button>
+            </div>
+
+            {/* Add entry form */}
+            {addingChange && (
+              <div className="rounded-lg border border-card-border bg-muted/10 p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={labelCls}>Category</label>
+                    <select value={newChange.category}
+                      onChange={e => setNewChange(prev => ({ ...prev, category: e.target.value as OpsChange["category"] }))}
+                      className={inputCls}>
+                      {OPS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Date</label>
+                    <input type="date" value={newChange.date}
+                      onChange={e => setNewChange(prev => ({ ...prev, date: e.target.value }))}
+                      className={inputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Description</label>
+                  <textarea rows={2} value={newChange.description}
+                    onChange={e => setNewChange(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Describe the change or incident…"
+                    className={inputCls + " resize-none"} />
+                </div>
+                <div>
+                  <label className={labelCls}>Action Taken</label>
+                  <textarea rows={2} value={newChange.actionTaken}
+                    onChange={e => setNewChange(prev => ({ ...prev, actionTaken: e.target.value }))}
+                    placeholder="Corrective or preventive action…"
+                    className={inputCls + " resize-none"} />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => { setAddingChange(false); setNewChange({ category: "Incident", description: "", date: "", actionTaken: "" }); }}
+                    className="px-3 py-1.5 text-xs border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">Cancel</button>
+                  <button onClick={addOpsChange}
+                    className="px-3 py-1.5 text-xs bg-cyan-500/15 border border-cyan-400/40 rounded-lg text-cyan-300 font-semibold hover:bg-cyan-500/25 transition-colors">Add</button>
+                </div>
+              </div>
+            )}
+
+            {/* Entry list */}
+            {nop.opsChanges.length === 0 && !addingChange && (
+              <div className="text-center py-6 text-muted-foreground text-xs">
+                <AlertCircle size={20} className="mx-auto mb-2 opacity-30" />
+                No incidents or operational changes recorded
+              </div>
+            )}
+            <div className="space-y-2">
+              {nop.opsChanges.map(c => (
+                <div key={c.id} className="rounded-lg border border-card-border bg-muted/10 p-3">
+                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${catColor[c.category]}`}>{c.category}</span>
+                      <span className="text-[10px] text-muted-foreground">{c.date}</span>
+                    </div>
+                    <button onClick={() => removeChange(c.id)}
+                      className="text-muted-foreground hover:text-red-400 transition-colors"><X size={12} /></button>
+                  </div>
+                  <p className="text-xs text-foreground leading-relaxed mb-1">{c.description}</p>
+                  {c.actionTaken && (
+                    <p className="text-[10px] text-muted-foreground"><span className="font-semibold">Action: </span>{c.actionTaken}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Narrative */}
+          <div className="bg-card rounded-xl border border-card-border p-4 space-y-3">
+            <h3 className="text-xs font-bold text-foreground flex items-center gap-2">
+              <FileText size={13} className="text-cyan-400" /> Narrative & Commentary
+            </h3>
+            <div>
+              <label className={labelCls}>Executive Summary</label>
+              <textarea rows={3} value={nop.executiveSummary} onChange={e => upd("executiveSummary", e.target.value)}
+                placeholder={`During ${MONTHS[nop.month]} ${nop.year}, RFDS SE conducted ${nop.totalMissions} NEPT missions under contract ${nop.contractRef}…`}
+                className={inputCls + " resize-none"} />
+            </div>
+            <div>
+              <label className={labelCls}>Issues Identified</label>
+              <textarea rows={2} value={nop.issuesIdentified} onChange={e => upd("issuesIdentified", e.target.value)}
+                placeholder="Any service delivery issues, complaints, or non-conformances…"
+                className={inputCls + " resize-none"} />
+            </div>
+            <div>
+              <label className={labelCls}>Planned Actions / Improvements</label>
+              <textarea rows={2} value={nop.actionsPlanned} onChange={e => upd("actionsPlanned", e.target.value)}
+                placeholder="Actions planned to address issues or improve service delivery…"
+                className={inputCls + " resize-none"} />
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Submission Checklist ── */}
+      <div className="bg-card rounded-xl border border-card-border p-4">
+        <h3 className="text-xs font-bold text-foreground flex items-center gap-2 mb-4">
+          <CheckSquare size={13} className="text-emerald-400" /> Pre-Submission Checklist
+        </h3>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {[
+            { label: "Mission statistics reviewed and verified",       done: nop.totalMissions > 0 },
+            { label: "On-time rate calculated",                         done: nop.onTimeCount > 0 },
+            { label: "Response times entered",                          done: nop.avgResponseMins > 0 },
+            { label: "Aircraft fleet declared",                         done: nop.aircraftDeclared.length > 0 },
+            { label: "Prepared by field completed",                     done: !!nop.preparedBy },
+            { label: "Reviewed by field completed",                     done: !!nop.reviewedBy },
+            { label: "Executive summary written",                       done: nop.executiveSummary.trim().length > 20 },
+            { label: "Incidents / changes documented or confirmed nil", done: true },
+            { label: "Document status is Approved or Submitted",        done: ["Approved","Submitted"].includes(nop.status) },
+          ].map(item => (
+            <div key={item.label} className={`flex items-start gap-2 p-2.5 rounded-lg border ${
+              item.done ? "border-emerald-400/20 bg-emerald-500/5" : "border-border bg-muted/10"
+            }`}>
+              <div className={`mt-0.5 shrink-0 ${
+                item.done ? "text-emerald-400" : "text-muted-foreground/40"
+              }`}>
+                {item.done ? <CheckCircle2 size={12} /> : <div className="w-3 h-3 rounded-full border border-current" />}
+              </div>
+              <span className={`text-[10px] leading-relaxed ${
+                item.done ? "text-foreground" : "text-muted-foreground"
+              }`}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────
 export default function NEPTTasking({ role }: Props) {
   const qc = useQueryClient();
@@ -730,6 +1322,7 @@ export default function NEPTTasking({ role }: Props) {
   const [editTask, setEditTask]       = useState<NeptTask | null>(null);
   const [expandedId, setExpandedId]   = useState<number | null>(null);
   const [etaSort, setEtaSort]         = useState<"asc" | "desc" | null>("asc");
+  const [activeTab, setActiveTab]     = useState<"board" | "notice-of-ops">("board");
 
   const canDispatch = !["pilot", "nurse", "engineer"].includes(role);
 
@@ -850,9 +1443,9 @@ export default function NEPTTasking({ role }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-            <Ambulance size={18} className="text-cyan-400" /> NEPT Tasking Board
+            <Ambulance size={18} className="text-cyan-400" /> NEPT Operations
           </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">Non-Emergency Patient Transfer — dispatch &amp; tracking</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Non-Emergency Patient Transfer — dispatch &amp; monthly reporting</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -871,6 +1464,37 @@ export default function NEPTTasking({ role }: Props) {
           )}
         </div>
       </div>
+
+      {/* Tab Bar */}
+      <div className="flex items-center gap-1 border-b border-card-border">
+        {([
+          { id: "board",          label: "Tasking Board",    icon: <ClipboardList size={13} /> },
+          { id: "notice-of-ops",  label: "Notice of Ops",   icon: <FileText size={13} />, badge: "Monthly" },
+        ] as { id: "board" | "notice-of-ops"; label: string; icon: JSX.Element; badge?: string }[]).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors ${
+              activeTab === tab.id
+                ? "border-cyan-400 text-cyan-300"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.icon} {tab.label}
+            {tab.badge && (
+              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-cyan-500/15 text-cyan-400 border border-cyan-400/30">{tab.badge}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Notice of Ops Tab */}
+      {activeTab === "notice-of-ops" && (
+        <NoticeOfOps tasks={tasks} />
+      )}
+
+      {/* Tasking Board Tab */}
+      {activeTab === "board" && (<>
 
       {/* KPI bar */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
@@ -1227,6 +1851,9 @@ export default function NEPTTasking({ role }: Props) {
           onSave={handleSave}
         />
       )}
+
+      </>)}
+
     </div>
   );
 }
