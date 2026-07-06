@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { type UserRole } from "@/lib/data";
@@ -94,6 +94,47 @@ function fmtDT(iso: string | null) {
       day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false,
     });
   } catch { return iso; }
+}
+
+// ── Live countdown hook ─────────────────────────────────────────────────────
+function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function ETACountdown({ eta, status }: { eta: string | null; status: TaskStatus }) {
+  const now = useNow(1000);
+  if (!eta) return null;
+  if (status === "Complete" || status === "Cancelled") return null;
+
+  const diffMs  = new Date(eta).getTime() - now;
+  const past    = diffMs < 0;
+  const absMs   = Math.abs(diffMs);
+  const hrs     = Math.floor(absMs / 3_600_000);
+  const mins    = Math.floor((absMs % 3_600_000) / 60_000);
+  const secs    = Math.floor((absMs % 60_000) / 1_000);
+
+  const label = hrs > 0
+    ? `${past ? "-" : ""}${hrs}h ${mins}m`
+    : `${past ? "-" : ""}${mins}m ${String(secs).padStart(2, "0")}s`;
+
+  const colour = past
+    ? "text-red-400 font-bold"
+    : diffMs < 5 * 60_000
+      ? "text-orange-400 font-semibold"   // < 5 min
+      : diffMs < 15 * 60_000
+        ? "text-amber-300 font-semibold"  // < 15 min
+        : "text-cyan-300";
+
+  return (
+    <span className={`tabular-nums text-[10px] ml-1 ${colour}`}>
+      ({label})
+    </span>
+  );
 }
 
 function emptyDraft(ref: string): TaskDraft {
@@ -685,12 +726,15 @@ export default function NEPTTasking({ role }: Props) {
                     </td>
                     <td className="px-3 py-3">
                       {t.estimatedEta ? (
-                        <span className={`font-semibold ${
-                          t.status === "En Route" ? "text-cyan-300" :
-                          t.status === "Complete" ? "text-green-400" : "text-foreground"
-                        }`}>
-                          {fmtDT(t.estimatedEta)}
-                        </span>
+                        <div>
+                          <span className={`font-semibold ${
+                            t.status === "En Route" ? "text-cyan-300" :
+                            t.status === "Complete" ? "text-green-400" : "text-foreground"
+                          }`}>
+                            {fmtDT(t.estimatedEta)}
+                          </span>
+                          <ETACountdown eta={t.estimatedEta} status={t.status} />
+                        </div>
                       ) : (
                         <span className="text-muted-foreground text-[10px]">Not set</span>
                       )}
@@ -809,6 +853,7 @@ export default function NEPTTasking({ role }: Props) {
                     t.status === "En Route" ? "text-cyan-300" :
                     t.status === "Complete" ? "text-green-400" : "text-foreground"
                   }`}>{fmtDT(t.estimatedEta)}</span>
+                  <ETACountdown eta={t.estimatedEta} status={t.status} />
                 </div>
               )}
               {canDispatch && (
