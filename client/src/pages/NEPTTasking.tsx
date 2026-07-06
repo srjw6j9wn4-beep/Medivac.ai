@@ -388,7 +388,7 @@ function QuickStatus({ task, onUpdate }: { task: NeptTask; onUpdate: (id: number
 export default function NEPTTasking({ role }: Props) {
   const qc = useQueryClient();
   const [search, setSearch]           = useState("");
-  const [filterStatus, setFilterStatus] = useState<TaskStatus | "All">("All");
+  const [filterStatus, setFilterStatus] = useState<TaskStatus | "All">("Pending");
   const [filterPriority, setFilterPriority] = useState<TaskPriority | "All">("All");
   const [showModal, setShowModal]     = useState(false);
   const [editTask, setEditTask]       = useState<NeptTask | null>(null);
