@@ -110,6 +110,7 @@ export const neptTasks = sqliteTable("nept_tasks", {
   estimatedEta:  text("estimated_eta"),               // ISO datetime — estimated arrival at destination
   actualDepart:  text("actual_depart"),               // ISO datetime
   actualArrive:  text("actual_arrive"),               // ISO datetime
+  completedAt:   text("completed_at"),                 // ISO datetime — auto-set when status → Complete
   notes:         text("notes"),
   createdAt:     text("created_at").notNull(),
   updatedAt:     text("updated_at").notNull(),

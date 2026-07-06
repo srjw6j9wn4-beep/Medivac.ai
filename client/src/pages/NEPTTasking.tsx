@@ -37,6 +37,7 @@ interface NeptTask {
   estimatedEta: string | null;
   actualDepart: string | null;
   actualArrive: string | null;
+  completedAt: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -160,6 +161,7 @@ function emptyDraft(ref: string): TaskDraft {
     estimatedEta: null,
     actualDepart: null,
     actualArrive: null,
+    completedAt: null,
     notes: null,
   };
 }
@@ -779,6 +781,13 @@ export default function NEPTTasking({ role }: Props) {
                             <div><span className="text-muted-foreground">Required by: </span>{fmtDT(t.requiredBy)}</div>
                             <div><span className="text-muted-foreground">Actual depart: </span>{fmtDT(t.actualDepart)}</div>
                             <div><span className="text-muted-foreground">Actual arrive: </span>{fmtDT(t.actualArrive)}</div>
+                            {t.completedAt && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <CheckCircle2 size={11} className="text-green-400" />
+                                <span className="text-muted-foreground">Completed: </span>
+                                <span className="text-green-400 font-semibold">{fmtDT(t.completedAt)}</span>
+                              </div>
+                            )}
                             {t.dispatchedBy && <div><span className="text-muted-foreground">Dispatched by: </span>{t.dispatchedBy}</div>}
                           </div>
                           <div className="space-y-1.5">
@@ -844,6 +853,14 @@ export default function NEPTTasking({ role }: Props) {
                   {t.pilotName && <div className="text-[10px] text-muted-foreground">{t.pilotName}</div>}
                 </div>
               </div>
+              {/* Completed At on mobile */}
+              {t.completedAt && t.status === "Complete" && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <CheckCircle2 size={11} className="text-green-400" />
+                  <span className="text-muted-foreground">Completed:</span>
+                  <span className="text-green-400 font-semibold">{fmtDT(t.completedAt)}</span>
+                </div>
+              )}
               {/* ETA pill on mobile */}
               {t.estimatedEta && (
                 <div className="flex items-center gap-1.5 text-xs">

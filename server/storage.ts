@@ -131,6 +131,7 @@ sqlite.exec(`
     estimated_eta TEXT,
     actual_depart TEXT,
     actual_arrive TEXT,
+    completed_at TEXT,
     notes TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
@@ -142,6 +143,9 @@ const existingCols = sqlite.prepare("PRAGMA table_info(nept_tasks)").all() as { 
 const neptColNames = existingCols.map(c => c.name);
 if (!neptColNames.includes("estimated_eta")) {
   sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN estimated_eta TEXT");
+}
+if (!neptColNames.includes("completed_at")) {
+  sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN completed_at TEXT");
 }
 
 export const db = drizzle(sqlite);

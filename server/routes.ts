@@ -792,8 +792,17 @@ export async function registerRoutes(
 
   app.patch("/api/nept-tasks/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
-      const task = await storage.updateNeptTask(id, req.body);
+      const id   = parseInt(req.params.id);
+      const body = { ...req.body };
+      // Auto-stamp completedAt when status transitions to Complete
+      if (body.status === "Complete" && !body.completedAt) {
+        body.completedAt = new Date().toISOString();
+      }
+      // Clear completedAt if status is moved back away from Complete
+      if (body.status && body.status !== "Complete") {
+        body.completedAt = null;
+      }
+      const task = await storage.updateNeptTask(id, body);
       if (!task) return res.status(404).json({ error: "Not found" });
       res.json(task);
     } catch (err) { res.status(500).json({ error: String(err) }); }
