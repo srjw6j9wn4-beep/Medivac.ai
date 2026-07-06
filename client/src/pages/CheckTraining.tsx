@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { type UserRole } from "@/lib/data";
 import {
   ClipboardCheck, ExternalLink, CheckCircle, Clock, AlertTriangle,
@@ -6,9 +6,11 @@ import {
   Plane, TrendingUp, BookOpen, Star, BarChart3, Sparkles,
   Shield, Target, Award, ChevronDown, Plus, Zap, Activity,
   GraduationCap, Eye, Lock, UserCheck, AlertCircle, CheckSquare,
-  XCircle, ClipboardList, X, Copy
+  XCircle, ClipboardList, X, Copy, BookMarked, Brain, Trophy,
+  ChevronLeft, RotateCcw, CheckCircle2, Timer
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
+import { EXAMS, PASS_MARK, EXAM_DURATION_MINUTES, type Exam, type ExamQuestion } from "@/data/theoryExams";
 
 interface Props { role: UserRole; }
 
@@ -538,7 +540,7 @@ function weekLabelForModuleId(moduleId: string): string {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CheckTraining({ role }: Props) {
-  const [activeTab, setActiveTab]               = useState<"forms" | "trainees" | "ops-staff">("forms");
+  const [activeTab, setActiveTab]               = useState<"forms" | "trainees" | "ops-staff" | "theory">("forms");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedTrainee, setSelectedTrainee]   = useState<TraineeRecord>(TRAINEES[0]);
   const [traineeTab, setTraineeTab]             = useState<"overview" | "approaches" | "milestones">("overview");
@@ -815,6 +817,18 @@ export default function CheckTraining({ role }: Props) {
           <GraduationCap size={14} />
           Ops Staff
           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold">Training Matrix</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("theory")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+            activeTab === "theory"
+              ? "border-emerald-400 text-emerald-400"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Brain size={14} />
+          Theory Knowledge Testing
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">12 Exams</span>
         </button>
       </div>
 
@@ -1760,6 +1774,416 @@ export default function CheckTraining({ role }: Props) {
         </div>
       )}
 
+      {/* ═══════════════ THEORY KNOWLEDGE TESTING TAB ═══════════════ */}
+      {activeTab === "theory" && <TheoryKnowledgeSection />}
+
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THEORY KNOWLEDGE TESTING — Self-contained component
+// ─────────────────────────────────────────────────────────────────────────────
+type ExamPhase = "select" | "in-progress" | "results";
+
+interface ExamResult {
+  examId: string;
+  score: number;
+  total: number;
+  passed: boolean;
+  answers: (number | null)[];
+  date: string;
+}
+
+function TheoryKnowledgeSection() {
+  const [phase, setPhase]               = useState<ExamPhase>("select");
+  const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
+  const [questions, setQuestions]       = useState<ExamQuestion[]>([]);
+  const [currentQ, setCurrentQ]         = useState(0);
+  const [answers, setAnswers]           = useState<(number | null)[]>([]);
+  const [showAnswer, setShowAnswer]     = useState(false);
+  const [result, setResult]             = useState<ExamResult | null>(null);
+  const [timeLeft, setTimeLeft]         = useState(EXAM_DURATION_MINUTES * 60);
+  const [results, setResults]           = useState<ExamResult[]>([]);
+  const timerRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
+  const answersRef                      = useRef<(number | null)[]>([]);
+  const questionsRef                    = useRef<ExamQuestion[]>([]);
+
+  useEffect(() => { answersRef.current = answers; }, [answers]);
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
+
+  useEffect(() => {
+    if (phase !== "in-progress") { if (timerRef.current) clearInterval(timerRef.current); return; }
+    timerRef.current = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(timerRef.current!);
+          finishExamRef.current(answersRef.current, questionsRef.current);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function startExam(exam: Exam) {
+    const shuffled = shuffleArray(exam.questions);
+    setSelectedExam(exam);
+    setQuestions(shuffled);
+    setCurrentQ(0);
+    const initAnswers = new Array(shuffled.length).fill(null);
+    setAnswers(initAnswers);
+    setShowAnswer(false);
+    setTimeLeft(EXAM_DURATION_MINUTES * 60);
+    setPhase("in-progress");
+  }
+
+  function handleAnswer(optionIndex: number) {
+    if (showAnswer) return;
+    const newAnswers = [...answers];
+    newAnswers[currentQ] = optionIndex;
+    setAnswers(newAnswers);
+    setShowAnswer(true);
+  }
+
+  function nextQuestion() {
+    setShowAnswer(false);
+    if (currentQ < questions.length - 1) {
+      setCurrentQ(q => q + 1);
+    } else {
+      finishExam(answers, questions);
+    }
+  }
+
+  function finishExam(finalAnswers: (number | null)[], qs: ExamQuestion[]) {
+    if (timerRef.current) clearInterval(timerRef.current);
+    let score = 0;
+    finalAnswers.forEach((ans, i) => { if (ans === qs[i]?.correctIndex) score++; });
+    const res: ExamResult = {
+      examId: selectedExam!.id,
+      score,
+      total: qs.length,
+      passed: (score / qs.length) * 100 >= PASS_MARK,
+      answers: finalAnswers,
+      date: new Date().toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" }),
+    };
+    setResult(res);
+    setResults(prev => [res, ...prev.slice(0, 19)]);
+    setPhase("results");
+  }
+
+  const finishExamRef = useRef(finishExam);
+  useEffect(() => { finishExamRef.current = finishExam; });
+
+  function formatTime(s: number) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  }
+
+  const pct = (n: number, d: number) => Math.round((n / d) * 100);
+  const OPTION_LABELS = ["A", "B", "C", "D"];
+
+  // ─── SELECT SCREEN ───────────────────────────────────────────────────────────
+  if (phase === "select") return (
+    <div className="p-4 space-y-6">
+      {/* Banner */}
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-start gap-3">
+        <Brain size={24} className="text-emerald-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="font-bold text-emerald-300 text-base">Theory Knowledge Testing</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            12 exams · 20 questions each · 30-minute timer · Pass mark {PASS_MARK}%
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            All questions sourced directly from RFDS SE King Air manuals. Every answer includes the source document and chapter for full transparency.
+          </p>
+        </div>
+      </div>
+
+      {/* Past results */}
+      {results.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent Results</p>
+          <div className="space-y-2">
+            {results.slice(0, 5).map((r, i) => {
+              const exam = EXAMS.find(e => e.id === r.examId);
+              return (
+                <div key={i} className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground truncate flex-1">{exam?.title ?? r.examId}</span>
+                  <div className="flex items-center gap-3 ml-4">
+                    <span className="text-xs text-muted-foreground">{r.date}</span>
+                    <span className={`font-bold text-sm ${r.passed ? "text-emerald-400" : "text-red-400"}`}>
+                      {pct(r.score, r.total)}% {r.passed ? "✓" : "✗"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Dedicated exams */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dedicated Exams — One Manual Per Exam</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {EXAMS.filter(e => !e.title.includes("Mixed")).map(exam => {
+            const lastResult = results.find(r => r.examId === exam.id);
+            return (
+              <button
+                key={exam.id}
+                onClick={() => startExam(exam)}
+                className="text-left rounded-xl border border-border bg-card hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all p-4 group"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <BookMarked size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                  {lastResult && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      lastResult.passed ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
+                    }`}>
+                      {pct(lastResult.score, lastResult.total)}%
+                    </span>
+                  )}
+                </div>
+                <p className="font-semibold text-sm mt-2 group-hover:text-emerald-300 transition-colors">{exam.title}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
+                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckSquare size={11} /> <span>20 questions</span>
+                  <Timer size={11} className="ml-1" /> <span>30 min</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Mixed exams */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Combined Exams — Mixed Across All Manuals</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {EXAMS.filter(e => e.title.includes("Mixed")).map(exam => {
+            const lastResult = results.find(r => r.examId === exam.id);
+            return (
+              <button
+                key={exam.id}
+                onClick={() => startExam(exam)}
+                className="text-left rounded-xl border border-border bg-card hover:border-purple-500/40 hover:bg-purple-500/5 transition-all p-4 group"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <Brain size={16} className="text-purple-400 shrink-0 mt-0.5" />
+                  {lastResult && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      lastResult.passed ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
+                    }`}>
+                      {pct(lastResult.score, lastResult.total)}%
+                    </span>
+                  )}
+                </div>
+                <p className="font-semibold text-sm mt-2 group-hover:text-purple-300 transition-colors">{exam.title}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
+                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <CheckSquare size={11} /> <span>20 questions</span>
+                  <Timer size={11} className="ml-1" /> <span>30 min</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── IN-PROGRESS SCREEN ──────────────────────────────────────────────────────
+  if (phase === "in-progress" && selectedExam) {
+    const q = questions[currentQ];
+    const chosen = answers[currentQ];
+    const isCorrect = chosen === q.correctIndex;
+    const progressPct = Math.round(((currentQ + (showAnswer ? 1 : 0)) / questions.length) * 100);
+    const timerWarn = timeLeft < 300;
+
+    return (
+      <div className="p-4 max-w-3xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-bold text-sm">{selectedExam.title}</p>
+            <p className="text-xs text-muted-foreground">{selectedExam.subtitle}</p>
+          </div>
+          <div className={`flex items-center gap-2 font-bold text-lg tabular-nums ${
+            timerWarn ? "text-red-400 animate-pulse" : "text-emerald-400"
+          }`}>
+            <Timer size={16} />
+            {formatTime(timeLeft)}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="space-y-1">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Question {currentQ + 1} of {questions.length}</span>
+            <span>{progressPct}% complete</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-border">
+            <div
+              className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${progressPct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Question card */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <p className="font-semibold text-sm leading-relaxed mb-4">{q.question}</p>
+
+          <div className="space-y-2">
+            {q.options.map((opt, idx) => {
+              let cls = "flex items-start gap-3 w-full rounded-lg border px-4 py-3 text-sm text-left transition-all ";
+              if (!showAnswer) {
+                cls += chosen === idx
+                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                  : "border-border bg-muted/30 hover:border-muted-foreground/40 hover:bg-muted/50 cursor-pointer";
+              } else {
+                if (idx === q.correctIndex) {
+                  cls += "border-emerald-500/60 bg-emerald-500/10 text-emerald-300";
+                } else if (idx === chosen && chosen !== q.correctIndex) {
+                  cls += "border-red-500/60 bg-red-500/10 text-red-300";
+                } else {
+                  cls += "border-border bg-muted/20 text-muted-foreground";
+                }
+              }
+              return (
+                <button key={idx} className={cls} onClick={() => handleAnswer(idx)} disabled={showAnswer}>
+                  <span className="font-bold text-xs w-5 shrink-0 mt-0.5">{OPTION_LABELS[idx]}</span>
+                  <span className="flex-1">{opt}</span>
+                  {showAnswer && idx === q.correctIndex && <CheckCircle2 size={14} className="text-emerald-400 shrink-0 mt-0.5" />}
+                  {showAnswer && idx === chosen && chosen !== q.correctIndex && <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Answer explanation */}
+          {showAnswer && (
+            <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2">
+              <span className={`font-bold text-sm ${isCorrect ? "text-emerald-400" : "text-red-400"}`}>
+                {isCorrect ? "✓ Correct" : "✗ Incorrect"}
+              </span>
+              <p className="text-sm text-foreground leading-relaxed">{q.explanation}</p>
+              <div className="flex items-start gap-2 pt-1">
+                <BookMarked size={11} className="text-muted-foreground shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground italic">{q.source}</p>
+              </div>
+              <button
+                onClick={nextQuestion}
+                className="mt-2 w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm py-2.5 transition-colors"
+              >
+                {currentQ < questions.length - 1 ? "Next Question →" : "Finish Exam"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── RESULTS SCREEN ──────────────────────────────────────────────────────────
+  if (phase === "results" && result && selectedExam) {
+    const scorePct = pct(result.score, result.total);
+
+    return (
+      <div className="p-4 max-w-3xl mx-auto space-y-4">
+        {/* Score card */}
+        <div className={`rounded-xl border p-6 text-center ${
+          result.passed ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/30 bg-red-500/5"
+        }`}>
+          <div className={`text-5xl font-bold mb-1 ${result.passed ? "text-emerald-400" : "text-red-400"}`}>
+            {scorePct}%
+          </div>
+          <div className={`font-semibold text-lg mb-1 ${result.passed ? "text-emerald-300" : "text-red-300"}`}>
+            {result.passed ? "PASS" : "NOT YET COMPETENT"}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {result.score} of {result.total} correct · Pass mark {PASS_MARK}%
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">{selectedExam.title} · {result.date}</p>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button
+            onClick={() => startExam(selectedExam)}
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 font-semibold text-sm py-2.5 transition-colors"
+          >
+            <RotateCcw size={14} /> Retry Exam
+          </button>
+          <button
+            onClick={() => { setPhase("select"); setSelectedExam(null); setResult(null); }}
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-border bg-muted/30 text-foreground hover:bg-muted/50 font-semibold text-sm py-2.5 transition-colors"
+          >
+            <ChevronLeft size={14} /> All Exams
+          </button>
+        </div>
+
+        {/* Question review */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Review — All Questions</p>
+          {questions.map((q, idx) => {
+            const chosen = result.answers[idx];
+            const correct = chosen === q.correctIndex;
+            return (
+              <div
+                key={q.id}
+                className={`rounded-xl border p-4 ${
+                  correct ? "border-emerald-500/20 bg-emerald-500/5" : "border-red-500/20 bg-red-500/5"
+                }`}
+              >
+                <div className="flex items-start gap-2 mb-2">
+                  <span className={`text-xs font-bold shrink-0 ${correct ? "text-emerald-400" : "text-red-400"}`}>
+                    Q{idx + 1} {correct ? "✓" : "✗"}
+                  </span>
+                  <p className="text-sm font-semibold leading-snug">{q.question}</p>
+                </div>
+                <div className="space-y-1 mb-3">
+                  {q.options.map((opt, oi) => {
+                    let cls = "flex items-center gap-2 text-xs px-3 py-1.5 rounded ";
+                    if (oi === q.correctIndex) cls += "bg-emerald-500/10 text-emerald-300 font-semibold";
+                    else if (oi === chosen && !correct) cls += "bg-red-500/10 text-red-300 line-through";
+                    else cls += "text-muted-foreground";
+                    return (
+                      <div key={oi} className={cls}>
+                        <span className="font-bold w-4">{OPTION_LABELS[oi]}</span>
+                        {opt}
+                        {oi === q.correctIndex && <CheckCircle2 size={11} className="text-emerald-400 ml-auto" />}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{q.explanation}</p>
+                <div className="flex items-start gap-1.5 mt-1.5">
+                  <BookMarked size={10} className="text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground italic">{q.source}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+
