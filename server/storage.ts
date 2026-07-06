@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -163,6 +163,24 @@ sqlite.exec(`
     task_id    INTEGER,
     read_at    TEXT,
     created_at TEXT NOT NULL
+  )
+`);
+
+// ── Special Mission QC Sessions ──────────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS special_mission_sessions (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    mission_type     TEXT NOT NULL,
+    mission_ref      TEXT NOT NULL,
+    status           TEXT NOT NULL DEFAULT 'pre-flight',
+    aircraft_reg     TEXT,
+    destination      TEXT,
+    checklist_data   TEXT NOT NULL DEFAULT '{}',
+    signoffs         TEXT NOT NULL DEFAULT '[]',
+    notes            TEXT,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL,
+    completed_at     TEXT
   )
 `);
 
@@ -498,6 +516,28 @@ export class DatabaseStorage implements IStorage {
       'SELECT * FROM active_missions WHERE completed = 0 ORDER BY created_at DESC'
     ).all() as any[];
     return rows.map(r => ({ ...r, airports: JSON.parse(r.airports) }));
+  }
+
+  // ── Special Mission QC Sessions ──────────────────────────────────────────────
+  listSpecialMissionSessions(): SpecialMissionSession[] {
+    return db.select().from(specialMissionSessions)
+      .all()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  getSpecialMissionSession(id: number): SpecialMissionSession | undefined {
+    return db.select().from(specialMissionSessions).where(eq(specialMissionSessions.id, id)).get();
+  }
+
+  createSpecialMissionSession(data: Omit<SpecialMissionSession, 'id'>): SpecialMissionSession {
+    return db.insert(specialMissionSessions).values(data).returning().get()!;
+  }
+
+  updateSpecialMissionSession(id: number, updates: Partial<SpecialMissionSession>): SpecialMissionSession {
+    return db.update(specialMissionSessions)
+      .set({ ...updates, updatedAt: new Date().toISOString() })
+      .where(eq(specialMissionSessions.id, id))
+      .returning().get()!;
   }
 }
 

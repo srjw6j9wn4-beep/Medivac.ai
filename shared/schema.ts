@@ -134,3 +134,23 @@ export const notifications = sqliteTable("notifications", {
 });
 
 export type Notification = typeof notifications.$inferSelect;
+
+// ── Special Mission QC Sessions ───────────────────────────────────────────────
+export const specialMissionSessions = sqliteTable("special_mission_sessions", {
+  id:            integer("id").primaryKey({ autoIncrement: true }),
+  missionType:   text("mission_type").notNull(),    // "lord-howe" | "nets" | "ecmo" | "isolation" | "telehealth"
+  missionRef:    text("mission_ref").notNull(),     // e.g. "LHI-2026-001"
+  status:        text("status").notNull().default("pre-flight"), // pre-flight | crew-brief | aircraft-config | patient-handover | airborne | post-flight | complete
+  aircraftReg:   text("aircraft_reg"),
+  destination:   text("destination"),
+  checklistData: text("checklist_data").notNull(),  // JSON: Record<checklistItemId, { checked: boolean; signedBy: string; signedAt: string }>
+  signoffs:      text("signoffs").notNull(),         // JSON: Array<{ stage, role, timestamp, notes }>
+  notes:         text("notes"),
+  createdAt:     text("created_at").notNull(),
+  updatedAt:     text("updated_at").notNull(),
+  completedAt:   text("completed_at"),
+});
+
+export const insertSpecialMissionSessionSchema = createInsertSchema(specialMissionSessions).omit({ id: true });
+export type InsertSpecialMissionSession = z.infer<typeof insertSpecialMissionSessionSchema>;
+export type SpecialMissionSession = typeof specialMissionSessions.$inferSelect;

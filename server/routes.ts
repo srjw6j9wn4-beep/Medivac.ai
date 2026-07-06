@@ -995,6 +995,49 @@ export async function registerRoutes(
   // Also run once 2 min after server start
   setTimeout(runNotamWatch, 2 * 60 * 1000);
 
+  // ── Special Mission QC Sessions ─────────────────────────────────────────────
+  app.get("/api/special-missions", (_req: Request, res: Response) => {
+    try {
+      const sessions = storage.listSpecialMissionSessions();
+      res.json(sessions);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.post("/api/special-missions", (req: Request, res: Response) => {
+    try {
+      const now = new Date().toISOString();
+      const session = storage.createSpecialMissionSession({
+        missionType:   req.body.missionType,
+        missionRef:    req.body.missionRef,
+        status:        req.body.status ?? "pre-flight",
+        aircraftReg:   req.body.aircraftReg ?? null,
+        destination:   req.body.destination ?? null,
+        checklistData: req.body.checklistData ?? "{}",
+        signoffs:      req.body.signoffs ?? "[]",
+        notes:         req.body.notes ?? null,
+        createdAt:     now,
+        updatedAt:     now,
+        completedAt:   null,
+      });
+      res.status(201).json(session);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  app.patch("/api/special-missions/:id", (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates: any = { ...req.body };
+      if (updates.status === "complete") updates.completedAt = new Date().toISOString();
+      const session = storage.updateSpecialMissionSession(id, updates);
+      res.json(session);
+    } catch (e) {
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
   return httpServer;
 }
-
