@@ -1463,10 +1463,10 @@ export default function CheckTraining({ role }: Props) {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse min-w-[1400px]">
+              <table className="w-full text-xs border-collapse" style={{ minWidth: "1140px", tableLayout: "fixed" }}>
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-card-border min-w-[180px]">
+                    <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-card-border" style={{ width: "180px", minWidth: "180px" }}>
                       Staff
                     </th>
                     {TRAINING_PROGRAM.map(week => (
@@ -1480,16 +1480,16 @@ export default function CheckTraining({ role }: Props) {
                     ))}
                   </tr>
                   <tr>
-                    <th className="sticky left-0 z-10 bg-card px-4 py-1 border-b border-card-border" />
+                    <th className="sticky left-0 z-10 bg-card px-4 py-1 border-b border-card-border" style={{ width: "180px", minWidth: "180px" }} />
                     {TRAINING_PROGRAM.map(week => (
                       week.modules.map((m, i) => (
                         <th
                           key={m.id}
                           title={m.title}
-                          className={`px-1 py-1.5 border-b border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom ${i === 0 ? "border-l" : ""}`}
-                          style={{ writingMode: "vertical-rl", maxHeight: "120px" }}
+                          className={`px-0 py-1.5 border-b border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom ${i === 0 ? "border-l" : ""}`}
+                          style={{ writingMode: "vertical-rl", width: "32px", minWidth: "32px", maxWidth: "32px" }}
                         >
-                          <span className="inline-block max-w-[110px] truncate">{m.title}</span>
+                          <span style={{ display: "inline-block", height: "100px", overflow: "hidden", lineHeight: 1.2 }}>{m.title}</span>
                         </th>
                       ))
                     ))}
@@ -1514,11 +1514,11 @@ export default function CheckTraining({ role }: Props) {
                             const status = map[m.id] ?? "not-started";
                             const meta = cellStatusMeta(status);
                             return (
-                              <td key={m.id} className={`p-1 ${i === 0 ? "border-l border-card-border" : ""}`}>
+                              <td key={m.id} className={`p-0.5 ${i === 0 ? "border-l border-card-border" : ""}`} style={{ width: "32px", minWidth: "32px", maxWidth: "32px" }}>
                                 <button
                                   onClick={() => cycleOpsCell(staff.id, m.id)}
                                   title={`${m.title} — ${status}`}
-                                  className={`w-full h-8 flex items-center justify-center rounded border ${meta.bg} ${meta.border} hover:opacity-70 transition-opacity`}
+                                  className={`w-full h-7 flex items-center justify-center rounded border ${meta.bg} ${meta.border} hover:opacity-70 transition-opacity`}
                                 >
                                   {meta.icon}
                                 </button>
