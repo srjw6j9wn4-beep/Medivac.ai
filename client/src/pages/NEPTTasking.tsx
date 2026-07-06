@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { generateNopPDF } from "@/lib/generateNopPDF";
 import { type UserRole } from "@/lib/data";
 import {
   Plus, X, Save, Pencil, Trash2, AlertTriangle, CheckCircle2,
@@ -871,6 +872,33 @@ function NoticeOfOps({ tasks }: { tasks: NeptTask[] }) {
     }
   }
 
+  function exportPDF() {
+    generateNopPDF({
+      month:              `${MONTHS[nop.month]} ${nop.year}`,
+      contractRef:        nop.contractRef,
+      preparedBy:         nop.preparedBy,
+      reviewedBy:         nop.reviewedBy,
+      status:             nop.status,
+      submittedDate:      nop.submittedDate,
+      totalMissions:      nop.totalMissions,
+      completedMissions:  nop.completedMissions,
+      cancelledMissions:  nop.cancelledMissions,
+      onTimeCount:        nop.onTimeCount,
+      completionRate,
+      onTimeRate,
+      avgResponseMins:    nop.avgResponseMins,
+      p1ResponseMins:     nop.p1ResponseMins,
+      p2ResponseMins:     nop.p2ResponseMins,
+      aircraftDeclared:   nop.aircraftDeclared,
+      fleetChanges:       nop.fleetChanges,
+      crewChanges:        nop.crewChanges,
+      opsChanges:         nop.opsChanges,
+      executiveSummary:   nop.executiveSummary,
+      issuesIdentified:   nop.issuesIdentified,
+      actionsPlanned:     nop.actionsPlanned,
+    });
+  }
+
   function addOpsChange() {
     if (!newChange.description || !newChange.date) return;
     const entry: OpsChange = {
@@ -940,10 +968,11 @@ function NoticeOfOps({ tasks }: { tasks: NeptTask[] }) {
             {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
           </select>
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-card-border rounded-lg text-muted-foreground hover:text-foreground hover:border-cyan-400/40 transition-colors"
+            onClick={exportPDF}
+            className="flex items-center gap-1.5 px-4 py-1.5 text-xs bg-cyan-500/15 border border-cyan-400/40 rounded-lg text-cyan-300 font-semibold hover:bg-cyan-500/25 transition-colors"
+            data-testid="button-export-nop-pdf"
           >
-            <Printer size={12} /> Print
+            <FileText size={12} /> Export PDF
           </button>
           {canAdvance && (
             <button
