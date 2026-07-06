@@ -11,7 +11,7 @@ import {
 interface Props { role: UserRole; }
 
 // ─── Types ────────────────────────────────────────────────────────────────
-type TaskStatus   = "Pending" | "Assigned" | "En Route" | "Complete" | "Cancelled";
+type TaskStatus   = "Pending" | "Assigned" | "Released" | "En Route" | "Complete" | "Cancelled";
 type TaskPriority = "Routine" | "Urgent" | "Emergency";
 
 /** A single flight leg within a multi-sector task */
@@ -56,7 +56,7 @@ interface NeptTask {
 type TaskDraft = Omit<NeptTask, "id" | "createdAt" | "updatedAt">;
 
 // ─── Constants ────────────────────────────────────────────────────────────
-const STATUSES: TaskStatus[] = ["Pending", "Assigned", "En Route", "Complete", "Cancelled"];
+const STATUSES: TaskStatus[] = ["Pending", "Assigned", "Released", "En Route", "Complete", "Cancelled"];
 const PRIORITIES: TaskPriority[] = ["Routine", "Urgent", "Emergency"];
 
 const AIRCRAFT_OPTIONS = [
@@ -84,11 +84,12 @@ function nextRef(tasks: NeptTask[]): string {
 
 function statusConfig(s: TaskStatus) {
   return {
-    Pending:   { bg: "bg-slate-500/15",  text: "text-slate-300",  border: "border-slate-500/30",  dot: "bg-slate-400"  },
-    Assigned:  { bg: "bg-blue-500/15",   text: "text-blue-300",   border: "border-blue-500/30",   dot: "bg-blue-400"   },
-    "En Route":{ bg: "bg-amber-500/15",  text: "text-amber-300",  border: "border-amber-500/30",  dot: "bg-amber-400"  },
-    Complete:  { bg: "bg-green-500/15",  text: "text-green-300",  border: "border-green-500/30",  dot: "bg-green-400"  },
-    Cancelled: { bg: "bg-red-500/15",    text: "text-red-400",    border: "border-red-500/30",    dot: "bg-red-400"    },
+    Pending:   { bg: "bg-slate-500/15",   text: "text-slate-300",   border: "border-slate-500/30",   dot: "bg-slate-400"   },
+    Assigned:  { bg: "bg-blue-500/15",    text: "text-blue-300",    border: "border-blue-500/30",    dot: "bg-blue-400"    },
+    Released:  { bg: "bg-violet-500/15",  text: "text-violet-300",  border: "border-violet-500/30",  dot: "bg-violet-400"  },
+    "En Route":{ bg: "bg-amber-500/15",   text: "text-amber-300",   border: "border-amber-500/30",   dot: "bg-amber-400"   },
+    Complete:  { bg: "bg-green-500/15",   text: "text-green-300",   border: "border-green-500/30",   dot: "bg-green-400"   },
+    Cancelled: { bg: "bg-red-500/15",     text: "text-red-400",     border: "border-red-500/30",     dot: "bg-red-400"     },
   }[s];
 }
 
@@ -900,11 +901,12 @@ export default function NEPTTasking({ role }: Props) {
             const count  = s === "All" ? counts["All"] : (counts[s] ?? 0);
             const accent: Record<string, string> = {
               All:        active ? "bg-white/10 text-foreground border-white/20"  : "border-card-border text-muted-foreground hover:border-white/20 hover:text-foreground",
-              Pending:    active ? "bg-amber-500/20 text-amber-300 border-amber-400/40"   : "border-card-border text-muted-foreground hover:border-amber-400/30 hover:text-amber-300",
-              Assigned:   active ? "bg-blue-500/20 text-blue-300 border-blue-400/40"     : "border-card-border text-muted-foreground hover:border-blue-400/30 hover:text-blue-300",
-              "En Route": active ? "bg-cyan-500/20 text-cyan-300 border-cyan-400/40"     : "border-card-border text-muted-foreground hover:border-cyan-400/30 hover:text-cyan-300",
-              Complete:   active ? "bg-green-500/20 text-green-300 border-green-400/40"  : "border-card-border text-muted-foreground hover:border-green-400/30 hover:text-green-300",
-              Cancelled:  active ? "bg-zinc-500/20 text-zinc-300 border-zinc-400/40"     : "border-card-border text-muted-foreground hover:border-zinc-400/30 hover:text-zinc-300",
+              Pending:    active ? "bg-amber-500/20 text-amber-300 border-amber-400/40"     : "border-card-border text-muted-foreground hover:border-amber-400/30 hover:text-amber-300",
+              Assigned:   active ? "bg-blue-500/20 text-blue-300 border-blue-400/40"       : "border-card-border text-muted-foreground hover:border-blue-400/30 hover:text-blue-300",
+              Released:   active ? "bg-violet-500/20 text-violet-300 border-violet-400/40" : "border-card-border text-muted-foreground hover:border-violet-400/30 hover:text-violet-300",
+              "En Route": active ? "bg-cyan-500/20 text-cyan-300 border-cyan-400/40"       : "border-card-border text-muted-foreground hover:border-cyan-400/30 hover:text-cyan-300",
+              Complete:   active ? "bg-green-500/20 text-green-300 border-green-400/40"    : "border-card-border text-muted-foreground hover:border-green-400/30 hover:text-green-300",
+              Cancelled:  active ? "bg-zinc-500/20 text-zinc-300 border-zinc-400/40"       : "border-card-border text-muted-foreground hover:border-zinc-400/30 hover:text-zinc-300",
             };
             return (
               <button
