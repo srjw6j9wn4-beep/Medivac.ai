@@ -524,8 +524,8 @@ export default function NEPTTasking({ role }: Props) {
 
       {/* Filters */}
       <div className="space-y-2">
-        {/* Quick-filter pills */}
-        <div className="flex flex-wrap gap-2">
+        {/* Quick-filter pills + New Task */}
+        <div className="flex flex-wrap items-center gap-2">
           {(["All", ...STATUSES] as (TaskStatus | "All")[]).map(s => {
             const active = filterStatus === s;
             const count  = s === "All" ? counts["All"] : (counts[s] ?? 0);
@@ -550,6 +550,14 @@ export default function NEPTTasking({ role }: Props) {
               </button>
             );
           })}
+          {canDispatch && (
+            <button
+              onClick={() => { setEditTask(null); setShowModal(true); }}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-cyan-400/50 bg-cyan-500/15 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/25 transition-colors"
+            >
+              <Plus size={12} /> New Task
+            </button>
+          )}
         </div>
         {/* Search + priority row */}
         <div className="flex flex-wrap items-center gap-2">
