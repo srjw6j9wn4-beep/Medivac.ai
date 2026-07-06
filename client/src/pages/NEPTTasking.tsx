@@ -523,24 +523,50 @@ export default function NEPTTasking({ role }: Props) {
       )}
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            className={`${inputCls} pl-8 w-full`}
-            placeholder="Search ref, location, patient, aircraft…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+      <div className="space-y-2">
+        {/* Quick-filter pills */}
+        <div className="flex flex-wrap gap-2">
+          {(["All", ...STATUSES] as (TaskStatus | "All")[]).map(s => {
+            const active = filterStatus === s;
+            const count  = s === "All" ? counts["All"] : (counts[s] ?? 0);
+            const accent: Record<string, string> = {
+              All:        active ? "bg-white/10 text-foreground border-white/20"  : "border-card-border text-muted-foreground hover:border-white/20 hover:text-foreground",
+              Pending:    active ? "bg-amber-500/20 text-amber-300 border-amber-400/40"   : "border-card-border text-muted-foreground hover:border-amber-400/30 hover:text-amber-300",
+              Assigned:   active ? "bg-blue-500/20 text-blue-300 border-blue-400/40"     : "border-card-border text-muted-foreground hover:border-blue-400/30 hover:text-blue-300",
+              "En Route": active ? "bg-cyan-500/20 text-cyan-300 border-cyan-400/40"     : "border-card-border text-muted-foreground hover:border-cyan-400/30 hover:text-cyan-300",
+              Complete:   active ? "bg-green-500/20 text-green-300 border-green-400/40"  : "border-card-border text-muted-foreground hover:border-green-400/30 hover:text-green-300",
+              Cancelled:  active ? "bg-zinc-500/20 text-zinc-300 border-zinc-400/40"     : "border-card-border text-muted-foreground hover:border-zinc-400/30 hover:text-zinc-300",
+            };
+            return (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${accent[s]}`}
+              >
+                {s}
+                <span className={`text-[10px] font-semibold tabular-nums ${
+                  active ? "opacity-100" : "opacity-60"
+                }`}>{count}</span>
+              </button>
+            );
+          })}
         </div>
-        <select className={inputCls} value={filterStatus} onChange={e => setFilterStatus(e.target.value as TaskStatus | "All")}>
-          <option value="All">All Statuses ({counts["All"]})</option>
-          {STATUSES.map(s => <option key={s} value={s}>{s} ({counts[s] ?? 0})</option>)}
-        </select>
-        <select className={inputCls} value={filterPriority} onChange={e => setFilterPriority(e.target.value as TaskPriority | "All")}>
-          <option value="All">All Priorities</option>
-          {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+        {/* Search + priority row */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              className={`${inputCls} pl-8 w-full`}
+              placeholder="Search ref, location, patient, aircraft…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <select className={inputCls} value={filterPriority} onChange={e => setFilterPriority(e.target.value as TaskPriority | "All")}>
+            <option value="All">All Priorities</option>
+            {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Table */}
