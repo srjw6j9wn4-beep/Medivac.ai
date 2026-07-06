@@ -403,6 +403,7 @@ export default function NEPTTasking({ role }: Props) {
   const [showModal, setShowModal]     = useState(false);
   const [editTask, setEditTask]       = useState<NeptTask | null>(null);
   const [expandedId, setExpandedId]   = useState<number | null>(null);
+  const [etaSort, setEtaSort]         = useState<"asc" | "desc" | null>("asc");
 
   const canDispatch = !["pilot", "nurse", "engineer"].includes(role);
 
@@ -430,23 +431,36 @@ export default function NEPTTasking({ role }: Props) {
   });
 
   // ── Derived data ─────────────────────────────────────────────────────────
-  const filtered = useMemo(() => tasks.filter(t => {
-    if (filterStatus !== "All" && t.status !== filterStatus) return false;
-    if (filterPriority !== "All" && t.priority !== filterPriority) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      return (
-        t.taskRef.toLowerCase().includes(q) ||
-        t.pickupLocation.toLowerCase().includes(q) ||
-        t.destLocation.toLowerCase().includes(q) ||
-        (t.patientName ?? "").toLowerCase().includes(q) ||
-        (t.aircraftReg ?? "").toLowerCase().includes(q) ||
-        (t.referringHospital ?? "").toLowerCase().includes(q) ||
-        (t.receivingHospital ?? "").toLowerCase().includes(q)
-      );
+  const filtered = useMemo(() => {
+    const list = tasks.filter(t => {
+      if (filterStatus !== "All" && t.status !== filterStatus) return false;
+      if (filterPriority !== "All" && t.priority !== filterPriority) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        return (
+          t.taskRef.toLowerCase().includes(q) ||
+          t.pickupLocation.toLowerCase().includes(q) ||
+          t.destLocation.toLowerCase().includes(q) ||
+          (t.patientName ?? "").toLowerCase().includes(q) ||
+          (t.aircraftReg ?? "").toLowerCase().includes(q) ||
+          (t.referringHospital ?? "").toLowerCase().includes(q) ||
+          (t.receivingHospital ?? "").toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+    if (etaSort) {
+      list.sort((a, b) => {
+        // Tasks with no ETA always go to the bottom
+        if (!a.estimatedEta && !b.estimatedEta) return 0;
+        if (!a.estimatedEta) return 1;
+        if (!b.estimatedEta) return -1;
+        const diff = a.estimatedEta.localeCompare(b.estimatedEta);
+        return etaSort === "asc" ? diff : -diff;
+      });
     }
-    return true;
-  }), [tasks, filterStatus, filterPriority, search]);
+    return list;
+  }, [tasks, filterStatus, filterPriority, search, etaSort]);
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { All: tasks.length };
@@ -595,9 +609,23 @@ export default function NEPTTasking({ role }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-card-border bg-muted/10">
-                {["Task Ref", "Priority", "Status", "Pickup → Destination", "Patient / Ref", "Aircraft & Crew", "ETA", "Actions"].map(h => (
+                {["Task Ref", "Priority", "Status", "Pickup → Destination", "Patient / Ref", "Aircraft & Crew"].map(h => (
                   <th key={h} className="text-left text-muted-foreground font-medium px-3 py-3 whitespace-nowrap">{h}</th>
                 ))}
+                {/* Sortable ETA header */}
+                <th className="text-left px-3 py-3 whitespace-nowrap">
+                  <button
+                    onClick={() => setEtaSort(s => s === "asc" ? "desc" : "asc")}
+                    className="flex items-center gap-1 text-muted-foreground font-medium hover:text-cyan-300 transition-colors group"
+                    title={etaSort === "asc" ? "Sorted: earliest first — click for latest first" : "Sorted: latest first — click for earliest first"}
+                  >
+                    ETA
+                    <span className="text-[10px] transition-colors group-hover:text-cyan-300">
+                      {etaSort === "asc" ? "▲" : "▼"}
+                    </span>
+                  </button>
+                </th>
+                <th className="text-left text-muted-foreground font-medium px-3 py-3 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
