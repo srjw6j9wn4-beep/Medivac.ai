@@ -4,6 +4,7 @@ import type { Request } from 'express';
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "node:http";
+import { helmetMiddleware, apiRateLimiter, corsMiddleware, apiKeyGuard } from "./security";
 
 const app = express();
 const httpServer = createServer(app);
@@ -13,6 +14,13 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// ── Security middleware (applied before all routes) ──────────────────────────
+app.set("trust proxy", 1);          // trust Railway / pplx proxy for real IPs
+app.use(helmetMiddleware);           // HTTP security headers
+app.use(corsMiddleware);             // CORS whitelist
+app.use("/api", apiRateLimiter);    // rate limit all /api/* routes
+app.use("/api", apiKeyGuard);       // API key guard — blocks bots/scrapers
 
 app.use(
   express.json({
