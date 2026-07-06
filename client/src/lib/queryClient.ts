@@ -2,7 +2,11 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 // On pplx.app the backend runs on port 5000 — API calls must be prefixed with /port/5000
 // In dev (Vite proxy) or when server and client share the same origin, use empty string.
-export const API_BASE = import.meta.env.VITE_API_BASE !== undefined ? (import.meta.env.VITE_API_BASE as string) : "/port/5000";
+// On pplx.app the backend runs behind a /port/5000 proxy — detect by hostname.
+// On Railway (or any other host) use relative paths (empty string).
+export const API_BASE = (typeof window !== 'undefined' && window.location.hostname.endsWith('.pplx.app'))
+  ? "/port/5000"
+  : "";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
