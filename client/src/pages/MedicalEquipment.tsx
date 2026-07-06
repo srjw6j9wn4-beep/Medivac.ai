@@ -105,6 +105,31 @@ interface ChestCheckEntry {
   used: number;           // used = par - qtyPresent
   note: string;
   flagReorder: boolean;
+  expiryDate: string;     // ISO date — batch expiry for this chest
+}
+
+function expiryStatus(iso: string): "ok" | "soon" | "critical" | "expired" | "none" {
+  if (!iso) return "none";
+  const today = new Date(); today.setHours(0,0,0,0);
+  const exp   = new Date(iso);
+  const days  = Math.round((exp.getTime() - today.getTime()) / 86400000);
+  if (days < 0)   return "expired";
+  if (days <= 30) return "critical";
+  if (days <= 90) return "soon";
+  return "ok";
+}
+
+function expiryLabel(iso: string): string {
+  if (!iso) return "";
+  const today = new Date(); today.setHours(0,0,0,0);
+  const exp   = new Date(iso);
+  const days  = Math.round((exp.getTime() - today.getTime()) / 86400000);
+  const formatted = exp.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+  if (days < 0)   return `EXPIRED ${Math.abs(days)}d ago (${formatted})`;
+  if (days === 0) return `Expires TODAY (${formatted})`;
+  if (days <= 30) return `Expires in ${days}d (${formatted})`;
+  if (days <= 90) return `Exp ${formatted} — ${days}d`;
+  return formatted;
 }
 
 // ─── Station Medical Chests ───────────────────────────────────────────────────
@@ -1111,8 +1136,31 @@ export default function MedicalEquipment({ role }: Props) {
             used: 0,
             note: "",
             flagReorder: false,
+            expiryDate: "",
           };
         }
+
+        function setExpiryDate(itemId: string, date: string) {
+          const c = getCheck(itemId);
+          // auto-flag for reorder if expiring within 90 days
+          const es = expiryStatus(date);
+          const shouldFlag = es === "expired" || es === "critical" || es === "soon";
+          setChestChecks(prev => ({
+            ...prev,
+            [selectedChestId]: {
+              ...(prev[selectedChestId] ?? {}),
+              [itemId]: { ...c, expiryDate: date, flagReorder: c.flagReorder || shouldFlag },
+            },
+          }));
+        }
+
+        // items expiring within 90 days or already expired (with a date set)
+        const expiringItems = CHEST_ITEMS.filter(item => {
+          const c = checks[item.id];
+          if (!c?.expiryDate) return false;
+          const es = expiryStatus(c.expiryDate);
+          return es === "expired" || es === "critical" || es === "soon";
+        });
 
         function setQtyPresent(itemId: string, val: number) {
           const item = CHEST_ITEMS.find(i => i.id === itemId)!;
@@ -1262,6 +1310,7 @@ export default function MedicalEquipment({ role }: Props) {
               <div className="px-5 py-3 border-b border-card-border bg-muted/10 flex flex-wrap gap-6 text-xs">
                 <div><span className="text-muted-foreground">Items</span> <span className="font-bold ml-1">{CHEST_ITEMS.length}</span></div>
                 <div><span className="text-muted-foreground">Used / low</span> <span className={`font-bold ml-1 ${reorderItems.length > 0 ? "text-amber-400" : "text-green-400"}`}>{reorderItems.length}</span></div>
+                <div><span className="text-muted-foreground">Expiring</span> <span className={`font-bold ml-1 ${expiringItems.length > 0 ? "text-red-400" : "text-muted-foreground"}`}>{expiringItems.length}</span></div>
                 <div><span className="text-muted-foreground">Checked</span> <span className="font-bold ml-1">{Object.keys(checks).length} of {CHEST_ITEMS.length}</span></div>
               </div>
 
@@ -1338,6 +1387,22 @@ export default function MedicalEquipment({ role }: Props) {
                                 onChange={e => setNote(item.id, e.target.value)}
                                 className="w-36 bg-background/50 border border-card-border rounded-lg px-2 py-1 text-[11px] focus:outline-none focus:border-cyan-400/40 shrink-0"
                               />
+
+                              {/* Expiry date field */}
+                              <input
+                                type="date"
+                                value={c.expiryDate}
+                                onChange={e => setExpiryDate(item.id, e.target.value)}
+                                title="Batch expiry date"
+                                className="w-32 bg-background/50 border border-card-border rounded-lg px-2 py-1 text-[11px] focus:outline-none focus:border-cyan-400/40 shrink-0 text-muted-foreground"
+                              />
+                              {c.expiryDate && expiryStatus(c.expiryDate) !== "ok" && expiryStatus(c.expiryDate) !== "none" && (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold border shrink-0 ${
+                                  expiryStatus(c.expiryDate) === "expired" ? "bg-red-500/20 text-red-300 border-red-500/30" :
+                                  expiryStatus(c.expiryDate) === "critical" ? "bg-red-500/15 text-red-400 border-red-500/25" :
+                                  "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                }`}>{expiryLabel(c.expiryDate)}</span>
+                              )}
                             </div>
                           );
                         })}
@@ -1346,6 +1411,35 @@ export default function MedicalEquipment({ role }: Props) {
                   );
                 })}
               </div>
+
+              {/* Expiring items alert panel */}
+              {expiringItems.length > 0 && (
+                <div className="mx-5 mb-4 mt-1 p-3 rounded-xl border border-amber-500/30 bg-amber-500/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle size={13} className="text-amber-400 shrink-0" />
+                    <span className="text-xs font-semibold text-amber-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                      {expiringItems.length} item{expiringItems.length > 1 ? "s" : ""} expiring within 90 days — review and reorder
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {expiringItems.map(item => {
+                      const c = checks[item.id];
+                      const es = expiryStatus(c.expiryDate);
+                      return (
+                        <div key={item.id} className="flex items-center gap-2 text-xs">
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold shrink-0 ${
+                            es === "expired" ? "bg-red-500/20 text-red-300" :
+                            es === "critical" ? "bg-red-500/15 text-red-400" :
+                            "bg-amber-500/15 text-amber-300"
+                          }`}>{es === "expired" ? "EXPIRED" : es === "critical" ? "CRITICAL" : "SOON"}</span>
+                          <span className="font-medium text-foreground/80">{item.name}</span>
+                          <span className="text-muted-foreground ml-auto shrink-0">{expiryLabel(c.expiryDate)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Footer actions */}
               <div className="px-5 py-4 border-t border-card-border flex items-center gap-3 flex-wrap bg-muted/5">
@@ -1409,6 +1503,12 @@ export default function MedicalEquipment({ role }: Props) {
                     {reorderItems.some(i => i.category === "S8 Controlled") && (
                       <div className="flex items-center gap-2 text-red-400 text-xs p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                         <AlertTriangle size={13} /> S8 items require a signed controlled drug requisition and witness countersign.
+                      </div>
+                    )}
+                    {expiringItems.length > 0 && (
+                      <div className="flex items-start gap-2 text-amber-300 text-xs p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                        <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                        <span><span className="font-semibold">{expiringItems.length} expiring item{expiringItems.length > 1 ? "s" : ""}</span> also flagged — verify batch expiry before restocking.</span>
                       </div>
                     )}
                   </div>
