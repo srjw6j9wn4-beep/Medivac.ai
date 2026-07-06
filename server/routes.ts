@@ -186,12 +186,14 @@ export async function registerRoutes(
       const apiKey  = customToken || proxyKey;
       const baseUrl = customToken ? customUrl : proxyBase;
 
+      console.log("[Bryan chat] apiKey present:", !!apiKey, "baseUrl:", baseUrl);
+
       if (!apiKey) {
         return res.status(503).json({ error: "Bryan's AI brain is not configured yet. Please add an Anthropic API key to enable live answers." });
       }
 
       const body = {
-        model: "claude-sonnet-4-5",
+        model: "claude-haiku-4-5",
         max_tokens: 200,
         system: JENNIFER_SYSTEM_PROMPT,
         messages: messages.map((m: { role: string; content: string }) => ({
