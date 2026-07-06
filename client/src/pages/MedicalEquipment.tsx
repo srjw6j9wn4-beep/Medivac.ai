@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { type UserRole } from "@/lib/data";
 import {
   Activity, AlertTriangle, CheckCircle, Clock, Download, Eye,
@@ -388,8 +390,37 @@ export default function MedicalEquipment({ role }: Props) {
   const [eqSearch, setEqSearch] = useState("");
   const [drugCat, setDrugCat]   = useState("All");
   const [drugSearch, setDrugSearch] = useState("");
-  // Inline-editable drug expiry + batch overrides
+  // Inline-editable drug expiry + batch overrides — persisted to SQLite
   const [drugEdits, setDrugEdits] = useState<Record<string, { expiryDate?: string; batchNo?: string }>>({});
+  const drugEditsLoaded = useRef(false);
+
+  // Load saved drug edits from server on mount
+  const { data: savedDrugEdits } = useQuery<Record<string, { expiryDate: string | null; batchNo: string | null }>>(
+    { queryKey: ["/api/drug-edits"], staleTime: Infinity }
+  );
+  useEffect(() => {
+    if (savedDrugEdits && !drugEditsLoaded.current) {
+      drugEditsLoaded.current = true;
+      const hydrated: Record<string, { expiryDate?: string; batchNo?: string }> = {};
+      Object.entries(savedDrugEdits).forEach(([id, v]) => {
+        hydrated[id] = {
+          ...(v.expiryDate ? { expiryDate: v.expiryDate } : {}),
+          ...(v.batchNo    ? { batchNo:    v.batchNo    } : {}),
+        };
+      });
+      setDrugEdits(hydrated);
+    }
+  }, [savedDrugEdits]);
+
+  // Debounced save — fires 800ms after last change for a given drugId
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const saveDrugEdit = useCallback((drugId: string, expiryDate: string | null, batchNo: string | null) => {
+    clearTimeout(saveTimers.current[drugId]);
+    saveTimers.current[drugId] = setTimeout(() => {
+      apiRequest("PUT", `/api/drug-edits/${drugId}`, { expiryDate, batchNo }).catch(console.error);
+    }, 800);
+  }, []);
+
   const [showAlertOnly, setShowAlertOnly] = useState(false);
   const [expandedEq, setExpandedEq] = useState<string | null>(null);
 
@@ -963,7 +994,7 @@ export default function MedicalEquipment({ role }: Props) {
                           <input
                             type="date"
                             value={d.expiryDate ? (() => { try { return new Date(d.expiryDate).toISOString().split('T')[0]; } catch { return ""; } })() : ""}
-                            onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), expiryDate: e.target.value } }))}
+                            onChange={e => { const v = e.target.value; setDrugEdits(prev => { const cur = prev[d.id] ?? {}; saveDrugEdit(d.id, v || null, cur.batchNo ?? null); return { ...prev, [d.id]: { ...cur, expiryDate: v } }; }); }}
                             className={`w-30 bg-background/50 border rounded-md px-1.5 py-0.5 text-[11px] focus:outline-none shrink-0 ${
                               d.daysToExpiry <= 0  ? "border-red-500/50 text-red-400 focus:border-red-400" :
                               d.daysToExpiry <= 30 ? "border-red-500/30 text-red-400 focus:border-red-400" :
@@ -986,7 +1017,7 @@ export default function MedicalEquipment({ role }: Props) {
                         <input
                           type="text"
                           value={d.batchNo}
-                          onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), batchNo: e.target.value } }))}
+                          onChange={e => { const v = e.target.value; setDrugEdits(prev => { const cur = prev[d.id] ?? {}; saveDrugEdit(d.id, cur.expiryDate ?? null, v || null); return { ...prev, [d.id]: { ...cur, batchNo: v } }; }); }}
                           className="w-28 bg-background/50 border border-card-border rounded-md px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground focus:outline-none focus:border-cyan-400/40"
                         />
                       </td>
@@ -1021,7 +1052,7 @@ export default function MedicalEquipment({ role }: Props) {
                       <input
                         type="date"
                         value={d.expiryDate ? (() => { try { return new Date(d.expiryDate).toISOString().split('T')[0]; } catch { return ""; } })() : ""}
-                        onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), expiryDate: e.target.value } }))}
+                        onChange={e => { const v = e.target.value; setDrugEdits(prev => { const cur = prev[d.id] ?? {}; saveDrugEdit(d.id, v || null, cur.batchNo ?? null); return { ...prev, [d.id]: { ...cur, expiryDate: v } }; }); }}
                         className={`bg-background/50 border rounded px-1.5 py-0.5 text-[11px] focus:outline-none ${
                           d.daysToExpiry <= 0  ? "border-red-500/40 text-red-400" :
                           d.daysToExpiry <= 30 ? "border-red-500/30 text-red-400" :
@@ -1040,7 +1071,7 @@ export default function MedicalEquipment({ role }: Props) {
                       <input
                         type="text"
                         value={d.batchNo}
-                        onChange={e => setDrugEdits(prev => ({ ...prev, [d.id]: { ...(prev[d.id] ?? {}), batchNo: e.target.value } }))}
+                        onChange={e => { const v = e.target.value; setDrugEdits(prev => { const cur = prev[d.id] ?? {}; saveDrugEdit(d.id, cur.expiryDate ?? null, v || null); return { ...prev, [d.id]: { ...cur, batchNo: v } }; }); }}
                         className="ml-1 bg-background/50 border border-card-border rounded px-1.5 py-0.5 text-[11px] font-mono text-muted-foreground focus:outline-none focus:border-cyan-400/40 w-24"
                       />
                     </div>

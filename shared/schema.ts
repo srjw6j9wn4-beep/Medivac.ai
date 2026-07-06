@@ -52,3 +52,18 @@ export const passengerManifests = sqliteTable("passenger_manifests", {
 export const insertManifestSchema = createInsertSchema(passengerManifests).omit({ id: true });
 export type InsertManifest = z.infer<typeof insertManifestSchema>;
 export type PassengerManifest = typeof passengerManifests.$inferSelect;
+
+// ── Drug Inventory Edits ───────────────────────────────────────────────────
+// Persists per-drug expiry date and batch number overrides
+export const drugEditsTable = sqliteTable("drug_edits", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  drugId:     text("drug_id").notNull().unique(),   // matches DRUGS[].id e.g. "dr01"
+  expiryDate: text("expiry_date"),                  // ISO yyyy-mm-dd or null
+  batchNo:    text("batch_no"),                     // free text or null
+  updatedAt:  text("updated_at").notNull(),
+  updatedBy:  text("updated_by").notNull().default("nurse"),
+});
+
+export const insertDrugEditSchema = createInsertSchema(drugEditsTable).omit({ id: true });
+export type InsertDrugEdit = z.infer<typeof insertDrugEditSchema>;
+export type DrugEdit = typeof drugEditsTable.$inferSelect;

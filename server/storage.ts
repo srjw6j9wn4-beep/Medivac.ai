@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -88,6 +88,14 @@ sqlite.exec(`
     created_by TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS drug_edits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    drug_id TEXT NOT NULL UNIQUE,
+    expiry_date TEXT,
+    batch_no TEXT,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT NOT NULL DEFAULT 'nurse'
+  );
 `);
 
 export const db = drizzle(sqlite);
@@ -134,6 +142,9 @@ export interface IStorage {
   upsertTechLogEntry(entry: TechLogEntry): Promise<TechLogEntry>;
   listTechLogEntries(date?: string, aircraft?: string): Promise<TechLogEntry[]>;
   getTechLogEntry(uuid: string): Promise<TechLogEntry | undefined>;
+  // Drug edits
+  listDrugEdits(): Promise<DrugEdit[]>;
+  upsertDrugEdit(drugId: string, expiryDate: string | null, batchNo: string | null, updatedBy: string): Promise<DrugEdit>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -287,6 +298,25 @@ export class DatabaseStorage implements IStorage {
 
   completeMission(missionId: string): void {
     sqlite.prepare('UPDATE active_missions SET completed = 1 WHERE mission_id = ?').run(missionId);
+  }
+
+  // ── Drug edits ─────────────────────────────────────────────────────────
+  async listDrugEdits(): Promise<DrugEdit[]> {
+    return db.select().from(drugEditsTable).all();
+  }
+
+  async upsertDrugEdit(drugId: string, expiryDate: string | null, batchNo: string | null, updatedBy: string): Promise<DrugEdit> {
+    const now = new Date().toISOString();
+    const existing = db.select().from(drugEditsTable).where(eq(drugEditsTable.drugId, drugId)).get();
+    if (existing) {
+      return db.update(drugEditsTable)
+        .set({ expiryDate, batchNo, updatedAt: now, updatedBy })
+        .where(eq(drugEditsTable.drugId, drugId))
+        .returning().get()!;
+    }
+    return db.insert(drugEditsTable)
+      .values({ drugId, expiryDate, batchNo, updatedAt: now, updatedBy })
+      .returning().get()!;
   }
 
   listActiveMissions(): any[] {

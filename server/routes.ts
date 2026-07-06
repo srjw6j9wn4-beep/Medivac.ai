@@ -774,6 +774,31 @@ export async function registerRoutes(
     console.log(`[notam-watch] Sent alert for ${flagged.length} flagged NOTAMs to ${subs.length} devices`);
   }
 
+  // ── Drug edits persistence ─────────────────────────────────────────────
+  // GET /api/drug-edits — return all saved drug edits as { drugId -> {expiryDate, batchNo} }
+  app.get("/api/drug-edits", async (_req: Request, res: Response) => {
+    try {
+      const rows = await storage.listDrugEdits();
+      const map: Record<string, { expiryDate: string | null; batchNo: string | null }> = {};
+      rows.forEach(r => { map[r.drugId] = { expiryDate: r.expiryDate ?? null, batchNo: r.batchNo ?? null }; });
+      res.json(map);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // PUT /api/drug-edits/:drugId — upsert expiry date and/or batch number
+  app.put("/api/drug-edits/:drugId", async (req: Request, res: Response) => {
+    try {
+      const { drugId } = req.params;
+      const { expiryDate = null, batchNo = null, updatedBy = "nurse" } = req.body ?? {};
+      const row = await storage.upsertDrugEdit(drugId, expiryDate, batchNo, updatedBy);
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // ── Video streaming route (byte-range aware) ─────────────────────────────
   // S3 static hosting does not support Range requests. Serve all video files
   // through Express so browsers can seek and autoplay reliably.
