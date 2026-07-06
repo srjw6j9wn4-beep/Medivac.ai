@@ -67,3 +67,21 @@ export const drugEditsTable = sqliteTable("drug_edits", {
 export const insertDrugEditSchema = createInsertSchema(drugEditsTable).omit({ id: true });
 export type InsertDrugEdit = z.infer<typeof insertDrugEditSchema>;
 export type DrugEdit = typeof drugEditsTable.$inferSelect;
+
+// ── Chest Item Edits ───────────────────────────────────────────────────────
+// Persists per-chest-item expiry date, qty present, and note overrides
+export const chestItemEditsTable = sqliteTable("chest_item_edits", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  chestId:     text("chest_id").notNull(),     // e.g. "chest-dubbo-a"
+  itemId:      text("item_id").notNull(),      // e.g. "ci-morphine"
+  expiryDate:  text("expiry_date"),            // ISO yyyy-mm-dd or null
+  qtyPresent:  integer("qty_present"),         // nullable
+  note:        text("note"),
+  flagReorder: integer("flag_reorder").notNull().default(0),  // 0/1 boolean
+  updatedAt:   text("updated_at").notNull(),
+  updatedBy:   text("updated_by").notNull().default("nurse"),
+});
+
+export const insertChestItemEditSchema = createInsertSchema(chestItemEditsTable).omit({ id: true });
+export type InsertChestItemEdit = z.infer<typeof insertChestItemEditSchema>;
+export type ChestItemEdit = typeof chestItemEditsTable.$inferSelect;

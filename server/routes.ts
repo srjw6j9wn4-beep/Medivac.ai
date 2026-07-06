@@ -774,6 +774,39 @@ export async function registerRoutes(
     console.log(`[notam-watch] Sent alert for ${flagged.length} flagged NOTAMs to ${subs.length} devices`);
   }
 
+  // ── Chest item edits persistence ───────────────────────────────────────────
+  // GET /api/chest-item-edits — all saved edits as { chestId_itemId -> {...} }
+  app.get("/api/chest-item-edits", async (_req: Request, res: Response) => {
+    try {
+      const rows = await storage.listChestItemEdits();
+      // key: "chestId::itemId" -> payload
+      const map: Record<string, { expiryDate: string | null; qtyPresent: number | null; note: string | null; flagReorder: boolean }> = {};
+      rows.forEach(r => {
+        map[`${r.chestId}::${r.itemId}`] = {
+          expiryDate:  r.expiryDate  ?? null,
+          qtyPresent:  r.qtyPresent  ?? null,
+          note:        r.note        ?? null,
+          flagReorder: r.flagReorder === 1,
+        };
+      });
+      res.json(map);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // PUT /api/chest-item-edits/:chestId/:itemId — upsert a single chest item edit
+  app.put("/api/chest-item-edits/:chestId/:itemId", async (req: Request, res: Response) => {
+    try {
+      const { chestId, itemId } = req.params;
+      const { expiryDate = null, qtyPresent = null, note = null, flagReorder = false, updatedBy = "nurse" } = req.body ?? {};
+      const row = await storage.upsertChestItemEdit(chestId, itemId, { expiryDate, qtyPresent, note, flagReorder }, updatedBy);
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // ── Drug edits persistence ─────────────────────────────────────────────
   // GET /api/drug-edits — return all saved drug edits as { drugId -> {expiryDate, batchNo} }
   app.get("/api/drug-edits", async (_req: Request, res: Response) => {

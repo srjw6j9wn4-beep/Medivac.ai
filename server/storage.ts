@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -96,6 +96,18 @@ sqlite.exec(`
     updated_at TEXT NOT NULL,
     updated_by TEXT NOT NULL DEFAULT 'nurse'
   );
+  CREATE TABLE IF NOT EXISTS chest_item_edits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chest_id TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    expiry_date TEXT,
+    qty_present INTEGER,
+    note TEXT,
+    flag_reorder INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT NOT NULL DEFAULT 'nurse',
+    UNIQUE(chest_id, item_id)
+  );
 `);
 
 export const db = drizzle(sqlite);
@@ -145,6 +157,9 @@ export interface IStorage {
   // Drug edits
   listDrugEdits(): Promise<DrugEdit[]>;
   upsertDrugEdit(drugId: string, expiryDate: string | null, batchNo: string | null, updatedBy: string): Promise<DrugEdit>;
+  // Chest item edits
+  listChestItemEdits(chestId?: string): Promise<ChestItemEdit[]>;
+  upsertChestItemEdit(chestId: string, itemId: string, data: { expiryDate?: string | null; qtyPresent?: number | null; note?: string | null; flagReorder?: boolean }, updatedBy: string): Promise<ChestItemEdit>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -316,6 +331,48 @@ export class DatabaseStorage implements IStorage {
     }
     return db.insert(drugEditsTable)
       .values({ drugId, expiryDate, batchNo, updatedAt: now, updatedBy })
+      .returning().get()!;
+  }
+
+  // ── Chest item edits ──────────────────────────────────────────────────────
+  async listChestItemEdits(chestId?: string): Promise<ChestItemEdit[]> {
+    if (chestId) {
+      return db.select().from(chestItemEditsTable).where(eq(chestItemEditsTable.chestId, chestId)).all();
+    }
+    return db.select().from(chestItemEditsTable).all();
+  }
+
+  async upsertChestItemEdit(chestId: string, itemId: string, data: { expiryDate?: string | null; qtyPresent?: number | null; note?: string | null; flagReorder?: boolean }, updatedBy: string): Promise<ChestItemEdit> {
+    const now = new Date().toISOString();
+    const existing = db.select().from(chestItemEditsTable)
+      .where(eq(chestItemEditsTable.chestId, chestId))
+      .all()
+      .find((r: ChestItemEdit) => r.itemId === itemId);
+    const flagReorderInt = data.flagReorder ? 1 : 0;
+    if (existing) {
+      return db.update(chestItemEditsTable)
+        .set({
+          expiryDate:  data.expiryDate  ?? existing.expiryDate,
+          qtyPresent:  data.qtyPresent  ?? existing.qtyPresent,
+          note:        data.note        ?? existing.note,
+          flagReorder: data.flagReorder !== undefined ? flagReorderInt : existing.flagReorder,
+          updatedAt: now,
+          updatedBy,
+        })
+        .where(eq(chestItemEditsTable.id, existing.id))
+        .returning().get()!;
+    }
+    return db.insert(chestItemEditsTable)
+      .values({
+        chestId,
+        itemId,
+        expiryDate:  data.expiryDate  ?? null,
+        qtyPresent:  data.qtyPresent  ?? null,
+        note:        data.note        ?? null,
+        flagReorder: flagReorderInt,
+        updatedAt: now,
+        updatedBy,
+      })
       .returning().get()!;
   }
 

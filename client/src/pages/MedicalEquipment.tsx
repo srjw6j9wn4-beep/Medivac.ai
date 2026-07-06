@@ -421,6 +421,56 @@ export default function MedicalEquipment({ role }: Props) {
     }, 800);
   }, []);
 
+  // ── Chest item edit persistence ──────────────────────────────────────────
+  type SavedChestEdits = Record<string, { expiryDate: string | null; qtyPresent: number | null; note: string | null; flagReorder: boolean }>;
+  const { data: savedChestEdits } = useQuery<SavedChestEdits>(
+    { queryKey: ["/api/chest-item-edits"], staleTime: Infinity }
+  );
+  const chestEditsLoaded = useRef(false);
+  useEffect(() => {
+    if (savedChestEdits && !chestEditsLoaded.current) {
+      chestEditsLoaded.current = true;
+      // key format: "chestId::itemId"
+      const hydrated: Record<string, Record<string, ChestCheckEntry>> = {};
+      Object.entries(savedChestEdits).forEach(([key, v]) => {
+        const [chestId, itemId] = key.split("::");
+        if (!chestId || !itemId) return;
+        const item = CHEST_ITEMS.find(i => i.id === itemId);
+        if (!item) return;
+        const parQty = item.parQty;
+        const qtyPresent = v.qtyPresent ?? parQty;
+        const used = Math.max(0, parQty - qtyPresent);
+        if (!hydrated[chestId]) hydrated[chestId] = {};
+        hydrated[chestId][itemId] = {
+          chestId,
+          itemId,
+          qtyPresent,
+          used,
+          note:        v.note        ?? "",
+          flagReorder: v.flagReorder ?? (used > 0),
+          expiryDate:  v.expiryDate  ?? "",
+        };
+      });
+      if (Object.keys(hydrated).length > 0) {
+        setChestChecks(hydrated);
+      }
+    }
+  }, [savedChestEdits]);
+
+  const chestSaveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const saveChestItemEdit = useCallback((
+    chestId: string,
+    itemId: string,
+    data: { expiryDate?: string | null; qtyPresent?: number | null; note?: string | null; flagReorder?: boolean }
+  ) => {
+    const timerKey = `${chestId}::${itemId}`;
+    clearTimeout(chestSaveTimers.current[timerKey]);
+    chestSaveTimers.current[timerKey] = setTimeout(() => {
+      apiRequest("PUT", `/api/chest-item-edits/${encodeURIComponent(chestId)}/${encodeURIComponent(itemId)}`, data)
+        .catch(console.error);
+    }, 800);
+  }, []);
+
   const [showAlertOnly, setShowAlertOnly] = useState(false);
   const [expandedEq, setExpandedEq] = useState<string | null>(null);
 
@@ -1296,13 +1346,15 @@ export default function MedicalEquipment({ role }: Props) {
           // auto-flag for reorder if expiring within 90 days
           const es = expiryStatus(date);
           const shouldFlag = es === "expired" || es === "critical" || es === "soon";
+          const newFlagReorder = c.flagReorder || shouldFlag;
           setChestChecks(prev => ({
             ...prev,
             [selectedChestId]: {
               ...(prev[selectedChestId] ?? {}),
-              [itemId]: { ...c, expiryDate: date, flagReorder: c.flagReorder || shouldFlag },
+              [itemId]: { ...c, expiryDate: date, flagReorder: newFlagReorder },
             },
           }));
+          saveChestItemEdit(selectedChestId, itemId, { expiryDate: date || null, flagReorder: newFlagReorder });
         }
 
         // items expiring within 90 days or already expired (with a date set)
@@ -1316,24 +1368,28 @@ export default function MedicalEquipment({ role }: Props) {
         function setQtyPresent(itemId: string, val: number) {
           const item = CHEST_ITEMS.find(i => i.id === itemId)!;
           const used = Math.max(0, item.parQty - val);
+          const flagReorder = used > 0;
           setChestChecks(prev => ({
             ...prev,
             [selectedChestId]: {
               ...(prev[selectedChestId] ?? {}),
-              [itemId]: { ...getCheck(itemId), qtyPresent: val, used, flagReorder: used > 0 },
+              [itemId]: { ...getCheck(itemId), qtyPresent: val, used, flagReorder },
             },
           }));
+          saveChestItemEdit(selectedChestId, itemId, { qtyPresent: val, flagReorder });
         }
 
         function toggleReorder(itemId: string) {
           const c = getCheck(itemId);
+          const newFlag = !c.flagReorder;
           setChestChecks(prev => ({
             ...prev,
             [selectedChestId]: {
               ...(prev[selectedChestId] ?? {}),
-              [itemId]: { ...c, flagReorder: !c.flagReorder },
+              [itemId]: { ...c, flagReorder: newFlag },
             },
           }));
+          saveChestItemEdit(selectedChestId, itemId, { flagReorder: newFlag });
         }
 
         function setNote(itemId: string, note: string) {
@@ -1345,6 +1401,7 @@ export default function MedicalEquipment({ role }: Props) {
               [itemId]: { ...c, note },
             },
           }));
+          saveChestItemEdit(selectedChestId, itemId, { note: note || null });
         }
 
         function markComplete() {
