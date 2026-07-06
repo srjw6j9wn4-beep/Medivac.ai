@@ -298,6 +298,8 @@ interface OpsStaffMember {
   role: string;
   base: string;
   startDate: string;
+  completedDate?: string;   // ISO date when all modules signed off
+  renewalDue?: string;      // ISO date — completedDate + 24 months
 }
 
 type CellStatus = "not-started" | "in-progress" | "complete" | "gap";
@@ -321,7 +323,27 @@ interface GapNote {
 interface WeekSignOff {
   weekId: string;
   assessor: string;
-  date: string;
+  date: string;             // ISO date of sign-off
+}
+
+// ─── 24-month renewal helpers ─────────────────────────────────────────────────
+function addMonths(dateStr: string, months: number): string {
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+function renewalStatus(renewalDue?: string): "current" | "due-soon" | "overdue" | "none" {
+  if (!renewalDue) return "none";
+  const today = new Date();
+  const due   = new Date(renewalDue);
+  const diffDays = Math.floor((due.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0)   return "overdue";
+  if (diffDays <= 90) return "due-soon";
+  return "current";
+}
+function formatRenewalDate(iso?: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 const OPS_STAFF_DEFAULT: OpsStaffMember[] = [
@@ -586,7 +608,17 @@ export default function CheckTraining({ role }: Props) {
       const next = nextStatus(current);
       staffMap[moduleId] = next;
 
-      // If moving away from "gap", clean up any note automatically kept in sync via opsGapNotes elsewhere
+      // If all 30 modules are now complete, record completedDate + renewalDue
+      const allComplete = ALL_MODULES.every(m => staffMap[m.id] === "complete");
+      if (allComplete) {
+        const today = new Date().toISOString().split("T")[0];
+        setOpsStaff(staffPrev => staffPrev.map(s =>
+          s.id === staffId && !s.completedDate
+            ? { ...s, completedDate: today, renewalDue: addMonths(today, 24) }
+            : s
+        ));
+      }
+
       return { ...prev, [staffId]: staffMap };
     });
   }
@@ -670,16 +702,24 @@ export default function CheckTraining({ role }: Props) {
       if (week5Complete) {
         lines.push(`  ★ Special Missions Certified`);
       }
+      // 24-month renewal
+      if (s.completedDate) {
+        const rs = renewalStatus(s.renewalDue);
+        const renewalLabel = rs === "overdue" ? "OVERDUE" : rs === "due-soon" ? "DUE SOON" : "Current";
+        lines.push(`  24-Month Review: ${renewalLabel} — Due ${formatRenewalDate(s.renewalDue)} (Completed ${formatRenewalDate(s.completedDate)})`);
+      }
       lines.push("");
     });
     const totalGaps = allOpsGaps().length;
     const avgPct = Math.round(opsStaff.reduce((acc, s) => acc + completionPct(opsStatus[s.id] ?? {}), 0) / (opsStaff.length || 1));
     const completedStaff = opsStaff.filter(s => countByStatus(opsStatus[s.id] ?? {}, "complete") === TOTAL_MODULES).length;
+    const renewalDueCount = opsStaff.filter(s => { const rs = renewalStatus(s.renewalDue); return rs === "overdue" || rs === "due-soon"; }).length;
     lines.push("---");
     lines.push(`Total staff in program: ${opsStaff.length}`);
     lines.push(`Average completion: ${avgPct}%`);
     lines.push(`Gaps identified: ${totalGaps}`);
     lines.push(`Staff completed: ${completedStaff}`);
+    if (renewalDueCount > 0) lines.push(`24-month reviews due: ${renewalDueCount}`);
 
     const text = lines.join("\n");
     navigator.clipboard?.writeText(text).then(() => {
@@ -695,6 +735,12 @@ export default function CheckTraining({ role }: Props) {
   const opsAvgPct = Math.round(opsStaff.reduce((acc, s) => acc + completionPct(opsStatus[s.id] ?? {}), 0) / (opsStaff.length || 1));
   const opsTotalGaps = allOpsGaps().length;
   const opsCompletedStaff = opsStaff.filter(s => countByStatus(opsStatus[s.id] ?? {}, "complete") === TOTAL_MODULES).length;
+  // Renewal tracking
+  const opsRenewalDue = opsStaff.filter(s => {
+    const rs = renewalStatus(s.renewalDue);
+    return rs === "overdue" || rs === "due-soon";
+  });
+  const opsRenewalOverdue = opsStaff.filter(s => renewalStatus(s.renewalDue) === "overdue");
 
 
   return (
@@ -1232,7 +1278,7 @@ export default function CheckTraining({ role }: Props) {
           </div>
 
           {/* Summary KPI dashboard */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="bg-card rounded-xl border border-card-border p-3 sm:p-4">
               <div className="text-2xl font-bold text-amber-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{opsStaff.length}</div>
               <div className="text-xs font-semibold mt-0.5">Total Staff</div>
@@ -1252,6 +1298,21 @@ export default function CheckTraining({ role }: Props) {
               <div className="text-2xl font-bold text-green-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{opsCompletedStaff}</div>
               <div className="text-xs font-semibold mt-0.5">Staff Completed</div>
               <div className="text-[10px] text-muted-foreground mt-0.5">All {TOTAL_MODULES} modules</div>
+            </div>
+            <div className={`bg-card rounded-xl border p-3 sm:p-4 ${
+              opsRenewalOverdue.length > 0 ? "border-red-500/30" :
+              opsRenewalDue.length > 0 ? "border-amber-500/30" :
+              "border-card-border"
+            }`}>
+              <div className={`text-2xl font-bold ${
+                opsRenewalOverdue.length > 0 ? "text-red-400" :
+                opsRenewalDue.length > 0 ? "text-amber-400" :
+                "text-green-400"
+              }`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                {opsRenewalDue.length}
+              </div>
+              <div className="text-xs font-semibold mt-0.5">Review Due</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">24-month cycle</div>
             </div>
           </div>
 
@@ -1326,6 +1387,54 @@ export default function CheckTraining({ role }: Props) {
                 >
                   Cancel
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* 24-Month Renewal Due section — only shown when staff have renewal dates */}
+          {opsRenewalDue.length > 0 && (
+            <div className="bg-card rounded-xl border border-amber-500/30 overflow-hidden" style={{ background: "rgba(245,158,11,0.03)" }}>
+              <div className="px-4 py-3 border-b border-card-border flex items-center gap-2">
+                <RefreshCw size={14} className={opsRenewalOverdue.length > 0 ? "text-red-400" : "text-amber-400"} />
+                <h2 className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                  24-Month Review Schedule
+                </h2>
+                <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                  opsRenewalOverdue.length > 0 ? "bg-red-500/20 text-red-300" : "bg-amber-500/20 text-amber-300"
+                }`}>
+                  {opsRenewalOverdue.length > 0 ? `${opsRenewalOverdue.length} Overdue` : `${opsRenewalDue.length} Due Soon`}
+                </span>
+              </div>
+              <div className="divide-y divide-card-border">
+                {opsRenewalDue.map(s => {
+                  const rs = renewalStatus(s.renewalDue);
+                  const isOverdue = rs === "overdue";
+                  return (
+                    <div key={s.id} className="px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${isOverdue ? "bg-red-400" : "bg-amber-400"}`} />
+                        <div>
+                          <div className="text-xs font-semibold">{s.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{s.role} · {s.base}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px]">
+                        {s.completedDate && (
+                          <span className="text-muted-foreground">Completed {formatRenewalDate(s.completedDate)}</span>
+                        )}
+                        <span className={`font-semibold ${isOverdue ? "text-red-400" : "text-amber-400"}`}>
+                          {isOverdue ? "Overdue — " : "Due "}{formatRenewalDate(s.renewalDue)}
+                        </span>
+                        <button
+                          onClick={() => setSelectedOpsStaffId(s.id)}
+                          className="px-2 py-1 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 hover:bg-amber-500/20 transition-colors font-semibold"
+                        >
+                          View
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -1444,8 +1553,35 @@ export default function CheckTraining({ role }: Props) {
                           <Award size={10} /> Special Missions Certified
                         </span>
                       )}
+                      {/* 24-month renewal badge */}
+                      {(() => {
+                        const rs = renewalStatus(staff.renewalDue);
+                        if (rs === "none") return null;
+                        const badgeStyle =
+                          rs === "overdue" ? "bg-red-500/20 text-red-300 border-red-500/40" :
+                          rs === "due-soon" ? "bg-amber-500/20 text-amber-300 border-amber-500/40" :
+                          "bg-green-500/20 text-green-300 border-green-500/40";
+                        const label =
+                          rs === "overdue" ? "Review Overdue" :
+                          rs === "due-soon" ? "Review Due Soon" :
+                          "Review Current";
+                        return (
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-semibold border flex items-center gap-1 ${badgeStyle}`}>
+                            <RefreshCw size={9} /> {label}
+                          </span>
+                        );
+                      })()}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{staff.role} · {staff.base} · Started {staff.startDate} · Week {weeksIn} of program</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {staff.role} · {staff.base} · Started {staff.startDate} · Week {weeksIn} of program
+                      {staff.renewalDue && (
+                        <span className="ml-2 text-[10px]">
+                          · <span className={renewalStatus(staff.renewalDue) === "overdue" ? "text-red-400" : renewalStatus(staff.renewalDue) === "due-soon" ? "text-amber-400" : "text-green-400"}>
+                            24-Month Review due {formatRenewalDate(staff.renewalDue)}
+                          </span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <button
                     onClick={() => setSelectedOpsStaffId(null)}
