@@ -5,7 +5,8 @@ import {
   User, Calendar, FileText, RefreshCw, Download, ChevronRight,
   Plane, TrendingUp, BookOpen, Star, BarChart3, Sparkles,
   Shield, Target, Award, ChevronDown, Plus, Zap, Activity,
-  GraduationCap, Eye, Lock
+  GraduationCap, Eye, Lock, UserCheck, AlertCircle, CheckSquare,
+  XCircle, ClipboardList, X, Copy
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
 
@@ -290,13 +291,251 @@ function AIAssessmentCard({ trainee }: { trainee: TraineeRecord }) {
   );
 }
 
+// ─── Ops Staff Training Matrix ─────────────────────────────────────────────────
+interface OpsStaffMember {
+  id: string;
+  name: string;
+  role: string;
+  base: string;
+  startDate: string;
+}
+
+type CellStatus = "not-started" | "in-progress" | "complete" | "gap";
+
+interface TrainingModule {
+  id: string;
+  title: string;
+}
+
+interface TrainingWeek {
+  id: string;
+  label: string;
+  modules: TrainingModule[];
+}
+
+interface GapNote {
+  moduleId: string;
+  notes: string;
+}
+
+interface WeekSignOff {
+  weekId: string;
+  assessor: string;
+  date: string;
+}
+
+const OPS_STAFF_DEFAULT: OpsStaffMember[] = [
+  { id: "s1", name: "Sarah Mitchell", role: "Team Lead",   base: "Dubbo",       startDate: "2026-06-02" },
+  { id: "s2", name: "James Okafor",   role: "Dispatcher",  base: "Broken Hill", startDate: "2026-06-02" },
+  { id: "s3", name: "Priya Sharma",   role: "Dispatcher",  base: "Bankstown",   startDate: "2026-06-09" },
+  { id: "s4", name: "Tom Harding",    role: "Coordinator", base: "Essendon",    startDate: "2026-06-16" },
+  { id: "s5", name: "Chloe Nguyen",   role: "Coordinator", base: "Launceston",  startDate: "2026-06-16" },
+];
+
+const TRAINING_PROGRAM: TrainingWeek[] = [
+  {
+    id: "w1",
+    label: "Week 1 — Foundations & Reporting",
+    modules: [
+      { id: "w1m1", title: "Introduction to RFDS SE Operations" },
+      { id: "w1m2", title: "Medivac.ai Platform Overview" },
+      { id: "w1m3", title: "Mission Reporting Fundamentals" },
+      { id: "w1m4", title: "Incident & ASR Reporting Procedures" },
+      { id: "w1m5", title: "Documentation Standards & Compliance" },
+    ],
+  },
+  {
+    id: "w2",
+    label: "Week 2 — Invoicing & Finance",
+    modules: [
+      { id: "w2m1", title: "Mission Cost Capture" },
+      { id: "w2m2", title: "NEPT Invoice Processing" },
+      { id: "w2m3", title: "Private Charter Billing" },
+      { id: "w2m4", title: "Medicare/DVA Claim Procedures" },
+      { id: "w2m5", title: "Financial Reconciliation Basics" },
+    ],
+  },
+  {
+    id: "w3",
+    label: "Week 3 — Team Lead Skills",
+    modules: [
+      { id: "w3m1", title: "Crew Briefing Protocols" },
+      { id: "w3m2", title: "Shift Handover Procedures" },
+      { id: "w3m3", title: "Conflict Resolution & Escalation" },
+      { id: "w3m4", title: "Performance Monitoring Basics" },
+      { id: "w3m5", title: "Fatigue Risk Management Overview" },
+    ],
+  },
+  {
+    id: "w4",
+    label: "Week 4 — Competency & Integration",
+    modules: [
+      { id: "w4m1", title: "End-to-End Mission Coordination" },
+      { id: "w4m2", title: "Multi-Base Communication" },
+      { id: "w4m3", title: "Emergency Protocols & Decision Making" },
+      { id: "w4m4", title: "System Integration Assessment" },
+      { id: "w4m5", title: "Final Competency Sign-Off" },
+    ],
+  },
+  {
+    id: "w5",
+    label: "Week 5 — Special Missions Training & Checks",
+    modules: [
+      { id: "w5m1",  title: "Neonatal & Paediatric Transport Protocols" },
+      { id: "w5m2",  title: "Mental Health & Psychiatric Transfer Procedures" },
+      { id: "w5m3",  title: "Bariatric Patient Handling & Equipment" },
+      { id: "w5m4",  title: "Organ Retrieval Mission Coordination" },
+      { id: "w5m5",  title: "Remote Area & Aeromedical Retrieval" },
+      { id: "w5m6",  title: "Search & Rescue (SAR) Support Operations" },
+      { id: "w5m7",  title: "Infectious Disease / Isolation Transport" },
+      { id: "w5m8",  title: "Disaster & Mass Casualty Response" },
+      { id: "w5m9",  title: "Repatriation & International Transfer" },
+      { id: "w5m10", title: "Special Mission Sign-Off & Competency Check" },
+    ],
+  },
+];
+
+const ALL_MODULES: TrainingModule[] = TRAINING_PROGRAM.flatMap(w => w.modules);
+const TOTAL_MODULES = ALL_MODULES.length; // 30
+const WEEK5_MODULE_IDS = TRAINING_PROGRAM.find(w => w.id === "w5")!.modules.map(m => m.id);
+
+function defaultStatusMap(): Record<string, CellStatus> {
+  const map: Record<string, CellStatus> = {};
+  ALL_MODULES.forEach(m => { map[m.id] = "not-started"; });
+  return map;
+}
+
+// Seed some realistic demo progress so the matrix isn't all blank
+function seedStatusMap(seedIndex: number): Record<string, CellStatus> {
+  const map = defaultStatusMap();
+  const patterns: CellStatus[][] = [
+    // Sarah Mitchell — Team Lead, ahead of schedule
+    ["complete","complete","complete","complete","complete",
+     "complete","complete","complete","complete","complete",
+     "complete","complete","in-progress","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started"],
+    // James Okafor — Dispatcher, one gap identified
+    ["complete","complete","complete","gap","complete",
+     "complete","in-progress","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started"],
+    // Priya Sharma — Dispatcher, on track
+    ["complete","complete","complete","complete","in-progress",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started"],
+    // Tom Harding — Coordinator, behind / needs support
+    ["complete","in-progress","gap","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started"],
+    // Chloe Nguyen — Coordinator, just started
+    ["complete","in-progress","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started",
+     "not-started","not-started","not-started","not-started","not-started"],
+  ];
+  const pattern = patterns[seedIndex % patterns.length];
+  ALL_MODULES.forEach((m, i) => { map[m.id] = pattern[i] ?? "not-started"; });
+  return map;
+}
+
+const CELL_CYCLE: CellStatus[] = ["not-started", "in-progress", "complete", "gap"];
+
+function nextStatus(s: CellStatus): CellStatus {
+  const idx = CELL_CYCLE.indexOf(s);
+  return CELL_CYCLE[(idx + 1) % CELL_CYCLE.length];
+}
+
+function countByStatus(map: Record<string, CellStatus>, status: CellStatus): number {
+  return Object.values(map).filter(s => s === status).length;
+}
+
+function completionPct(map: Record<string, CellStatus>): number {
+  return Math.round((countByStatus(map, "complete") / TOTAL_MODULES) * 100);
+}
+
+function weeksIntoProgram(startDate: string): number {
+  const start = new Date(startDate).getTime();
+  const now = new Date("2026-07-06").getTime(); // fixed "current" date per app context
+  const diffWeeks = Math.floor((now - start) / (7 * 24 * 60 * 60 * 1000));
+  return Math.max(0, diffWeeks + 1);
+}
+
+type OverallStatus = "On Track" | "Behind Schedule" | "Completed" | "Needs Support";
+
+function calcOverallStatus(map: Record<string, CellStatus>, startDate: string): OverallStatus {
+  const complete = countByStatus(map, "complete");
+  const gaps = countByStatus(map, "gap");
+  if (complete === TOTAL_MODULES) return "Completed";
+  const weeksIn = weeksIntoProgram(startDate);
+  const expectedModules = Math.min(TOTAL_MODULES, weeksIn * 5); // ~5 modules/week pace (weeks 1-4); week5 has 10, but pace baseline still 5/wk minimum
+  if (gaps >= 2) return "Needs Support";
+  if (complete < expectedModules * 0.6) return "Behind Schedule";
+  return "On Track";
+}
+
+const OVERALL_STATUS_COLOR: Record<OverallStatus, string> = {
+  "On Track": "status-green",
+  "Behind Schedule": "status-orange",
+  "Completed": "status-blue",
+  "Needs Support": "status-red",
+};
+
+function cellStatusMeta(status: CellStatus) {
+  switch (status) {
+    case "complete":
+      return { icon: <CheckSquare size={13} className="text-green-400" />, bg: "bg-green-500/10", border: "border-green-500/30" };
+    case "in-progress":
+      return { icon: <div className="w-2 h-2 rounded-full bg-amber-400" />, bg: "bg-amber-500/10", border: "border-amber-500/30" };
+    case "gap":
+      return { icon: <XCircle size={13} className="text-red-400" />, bg: "bg-red-500/10", border: "border-red-500/30" };
+    default:
+      return { icon: null, bg: "bg-background/50", border: "border-card-border" };
+  }
+}
+
+function moduleTitleById(id: string): string {
+  return ALL_MODULES.find(m => m.id === id)?.title ?? id;
+}
+
+function weekLabelForModuleId(moduleId: string): string {
+  const week = TRAINING_PROGRAM.find(w => w.modules.some(m => m.id === moduleId));
+  return week ? week.label : "";
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CheckTraining({ role }: Props) {
-  const [activeTab, setActiveTab]               = useState<"forms" | "trainees">("forms");
+  const [activeTab, setActiveTab]               = useState<"forms" | "trainees" | "ops-staff">("forms");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedTrainee, setSelectedTrainee]   = useState<TraineeRecord>(TRAINEES[0]);
   const [traineeTab, setTraineeTab]             = useState<"overview" | "approaches" | "milestones">("overview");
   const [aiGenerating, setAiGenerating]         = useState(false);
+
+  // ── Ops Staff Training Matrix state ──
+  const [opsStaff, setOpsStaff] = useState<OpsStaffMember[]>(OPS_STAFF_DEFAULT);
+  const [opsStatus, setOpsStatus] = useState<Record<string, Record<string, CellStatus>>>(() => {
+    const init: Record<string, Record<string, CellStatus>> = {};
+    OPS_STAFF_DEFAULT.forEach((s, i) => { init[s.id] = seedStatusMap(i); });
+    return init;
+  });
+  const [opsGapNotes, setOpsGapNotes] = useState<Record<string, GapNote[]>>({});
+  const [opsSignOffs, setOpsSignOffs] = useState<Record<string, WeekSignOff[]>>({});
+  const [selectedOpsStaffId, setSelectedOpsStaffId] = useState<string | null>(null);
+  const [showAddStaff, setShowAddStaff] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: "", role: "", base: "", startDate: "" });
+  const [showGapReport, setShowGapReport] = useState(false);
+  const [exportCopied, setExportCopied] = useState(false);
 
   const filtered = selectedCategory === "All"
     ? JOTFORM_FORMS
@@ -338,6 +577,125 @@ export default function CheckTraining({ role }: Props) {
       ],
     });
   }
+
+  // ── Ops Staff Training Matrix handlers ──
+  function cycleOpsCell(staffId: string, moduleId: string) {
+    setOpsStatus(prev => {
+      const staffMap = { ...(prev[staffId] ?? defaultStatusMap()) };
+      const current = staffMap[moduleId] ?? "not-started";
+      const next = nextStatus(current);
+      staffMap[moduleId] = next;
+
+      // If moving away from "gap", clean up any note automatically kept in sync via opsGapNotes elsewhere
+      return { ...prev, [staffId]: staffMap };
+    });
+  }
+
+  function updateGapNote(staffId: string, moduleId: string, notes: string) {
+    setOpsGapNotes(prev => {
+      const existing = prev[staffId] ?? [];
+      const idx = existing.findIndex(g => g.moduleId === moduleId);
+      const updated = [...existing];
+      if (idx >= 0) {
+        updated[idx] = { moduleId, notes };
+      } else {
+        updated.push({ moduleId, notes });
+      }
+      return { ...prev, [staffId]: updated };
+    });
+  }
+
+  function updateSignOff(staffId: string, weekId: string, field: "assessor" | "date", value: string) {
+    setOpsSignOffs(prev => {
+      const existing = prev[staffId] ?? [];
+      const idx = existing.findIndex(s => s.weekId === weekId);
+      const updated = [...existing];
+      if (idx >= 0) {
+        updated[idx] = { ...updated[idx], [field]: value };
+      } else {
+        updated.push({ weekId, assessor: field === "assessor" ? value : "", date: field === "date" ? value : "" });
+      }
+      return { ...prev, [staffId]: updated };
+    });
+  }
+
+  function addOpsStaffMember() {
+    if (!newStaff.name.trim() || !newStaff.role.trim() || !newStaff.base.trim() || !newStaff.startDate.trim()) return;
+    const id = `s${Date.now()}`;
+    const member: OpsStaffMember = { id, ...newStaff };
+    setOpsStaff(prev => [...prev, member]);
+    setOpsStatus(prev => ({ ...prev, [id]: defaultStatusMap() }));
+    setNewStaff({ name: "", role: "", base: "", startDate: "" });
+    setShowAddStaff(false);
+  }
+
+  function allOpsGaps(): { staffName: string; moduleId: string; notes: string }[] {
+    const gaps: { staffName: string; moduleId: string; notes: string }[] = [];
+    opsStaff.forEach(s => {
+      const map = opsStatus[s.id] ?? {};
+      ALL_MODULES.forEach(m => {
+        if (map[m.id] === "gap") {
+          const note = (opsGapNotes[s.id] ?? []).find(g => g.moduleId === m.id)?.notes ?? "";
+          gaps.push({ staffName: s.name, moduleId: m.id, notes: note });
+        }
+      });
+    });
+    return gaps;
+  }
+
+  function exportOpsSummary() {
+    const lines: string[] = [];
+    lines.push("OPS STAFF TRAINING MATRIX — SUMMARY");
+    lines.push(`Generated: ${new Date().toLocaleDateString("en-AU")}`);
+    lines.push("");
+    opsStaff.forEach(s => {
+      const map = opsStatus[s.id] ?? {};
+      const pct = completionPct(map);
+      const status = calcOverallStatus(map, s.startDate);
+      const complete = countByStatus(map, "complete");
+      const gaps = countByStatus(map, "gap");
+      lines.push(`${s.name} (${s.role}, ${s.base})`);
+      lines.push(`  Started: ${s.startDate} · Progress: ${complete}/${TOTAL_MODULES} modules (${pct}%) · Status: ${status}`);
+      if (gaps > 0) {
+        lines.push(`  Gaps identified: ${gaps}`);
+        ALL_MODULES.forEach(m => {
+          if (map[m.id] === "gap") {
+            const note = (opsGapNotes[s.id] ?? []).find(g => g.moduleId === m.id)?.notes;
+            lines.push(`    - ${m.title}${note ? ` (${note})` : ""}`);
+          }
+        });
+      }
+      const week5Map = map;
+      const week5Complete = WEEK5_MODULE_IDS.every(id => week5Map[id] === "complete");
+      if (week5Complete) {
+        lines.push(`  ★ Special Missions Certified`);
+      }
+      lines.push("");
+    });
+    const totalGaps = allOpsGaps().length;
+    const avgPct = Math.round(opsStaff.reduce((acc, s) => acc + completionPct(opsStatus[s.id] ?? {}), 0) / (opsStaff.length || 1));
+    const completedStaff = opsStaff.filter(s => countByStatus(opsStatus[s.id] ?? {}, "complete") === TOTAL_MODULES).length;
+    lines.push("---");
+    lines.push(`Total staff in program: ${opsStaff.length}`);
+    lines.push(`Average completion: ${avgPct}%`);
+    lines.push(`Gaps identified: ${totalGaps}`);
+    lines.push(`Staff completed: ${completedStaff}`);
+
+    const text = lines.join("\n");
+    navigator.clipboard?.writeText(text).then(() => {
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    }).catch(() => {
+      setExportCopied(true);
+      setTimeout(() => setExportCopied(false), 2000);
+    });
+  }
+
+  const selectedOpsStaff = opsStaff.find(s => s.id === selectedOpsStaffId) ?? null;
+  const opsAvgPct = Math.round(opsStaff.reduce((acc, s) => acc + completionPct(opsStatus[s.id] ?? {}), 0) / (opsStaff.length || 1));
+  const opsTotalGaps = allOpsGaps().length;
+  const opsCompletedStaff = opsStaff.filter(s => countByStatus(opsStatus[s.id] ?? {}, "complete") === TOTAL_MODULES).length;
+
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -399,6 +757,18 @@ export default function CheckTraining({ role }: Props) {
           <GraduationCap size={14} />
           AI Trainee Tracker
           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-semibold">Supervisory</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("ops-staff")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+            activeTab === "ops-staff"
+              ? "border-amber-400 text-amber-400"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <GraduationCap size={14} />
+          Ops Staff
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold">Training Matrix</span>
         </button>
       </div>
 
@@ -845,6 +1215,392 @@ export default function CheckTraining({ role }: Props) {
 
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ═══════════════ OPS STAFF TRAINING MATRIX TAB ═══════════════ */}
+      {activeTab === "ops-staff" && (
+        <div className="space-y-5">
+
+          {/* Banner */}
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-amber-500/20" style={{ background: "rgba(245,158,11,0.05)" }}>
+            <UserCheck size={14} className="text-amber-400 shrink-0" />
+            <div className="flex-1 text-xs">
+              <span className="font-semibold text-amber-400">Ops Staff Training Matrix</span>
+              <span className="text-muted-foreground ml-1.5">— 5-week onboarding program covering foundations, finance, team lead skills, competency integration, and special missions.</span>
+            </div>
+          </div>
+
+          {/* Summary KPI dashboard */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-card rounded-xl border border-card-border p-3 sm:p-4">
+              <div className="text-2xl font-bold text-amber-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{opsStaff.length}</div>
+              <div className="text-xs font-semibold mt-0.5">Total Staff</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">In training program</div>
+            </div>
+            <div className="bg-card rounded-xl border border-card-border p-3 sm:p-4">
+              <div className="text-2xl font-bold text-cyan-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{opsAvgPct}%</div>
+              <div className="text-xs font-semibold mt-0.5">Avg Completion</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Across {TOTAL_MODULES} modules</div>
+            </div>
+            <div className="bg-card rounded-xl border border-card-border p-3 sm:p-4">
+              <div className={`text-2xl font-bold ${opsTotalGaps > 0 ? "text-red-400" : "text-green-400"}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{opsTotalGaps}</div>
+              <div className="text-xs font-semibold mt-0.5">Gaps Identified</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">Requires review</div>
+            </div>
+            <div className="bg-card rounded-xl border border-card-border p-3 sm:p-4">
+              <div className="text-2xl font-bold text-green-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{opsCompletedStaff}</div>
+              <div className="text-xs font-semibold mt-0.5">Staff Completed</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">All {TOTAL_MODULES} modules</div>
+            </div>
+          </div>
+
+          {/* Action bar */}
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowAddStaff(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400 hover:bg-amber-500/20 transition-colors font-semibold"
+            >
+              <Plus size={12} /> Add Staff Member
+            </button>
+            <button
+              onClick={exportOpsSummary}
+              className="flex items-center gap-1.5 px-3 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-xs text-cyan-400 hover:bg-cyan-500/20 transition-colors font-semibold"
+            >
+              <Copy size={12} /> {exportCopied ? "Copied!" : "Export Summary"}
+            </button>
+            <button
+              onClick={() => setShowGapReport(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400 hover:bg-red-500/20 transition-colors font-semibold"
+            >
+              <ClipboardList size={12} /> Gap Report {opsTotalGaps > 0 && `(${opsTotalGaps})`}
+            </button>
+          </div>
+
+          {/* Add staff inline form */}
+          {showAddStaff && (
+            <div className="bg-card rounded-xl border border-amber-500/30 p-4 space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+                <Plus size={12} /> Add Staff Member
+              </h3>
+              <div className="grid sm:grid-cols-4 gap-3">
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={newStaff.name}
+                  onChange={e => setNewStaff(prev => ({ ...prev, name: e.target.value }))}
+                  className="bg-background/50 border border-card-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-400/50"
+                />
+                <input
+                  type="text"
+                  placeholder="Role"
+                  value={newStaff.role}
+                  onChange={e => setNewStaff(prev => ({ ...prev, role: e.target.value }))}
+                  className="bg-background/50 border border-card-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-400/50"
+                />
+                <input
+                  type="text"
+                  placeholder="Base"
+                  value={newStaff.base}
+                  onChange={e => setNewStaff(prev => ({ ...prev, base: e.target.value }))}
+                  className="bg-background/50 border border-card-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-400/50"
+                />
+                <input
+                  type="date"
+                  placeholder="Start date"
+                  value={newStaff.startDate}
+                  onChange={e => setNewStaff(prev => ({ ...prev, startDate: e.target.value }))}
+                  className="bg-background/50 border border-card-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-400/50"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={addOpsStaffMember}
+                  className="px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded-lg text-xs text-amber-400 hover:bg-amber-500/30 transition-colors font-semibold"
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => setShowAddStaff(false)}
+                  className="px-3 py-1.5 bg-muted border border-border rounded-lg text-xs text-muted-foreground hover:bg-muted/70 transition-colors font-semibold"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Matrix view */}
+          <div className="bg-card rounded-xl border border-card-border overflow-hidden">
+            <div className="px-4 py-3 border-b border-card-border flex items-center justify-between">
+              <h2 className="text-sm font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                <ClipboardList size={14} className="text-amber-400" /> Training Competency Matrix
+              </h2>
+              <span className="text-[10px] text-muted-foreground">Click a cell to cycle status</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse min-w-[1400px]">
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-card-border min-w-[180px]">
+                      Staff
+                    </th>
+                    {TRAINING_PROGRAM.map(week => (
+                      <th
+                        key={week.id}
+                        colSpan={week.modules.length}
+                        className="text-center px-2 py-2 font-semibold text-[10px] uppercase tracking-wider border-b border-l border-card-border bg-muted/20"
+                      >
+                        {week.label}
+                      </th>
+                    ))}
+                  </tr>
+                  <tr>
+                    <th className="sticky left-0 z-10 bg-card px-4 py-1 border-b border-card-border" />
+                    {TRAINING_PROGRAM.map(week => (
+                      week.modules.map((m, i) => (
+                        <th
+                          key={m.id}
+                          title={m.title}
+                          className={`px-1 py-1.5 border-b border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom ${i === 0 ? "border-l" : ""}`}
+                          style={{ writingMode: "vertical-rl", maxHeight: "120px" }}
+                        >
+                          <span className="inline-block max-w-[110px] truncate">{m.title}</span>
+                        </th>
+                      ))
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {opsStaff.map(staff => {
+                    const map = opsStatus[staff.id] ?? defaultStatusMap();
+                    return (
+                      <tr key={staff.id} className="border-b border-border last:border-0 hover:bg-muted/10 transition-colors">
+                        <td className="sticky left-0 z-10 bg-card px-4 py-2 border-r border-card-border">
+                          <button
+                            onClick={() => setSelectedOpsStaffId(staff.id)}
+                            className="text-left hover:text-amber-400 transition-colors"
+                          >
+                            <div className="text-xs font-semibold">{staff.name}</div>
+                            <div className="text-[10px] text-muted-foreground">{staff.role} · {staff.base}</div>
+                          </button>
+                        </td>
+                        {TRAINING_PROGRAM.map(week => (
+                          week.modules.map((m, i) => {
+                            const status = map[m.id] ?? "not-started";
+                            const meta = cellStatusMeta(status);
+                            return (
+                              <td key={m.id} className={`p-1 ${i === 0 ? "border-l border-card-border" : ""}`}>
+                                <button
+                                  onClick={() => cycleOpsCell(staff.id, m.id)}
+                                  title={`${m.title} — ${status}`}
+                                  className={`w-full h-8 flex items-center justify-center rounded border ${meta.bg} ${meta.border} hover:opacity-70 transition-opacity`}
+                                >
+                                  {meta.icon}
+                                </button>
+                              </td>
+                            );
+                          })
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-4 px-4 py-3 border-t border-card-border text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-background/50 border border-card-border" /> Not Started</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-amber-400" /></div> In Progress</div>
+              <div className="flex items-center gap-1.5"><CheckSquare size={12} className="text-green-400" /> Complete</div>
+              <div className="flex items-center gap-1.5"><XCircle size={12} className="text-red-400" /> Gap</div>
+            </div>
+          </div>
+
+          {/* Individual staff card / panel */}
+          {selectedOpsStaff && (() => {
+            const staff = selectedOpsStaff;
+            const map = opsStatus[staff.id] ?? defaultStatusMap();
+            const complete = countByStatus(map, "complete");
+            const pct = completionPct(map);
+            const overall = calcOverallStatus(map, staff.startDate);
+            const weeksIn = weeksIntoProgram(staff.startDate);
+            const gapEntries = ALL_MODULES.filter(m => map[m.id] === "gap");
+            const staffGapNotes = opsGapNotes[staff.id] ?? [];
+            const staffSignOffs = opsSignOffs[staff.id] ?? [];
+            const week5Complete = WEEK5_MODULE_IDS.every(id => map[id] === "complete");
+
+            return (
+              <div className="bg-card rounded-xl border border-amber-500/30 overflow-hidden">
+                <div className="px-5 py-4 border-b border-card-border flex items-center justify-between flex-wrap gap-3" style={{ background: "rgba(245,158,11,0.04)" }}>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className="text-base font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{staff.name}</div>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full font-semibold ${OVERALL_STATUS_COLOR[overall]}`}>{overall}</span>
+                      {week5Complete && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 flex items-center gap-1">
+                          <Award size={10} /> Special Missions Certified
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{staff.role} · {staff.base} · Started {staff.startDate} · Week {weeksIn} of program</div>
+                  </div>
+                  <button
+                    onClick={() => setSelectedOpsStaffId(null)}
+                    className="p-1.5 rounded-lg hover:bg-muted/40 transition-colors"
+                  >
+                    <X size={14} className="text-muted-foreground" />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-5">
+                  {/* Progress bar */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-semibold">Overall Progress</span>
+                      <span className="font-bold text-amber-400">{complete} of {TOTAL_MODULES} modules ({pct}%)</span>
+                    </div>
+                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${pct === 100 ? "bg-green-400" : pct >= 50 ? "bg-cyan-400" : "bg-amber-400"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Week-by-week breakdown */}
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                      <BookOpen size={12} /> Week-by-Week Breakdown
+                    </h3>
+                    <div className="space-y-3">
+                      {TRAINING_PROGRAM.map(week => {
+                        const weekComplete = week.modules.filter(m => map[m.id] === "complete").length;
+                        const signOff = staffSignOffs.find(s => s.weekId === week.id);
+                        return (
+                          <div key={week.id} className="bg-background/50 rounded-xl border border-card-border p-3">
+                            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                              <span className="text-xs font-semibold">{week.label}</span>
+                              <span className="text-[10px] text-muted-foreground">{weekComplete} / {week.modules.length} complete</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              {week.modules.map(m => {
+                                const status = map[m.id] ?? "not-started";
+                                const meta = cellStatusMeta(status);
+                                return (
+                                  <div key={m.id} className="flex items-center gap-2 text-[11px]">
+                                    <div className={`w-5 h-5 rounded flex items-center justify-center border shrink-0 ${meta.bg} ${meta.border}`}>
+                                      {meta.icon}
+                                    </div>
+                                    <span className={status === "complete" ? "text-muted-foreground line-through" : ""}>{m.title}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {/* Assessor sign-off */}
+                            <div className="mt-3 pt-3 border-t border-card-border grid sm:grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                placeholder="Assessor name"
+                                value={signOff?.assessor ?? ""}
+                                onChange={e => updateSignOff(staff.id, week.id, "assessor", e.target.value)}
+                                className="bg-card border border-card-border rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:border-amber-400/50"
+                              />
+                              <input
+                                type="date"
+                                value={signOff?.date ?? ""}
+                                onChange={e => updateSignOff(staff.id, week.id, "date", e.target.value)}
+                                className="bg-card border border-card-border rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:border-amber-400/50"
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Gap analysis */}
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-red-400 mb-3 flex items-center gap-2">
+                      <AlertCircle size={12} /> Gap Analysis
+                    </h3>
+                    {gapEntries.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No knowledge gaps identified.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {gapEntries.map(m => {
+                          const note = staffGapNotes.find(g => g.moduleId === m.id)?.notes ?? "";
+                          return (
+                            <div key={m.id} className="bg-red-500/5 border border-red-500/20 rounded-xl p-3">
+                              <div className="flex items-center gap-2 text-xs font-semibold mb-1.5">
+                                <XCircle size={12} className="text-red-400" /> {m.title}
+                                <span className="text-[10px] text-muted-foreground font-normal ml-auto">{weekLabelForModuleId(m.id)}</span>
+                              </div>
+                              <textarea
+                                placeholder="Notes on the identified gap and remediation plan…"
+                                value={note}
+                                onChange={e => updateGapNote(staff.id, m.id, e.target.value)}
+                                className="w-full bg-background/50 border border-card-border rounded-lg px-2 py-1.5 text-[11px] focus:outline-none focus:border-red-400/50 resize-none"
+                                rows={2}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Gap report modal */}
+          {showGapReport && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowGapReport(false)}>
+              <div
+                className="bg-card rounded-2xl border border-card-border max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="px-5 py-4 border-b border-card-border flex items-center justify-between">
+                  <h2 className="text-sm font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                    <ClipboardList size={14} className="text-red-400" /> Gap Report — Manager Review
+                  </h2>
+                  <button onClick={() => setShowGapReport(false)} className="p-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+                    <X size={14} className="text-muted-foreground" />
+                  </button>
+                </div>
+                <div className="overflow-y-auto flex-1">
+                  {allOpsGaps().length === 0 ? (
+                    <div className="p-6 text-center text-xs text-muted-foreground">No gaps currently identified across any staff member.</div>
+                  ) : (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/20 sticky top-0">
+                          <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Staff Name</th>
+                          <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Module</th>
+                          <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Week</th>
+                          <th className="text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {allOpsGaps().map((g, i) => (
+                          <tr key={i} className="border-b border-border last:border-0">
+                            <td className="px-4 py-3 font-semibold">{g.staffName}</td>
+                            <td className="px-4 py-3">{moduleTitleById(g.moduleId)}</td>
+                            <td className="px-4 py-3 text-muted-foreground">{weekLabelForModuleId(g.moduleId)}</td>
+                            <td className="px-4 py-3 text-muted-foreground italic">{g.notes || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
