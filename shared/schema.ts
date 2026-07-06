@@ -107,6 +107,7 @@ export const neptTasks = sqliteTable("nept_tasks", {
   pilotName:     text("pilot_name"),
   nurseName:     text("nurse_name"),
   dispatchedBy:  text("dispatched_by"),
+  estimatedEta:  text("estimated_eta"),               // ISO datetime — estimated arrival at destination
   actualDepart:  text("actual_depart"),               // ISO datetime
   actualArrive:  text("actual_arrive"),               // ISO datetime
   notes:         text("notes"),

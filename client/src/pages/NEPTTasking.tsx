@@ -34,6 +34,7 @@ interface NeptTask {
   pilotName: string | null;
   nurseName: string | null;
   dispatchedBy: string | null;
+  estimatedEta: string | null;
   actualDepart: string | null;
   actualArrive: string | null;
   notes: string | null;
@@ -115,6 +116,7 @@ function emptyDraft(ref: string): TaskDraft {
     pilotName: null,
     nurseName: null,
     dispatchedBy: null,
+    estimatedEta: null,
     actualDepart: null,
     actualArrive: null,
     notes: null,
@@ -202,10 +204,6 @@ function TaskModal({
             <div>
               <label className={labelCls}>Request Time</label>
               <input type="datetime-local" className={fieldCls} value={d.requestTime?.slice(0,16) ?? ""} onChange={e => set("requestTime", e.target.value)} />
-            </div>
-            <div>
-              <label className={labelCls}>Required By</label>
-              <input type="datetime-local" className={fieldCls} value={d.requiredBy?.slice(0,16) ?? ""} onChange={e => set("requiredBy", e.target.value)} />
             </div>
           </div>
 
@@ -307,7 +305,19 @@ function TaskModal({
             </div>
           </div>
 
-          {/* Row 7 — actual times (for completion) */}
+          {/* Row 7 — ETA + required by */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Estimated ETA</label>
+              <input type="datetime-local" className={`${fieldCls} border-cyan-400/30 focus:border-cyan-400/60`} value={d.estimatedEta?.slice(0,16) ?? ""} onChange={e => set("estimatedEta", e.target.value || null)} />
+            </div>
+            <div>
+              <label className={labelCls}>Required By</label>
+              <input type="datetime-local" className={fieldCls} value={d.requiredBy?.slice(0,16) ?? ""} onChange={e => set("requiredBy", e.target.value || null)} />
+            </div>
+          </div>
+
+          {/* Row 8 — actual times (for completion) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Actual Departure</label>
@@ -585,7 +595,7 @@ export default function NEPTTasking({ role }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-card-border bg-muted/10">
-                {["Task Ref", "Priority", "Status", "Pickup → Destination", "Patient / Ref", "Aircraft & Crew", "Required By", "Actions"].map(h => (
+                {["Task Ref", "Priority", "Status", "Pickup → Destination", "Patient / Ref", "Aircraft & Crew", "ETA", "Actions"].map(h => (
                   <th key={h} className="text-left text-muted-foreground font-medium px-3 py-3 whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -646,9 +656,16 @@ export default function NEPTTasking({ role }: Props) {
                       {t.nurseName && <div className="text-[10px] text-muted-foreground">{t.nurseName}</div>}
                     </td>
                     <td className="px-3 py-3">
-                      <span className={t.requiredBy && new Date(t.requiredBy) < new Date() && t.status !== "Complete" ? "text-red-400 font-semibold" : "text-foreground"}>
-                        {fmtDT(t.requiredBy)}
-                      </span>
+                      {t.estimatedEta ? (
+                        <span className={`font-semibold ${
+                          t.status === "En Route" ? "text-cyan-300" :
+                          t.status === "Complete" ? "text-green-400" : "text-foreground"
+                        }`}>
+                          {fmtDT(t.estimatedEta)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground text-[10px]">Not set</span>
+                      )}
                     </td>
                     <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                       {canDispatch && (
@@ -686,6 +703,7 @@ export default function NEPTTasking({ role }: Props) {
                           <div className="space-y-1.5">
                             <div className="font-semibold text-foreground/60 uppercase tracking-wide text-[10px] mb-2">Times</div>
                             <div><span className="text-muted-foreground">Requested: </span>{fmtDT(t.requestTime)}</div>
+                            {t.estimatedEta && <div><span className="text-muted-foreground">ETA: </span><span className="text-cyan-300 font-semibold">{fmtDT(t.estimatedEta)}</span></div>}
                             <div><span className="text-muted-foreground">Required by: </span>{fmtDT(t.requiredBy)}</div>
                             <div><span className="text-muted-foreground">Actual depart: </span>{fmtDT(t.actualDepart)}</div>
                             <div><span className="text-muted-foreground">Actual arrive: </span>{fmtDT(t.actualArrive)}</div>
@@ -754,6 +772,17 @@ export default function NEPTTasking({ role }: Props) {
                   {t.pilotName && <div className="text-[10px] text-muted-foreground">{t.pilotName}</div>}
                 </div>
               </div>
+              {/* ETA pill on mobile */}
+              {t.estimatedEta && (
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Clock size={11} className="text-cyan-400" />
+                  <span className="text-muted-foreground">ETA:</span>
+                  <span className={`font-semibold ${
+                    t.status === "En Route" ? "text-cyan-300" :
+                    t.status === "Complete" ? "text-green-400" : "text-foreground"
+                  }`}>{fmtDT(t.estimatedEta)}</span>
+                </div>
+              )}
               {canDispatch && (
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => { setEditTask(t); setShowModal(true); }}

@@ -128,6 +128,7 @@ sqlite.exec(`
     pilot_name TEXT,
     nurse_name TEXT,
     dispatched_by TEXT,
+    estimated_eta TEXT,
     actual_depart TEXT,
     actual_arrive TEXT,
     notes TEXT,
@@ -135,6 +136,13 @@ sqlite.exec(`
     updated_at TEXT NOT NULL
   );
 `);
+
+// ── Migrations for existing DBs ───────────────────────────────────────────────
+const existingCols = sqlite.prepare("PRAGMA table_info(nept_tasks)").all() as { name: string }[];
+const neptColNames = existingCols.map(c => c.name);
+if (!neptColNames.includes("estimated_eta")) {
+  sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN estimated_eta TEXT");
+}
 
 export const db = drizzle(sqlite);
 
