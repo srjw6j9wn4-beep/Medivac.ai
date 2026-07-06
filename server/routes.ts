@@ -774,6 +774,38 @@ export async function registerRoutes(
     console.log(`[notam-watch] Sent alert for ${flagged.length} flagged NOTAMs to ${subs.length} devices`);
   }
 
+  // ── NEPT Tasking Board ────────────────────────────────────────────────────
+  app.get("/api/nept-tasks", async (_req: Request, res: Response) => {
+    try {
+      const tasks = await storage.listNeptTasks();
+      res.json(tasks);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  app.post("/api/nept-tasks", async (req: Request, res: Response) => {
+    try {
+      const now = new Date().toISOString();
+      const task = await storage.createNeptTask({ ...req.body, createdAt: now, updatedAt: now });
+      res.status(201).json(task);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  app.patch("/api/nept-tasks/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const task = await storage.updateNeptTask(id, req.body);
+      if (!task) return res.status(404).json({ error: "Not found" });
+      res.json(task);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  app.delete("/api/nept-tasks/:id", async (req: Request, res: Response) => {
+    try {
+      await storage.deleteNeptTask(parseInt(req.params.id));
+      res.json({ ok: true });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
   // ── Chest item edits persistence ───────────────────────────────────────────
   // GET /api/chest-item-edits — all saved edits as { chestId_itemId -> {...} }
   app.get("/api/chest-item-edits", async (_req: Request, res: Response) => {

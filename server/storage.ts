@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -108,6 +108,32 @@ sqlite.exec(`
     updated_by TEXT NOT NULL DEFAULT 'nurse',
     UNIQUE(chest_id, item_id)
   );
+  CREATE TABLE IF NOT EXISTS nept_tasks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_ref TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pending',
+    priority TEXT NOT NULL DEFAULT 'Routine',
+    request_time TEXT NOT NULL,
+    required_by TEXT,
+    pickup_location TEXT NOT NULL,
+    pickup_icao TEXT,
+    dest_location TEXT NOT NULL,
+    dest_icao TEXT,
+    patient_name TEXT,
+    patient_ref TEXT,
+    escort_name TEXT,
+    referring_hospital TEXT,
+    receiving_hospital TEXT,
+    aircraft_reg TEXT,
+    pilot_name TEXT,
+    nurse_name TEXT,
+    dispatched_by TEXT,
+    actual_depart TEXT,
+    actual_arrive TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `);
 
 export const db = drizzle(sqlite);
@@ -160,6 +186,12 @@ export interface IStorage {
   // Chest item edits
   listChestItemEdits(chestId?: string): Promise<ChestItemEdit[]>;
   upsertChestItemEdit(chestId: string, itemId: string, data: { expiryDate?: string | null; qtyPresent?: number | null; note?: string | null; flagReorder?: boolean }, updatedBy: string): Promise<ChestItemEdit>;
+  // NEPT tasks
+  listNeptTasks(): Promise<NeptTask[]>;
+  getNeptTask(id: number): Promise<NeptTask | undefined>;
+  createNeptTask(data: Omit<NeptTask, 'id'>): Promise<NeptTask>;
+  updateNeptTask(id: number, updates: Partial<NeptTask>): Promise<NeptTask>;
+  deleteNeptTask(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -374,6 +406,26 @@ export class DatabaseStorage implements IStorage {
         updatedBy,
       })
       .returning().get()!;
+  }
+
+  // ── NEPT tasks ───────────────────────────────────────────────────────────
+  async listNeptTasks(): Promise<NeptTask[]> {
+    return db.select().from(neptTasks).all();
+  }
+  async getNeptTask(id: number): Promise<NeptTask | undefined> {
+    return db.select().from(neptTasks).where(eq(neptTasks.id, id)).get();
+  }
+  async createNeptTask(data: Omit<NeptTask, 'id'>): Promise<NeptTask> {
+    return db.insert(neptTasks).values(data).returning().get()!;
+  }
+  async updateNeptTask(id: number, updates: Partial<NeptTask>): Promise<NeptTask> {
+    return db.update(neptTasks)
+      .set({ ...updates, updatedAt: new Date().toISOString() })
+      .where(eq(neptTasks.id, id))
+      .returning().get()!;
+  }
+  async deleteNeptTask(id: number): Promise<void> {
+    db.delete(neptTasks).where(eq(neptTasks.id, id)).run();
   }
 
   listActiveMissions(): any[] {

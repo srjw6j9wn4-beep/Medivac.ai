@@ -43,7 +43,7 @@ import PassengerManifest from "@/pages/PassengerManifest";
 import MissionOptimiser from "@/pages/MissionOptimiser";
 import ManifestSign from "@/pages/ManifestSign";
 import TechLogEmbed from "@/pages/TechLogEmbed";
-import ISOCompliance from "@/pages/ISOCompliance";
+import NEPTTasking from "@/pages/NEPTTasking";
 import { FEATURES } from "@/lib/config";
 import type { UserRole } from "@/lib/data";
 
@@ -69,6 +69,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/missions" component={() => <MissionBoard role={role} />} />
       <Route path="/map" component={() => <FlightMap role={role} />} />
       <Route path="/dispatch" component={() => <Dispatch role={role} />} />
+      <Route path="/nept-tasking" component={() => <NEPTTasking role={role} />} />
       <Route path="/ora" component={() => <OperationalRiskAssessment role={role} />} />
       <Route path="/morning-brief" component={() => <MorningBrief role={role} />} />
       <Route path="/passenger-manifest" component={() => <PassengerManifest role={role} />} />

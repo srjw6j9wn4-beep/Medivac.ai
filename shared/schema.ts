@@ -85,3 +85,35 @@ export const chestItemEditsTable = sqliteTable("chest_item_edits", {
 export const insertChestItemEditSchema = createInsertSchema(chestItemEditsTable).omit({ id: true });
 export type InsertChestItemEdit = z.infer<typeof insertChestItemEditSchema>;
 export type ChestItemEdit = typeof chestItemEditsTable.$inferSelect;
+
+// ── NEPT Tasks ─────────────────────────────────────────────────────────────
+export const neptTasks = sqliteTable("nept_tasks", {
+  id:            integer("id").primaryKey({ autoIncrement: true }),
+  taskRef:       text("task_ref").notNull(),          // e.g. "NEPT-2026-0047"
+  status:        text("status").notNull().default("Pending"),  // Pending | Assigned | En Route | Complete | Cancelled
+  priority:      text("priority").notNull().default("Routine"), // Routine | Urgent | Emergency
+  requestTime:   text("request_time").notNull(),      // ISO datetime
+  requiredBy:    text("required_by"),                 // ISO datetime — requested departure
+  pickupLocation:text("pickup_location").notNull(),   // free text — hospital / address
+  pickupIcao:    text("pickup_icao"),                 // airport code if applicable
+  destLocation:  text("dest_location").notNull(),     // free text
+  destIcao:      text("dest_icao"),
+  patientName:   text("patient_name"),                // identify only — no clinical data
+  patientRef:    text("patient_ref"),                 // task ID / UR number
+  escortName:    text("escort_name"),
+  referringHospital: text("referring_hospital"),
+  receivingHospital: text("receiving_hospital"),
+  aircraftReg:   text("aircraft_reg"),                // assigned aircraft
+  pilotName:     text("pilot_name"),
+  nurseName:     text("nurse_name"),
+  dispatchedBy:  text("dispatched_by"),
+  actualDepart:  text("actual_depart"),               // ISO datetime
+  actualArrive:  text("actual_arrive"),               // ISO datetime
+  notes:         text("notes"),
+  createdAt:     text("created_at").notNull(),
+  updatedAt:     text("updated_at").notNull(),
+});
+
+export const insertNeptTaskSchema = createInsertSchema(neptTasks).omit({ id: true });
+export type InsertNeptTask = z.infer<typeof insertNeptTaskSchema>;
+export type NeptTask = typeof neptTasks.$inferSelect;
