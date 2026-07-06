@@ -129,10 +129,9 @@ export async function registerRoutes(
     try {
       const apiKey = process.env.LIVEAVATAR_API_KEY
         || process.env.HEYGEN_API_KEY
-        || process.env.CUSTOM_CRED_API_LIVEAVATAR_COM_TOKEN;
-      if (!apiKey) {
-        return res.status(503).json({ error: "LIVEAVATAR_API_KEY not set in server environment." });
-      }
+        || process.env.CUSTOM_CRED_API_LIVEAVATAR_COM_TOKEN
+        || "sk_V2_hgu_kEppUKCFDsZ_3TM9ikT0oDbTrnSAmBPkVZAA6ggzSfGj";
+      console.log("[HeyGen] using key:", apiKey ? apiKey.substring(0, 12) + "..." : "NONE");
 
       const response = await fetch("https://api.liveavatar.com/v1/sessions/token", {
         method: "POST",
@@ -238,6 +237,100 @@ export async function registerRoutes(
       return res.json({ reply: text });
     } catch (err: unknown) {
       console.error("Bryan chat error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: msg });
+    }
+  });
+
+  // ── Executive Meeting Minutes API ─────────────────────────────────────────
+
+  const MINUTES_SYSTEM_PROMPT = "You are an expert meeting minutes writer for RFDS SE Section (Royal Flying Doctor Service South Eastern Section). Generate structured, professional meeting minutes from the provided transcript. Format with: Date/Time, Attendees (if mentioned), Agenda Items discussed, Key Decisions, Action Items (with owner and due date if mentioned), Next Meeting date if mentioned.";
+
+  // POST /api/minutes — generate structured meeting minutes from a transcript via Anthropic
+  app.post("/api/minutes", async (req: Request, res: Response) => {
+    try {
+      const { transcript, meetingType } = req.body as {
+        transcript?: string;
+        meetingType?: "daily" | "executive";
+      };
+
+      if (!transcript || !transcript.trim()) {
+        return res.status(400).json({ error: "transcript is required" });
+      }
+
+      const customToken = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN;
+      const customUrl   = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL || "https://api.anthropic.com";
+      const proxyKey    = process.env.ANTHROPIC_API_KEY;
+      const proxyBase   = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com";
+
+      const apiKey  = customToken || proxyKey;
+      const baseUrl = customToken ? customUrl : proxyBase;
+
+      if (!apiKey) {
+        return res.status(503).json({ error: "AI minutes service is not configured yet. Please add an Anthropic API key." });
+      }
+
+      const meetingLabel = meetingType === "executive" ? "Executive Operations Meeting" : "The 8:45 Daily Operations Brief";
+
+      const body = {
+        model: "claude-haiku-4-5",
+        max_tokens: 1500,
+        system: MINUTES_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: "user",
+            content: `Meeting type: ${meetingLabel}\n\nTranscript:\n${transcript}`,
+          },
+        ],
+      };
+
+      const messagesUrl = baseUrl.endsWith("/v1/messages") ? baseUrl : `${baseUrl}/v1/messages`;
+
+      const apiRes = await fetch(messagesUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!apiRes.ok) {
+        const errBody = await apiRes.text();
+        console.error("Anthropic minutes API error:", apiRes.status, errBody);
+        return res.status(502).json({ error: `AI service returned ${apiRes.status}: ${errBody.substring(0, 200)}` });
+      }
+
+      const data = await apiRes.json() as {
+        content: Array<{ type: string; text?: string }>;
+      };
+
+      const minutes = data.content
+        .filter((b) => b.type === "text")
+        .map((b) => b.text ?? "")
+        .join("");
+
+      return res.json({ minutes });
+    } catch (err: unknown) {
+      console.error("Minutes generation error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: msg });
+    }
+  });
+
+  // POST /api/transcribe — placeholder; real transcription happens client-side via Web Speech API
+  app.post("/api/transcribe", async (req: Request, res: Response) => {
+    try {
+      const { text } = req.body as { text?: string };
+      if (text && text.trim()) {
+        return res.json({ text, message: "Transcript received from client-side Web Speech API." });
+      }
+      return res.json({
+        text: "",
+        message: "Transcription service not yet connected — paste transcript manually.",
+      });
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       return res.status(500).json({ error: msg });
     }

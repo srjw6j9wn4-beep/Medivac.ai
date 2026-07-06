@@ -7,10 +7,11 @@ import TechLogWidget from "@/components/TechLogWidget";
 import {
   Clock, Plane, AlertTriangle, CheckCircle, ChevronDown, ChevronRight,
   Radio, Truck, CloudRain, Calendar, MapPin, Users, Activity,
-  AlertCircle, FileText, Clipboard, Wind, RefreshCw,
+  AlertCircle, FileText, FileText as FileTextIcon, Clipboard, Wind, RefreshCw,
   Sun, Cloud, CloudDrizzle, CloudSnow, CloudLightning, Droplets,
   Thermometer, Navigation, CloudFog, Edit3, Save, X, ExternalLink,
-  LayoutGrid, Table2, Plus, Trash2, Maximize, Minimize, Monitor
+  LayoutGrid, Table2, Plus, Trash2, Maximize, Minimize, Monitor,
+  Mic, MicOff, Square, Copy, ChevronUp, UserPlus, Timer, Briefcase
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -177,6 +178,103 @@ const AGENDA: AgendaItem[] = [
   { num: 8, title: "Actions & Handover",           duration: "4 min", icon: <Clipboard size={16} /> },
 ];
 
+// ── Executive Meeting types & defaults ─────────────────────────────────────
+
+type AgendaStatus = "Pending" | "In Progress" | "Complete";
+
+interface ExecAgendaItem {
+  id: number;
+  title: string;
+  duration: string;
+  presenter: string;
+  notes: string;
+  aiMinutes: string;
+  status: AgendaStatus;
+}
+
+const DEFAULT_EXEC_AGENDA: ExecAgendaItem[] = [
+  { id: 1,  title: "CEO / GM Report",                duration: "10 min", presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 2,  title: "Financial Performance Review",    duration: "10 min", presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 3,  title: "Clinical Governance Update",      duration: "10 min", presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 4,  title: "Operations & Safety Report",      duration: "10 min", presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 5,  title: "Fleet & Engineering Status",      duration: "5 min",  presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 6,  title: "HR & Workforce Report",           duration: "5 min",  presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 7,  title: "Regulatory & Compliance Update",  duration: "5 min",  presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 8,  title: "Strategic Initiatives",           duration: "10 min", presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 9,  title: "Board / Committee Items",         duration: "5 min",  presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+  { id: 10, title: "Actions & Next Steps",            duration: "5 min",  presenter: "", notes: "", aiMinutes: "", status: "Pending" },
+];
+
+interface Attendee { id: number; name: string; role: string; }
+const DEFAULT_ATTENDEES: Attendee[] = [
+  { id: 1, name: "", role: "CEO" },
+  { id: 2, name: "", role: "GM" },
+  { id: 3, name: "", role: "DON" },
+  { id: 4, name: "", role: "CFO" },
+];
+
+type MeetingStatus = "Not Started" | "In Progress" | "Complete";
+
+// ── Action Items Tracker types & defaults ─────────────────────────────────
+
+type ActionStatus = "Open" | "In Progress" | "Complete";
+
+interface ActionItem {
+  id: number;
+  description: string;
+  owner: string;
+  dueDate: string; // yyyy-mm-dd for <input type="date">
+  status: ActionStatus;
+}
+
+const DEFAULT_ACTION_ITEMS: ActionItem[] = [];
+
+let actionItemIdCounter = 1000;
+function nextActionItemId() { return ++actionItemIdCounter; }
+
+// Very simple heuristic parser — pulls lines that look like action items out of
+// AI-generated minutes text (lines under an "Action Items" heading, or lines
+// starting with a dash/bullet that mention an owner).
+function parseActionItemsFromMinutes(minutesText: string): ActionItem[] {
+  const lines = minutesText.split("\n").map(l => l.trim()).filter(Boolean);
+  const items: ActionItem[] = [];
+  let inActionSection = false;
+
+  for (const line of lines) {
+    if (/^#{0,3}\s*action items?/i.test(line)) { inActionSection = true; continue; }
+    if (inActionSection && /^#{0,3}\s*(next meeting|key decisions|agenda items|attendees)/i.test(line)) {
+      inActionSection = false;
+      continue;
+    }
+    if (!inActionSection) continue;
+
+    const bulletMatch = line.match(/^[-*\u2022]\s*(.+)/) || line.match(/^\d+[.)]\s*(.+)/);
+    if (!bulletMatch) continue;
+    let text = bulletMatch[1].trim();
+    if (!text) continue;
+
+    // Try to pull an owner, e.g. "(Owner: Jane Smith, Due: 2026-07-10)" or "- Jane Smith to do X by 10 July"
+    let owner = "";
+    let dueDate = "";
+    const ownerDueMatch = text.match(/\(?\s*owner:?\s*([^,)]+)(?:,\s*due:?\s*([^)]+))?\)?/i);
+    if (ownerDueMatch) {
+      owner = ownerDueMatch[1].trim();
+      if (ownerDueMatch[2]) dueDate = ownerDueMatch[2].trim();
+      text = text.replace(ownerDueMatch[0], "").trim();
+    }
+
+    items.push({
+      id: nextActionItemId(),
+      description: text.replace(/\s{2,}/g, " ").trim(),
+      owner,
+      dueDate,
+      status: "Open",
+    });
+  }
+
+  return items;
+}
+
 // ── Helper components ──────────────────────────────────────────────────────
 
 function StatusDot({ status, size = "sm" }: { status: "green" | "amber" | "red" | "offline"; size?: "sm" | "lg" }) {
@@ -279,6 +377,392 @@ function StatusCycle({ status, onChange, editMode, options }: {
   );
 }
 
+// ── Executive Meeting View ──────────────────────────────────────────────────
+
+interface ExecutiveMeetingViewProps {
+  clock: Date;
+  fmtDate: (d: Date) => string;
+  fmtTime: (d: Date) => string;
+  execAgenda: ExecAgendaItem[];
+  setExecAgenda: React.Dispatch<React.SetStateAction<ExecAgendaItem[]>>;
+  execExpanded: number[];
+  toggleExecAgenda: (id: number) => void;
+  attendees: Attendee[];
+  setAttendees: React.Dispatch<React.SetStateAction<Attendee[]>>;
+  execMeetingStatus: MeetingStatus;
+  execElapsed: number;
+  fmtElapsed: (s: number) => string;
+  startExecMeeting: () => void;
+  completeExecMeeting: () => void;
+  resetExecMeeting: () => void;
+  actionItems: ActionItem[];
+  setActionItems: React.Dispatch<React.SetStateAction<ActionItem[]>>;
+  actionFilter: "All" | "Open" | "Complete";
+  setActionFilter: React.Dispatch<React.SetStateAction<"All" | "Open" | "Complete">>;
+}
+
+function ExecutiveMeetingView({
+  clock, fmtDate, fmtTime, execAgenda, setExecAgenda, execExpanded, toggleExecAgenda,
+  attendees, setAttendees, execMeetingStatus, execElapsed, fmtElapsed,
+  startExecMeeting, completeExecMeeting, resetExecMeeting,
+  actionItems, setActionItems, actionFilter, setActionFilter,
+}: ExecutiveMeetingViewProps) {
+
+  const openActionsCount = actionItems.filter(a => a.status !== "Complete").length;
+
+  const filteredActions = actionItems.filter(a => {
+    if (actionFilter === "All") return true;
+    if (actionFilter === "Open") return a.status !== "Complete";
+    return a.status === "Complete";
+  });
+
+  function addActionItem() {
+    setActionItems(prev => [...prev, { id: nextActionItemId(), description: "", owner: "", dueDate: "", status: "Open" }]);
+  }
+  function removeActionItem(id: number) {
+    setActionItems(prev => prev.filter(a => a.id !== id));
+  }
+  function updateActionItem(id: number, patch: Partial<ActionItem>) {
+    setActionItems(prev => prev.map(a => a.id === id ? { ...a, ...patch } : a));
+  }
+  function cycleActionStatus(status: ActionStatus): ActionStatus {
+    const order: ActionStatus[] = ["Open", "In Progress", "Complete"];
+    return order[(order.indexOf(status) + 1) % order.length];
+  }
+  function exportActionsAsText() {
+    const lines = actionItems.map((a, i) =>
+      `${i + 1}. ${a.description || "(no description)"} — Owner: ${a.owner || "TBC"} — Due: ${a.dueDate || "TBC"} — Status: ${a.status}`
+    );
+    const text = `RFDS SE — Executive Meeting Action Items\n${fmtDate(clock)}\n\n` + lines.join("\n");
+    navigator.clipboard.writeText(text).catch(() => {});
+    return text;
+  }
+
+  const statusChipCls: Record<ActionStatus, string> = {
+    Open: "bg-zinc-700 border-zinc-500 text-zinc-300",
+    "In Progress": "bg-amber-500/20 border-amber-500/50 text-amber-400",
+    Complete: "bg-green-500/20 border-green-500/50 text-green-400",
+  };
+
+  const agendaStatusCls: Record<AgendaStatus, string> = {
+    Pending: "bg-zinc-700 border-zinc-500 text-zinc-300",
+    "In Progress": "bg-amber-500/20 border-amber-500/50 text-amber-400",
+    Complete: "bg-green-500/20 border-green-500/50 text-green-400",
+  };
+
+  function cycleAgendaStatus(status: AgendaStatus): AgendaStatus {
+    const order: AgendaStatus[] = ["Pending", "In Progress", "Complete"];
+    return order[(order.indexOf(status) + 1) % order.length];
+  }
+
+  const meetingStatusCls: Record<MeetingStatus, string> = {
+    "Not Started": "bg-zinc-700 border-zinc-500 text-zinc-300",
+    "In Progress": "bg-amber-500/15 border-amber-500/40 text-amber-400",
+    Complete: "bg-green-500/15 border-green-500/40 text-green-400",
+  };
+
+  return (
+    <>
+      {/* ══ EXEC HERO HEADER ══════════════════════════════════════════════════ */}
+      <div className="bg-card border border-card-border rounded-2xl p-5 lg:p-6">
+        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="w-14 h-14 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center flex-shrink-0">
+              <Briefcase size={26} className="text-cyan-400" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-3xl lg:text-4xl font-extrabold text-foreground leading-tight tracking-tight"
+                style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Executive Operations Meeting</h1>
+              <p className="text-base text-muted-foreground mt-0.5 font-medium">
+                RFDS SE Section · {fmtDate(clock)}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 flex-shrink-0">
+            <div className="flex items-center gap-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl px-5 py-3">
+              <Clock size={20} className="text-cyan-400 flex-shrink-0" />
+              <span className="text-2xl font-bold text-cyan-400 tabular-nums"
+                style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{fmtTime(clock)}</span>
+            </div>
+            <a href={TEAMS_URL} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-2.5 px-5 py-3 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95 whitespace-nowrap"
+              style={{ backgroundColor: "#6264a7", border: "1px solid #7b7ec7", fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              <TeamsIcon size={18} />
+              Join Executive Meeting
+            </a>
+          </div>
+        </div>
+
+        {/* Meeting status bar */}
+        <div className="flex flex-wrap items-center gap-3 mt-5 pt-5 border-t border-card-border">
+          <span className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-full border ${meetingStatusCls[execMeetingStatus]}`}
+            style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+            <Activity size={14} />
+            {execMeetingStatus}
+          </span>
+          {execMeetingStatus === "In Progress" && (
+            <span className="flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-full bg-background/50 border border-card-border text-foreground tabular-nums">
+              <Timer size={14} className="text-cyan-400" />
+              {fmtElapsed(execElapsed)}
+            </span>
+          )}
+          <span className="flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400">
+            <Clipboard size={12} />
+            {openActionsCount} open action{openActionsCount === 1 ? "" : "s"}
+          </span>
+          <div className="flex-1" />
+          {execMeetingStatus === "Not Started" && (
+            <button onClick={startExecMeeting}
+              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/25 transition-colors">
+              Start Meeting
+            </button>
+          )}
+          {execMeetingStatus === "In Progress" && (
+            <button onClick={completeExecMeeting}
+              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg bg-green-500/15 border border-green-500/40 text-green-400 hover:bg-green-500/25 transition-colors">
+              Mark Complete
+            </button>
+          )}
+          {execMeetingStatus === "Complete" && (
+            <button onClick={resetExecMeeting}
+              className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg bg-white/5 border border-card-border text-muted-foreground hover:text-foreground transition-colors">
+              <RefreshCw size={12} /> Reset
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ══ ATTENDEES ═══════════════════════════════════════════════════════ */}
+      <div className="bg-card border border-card-border rounded-2xl p-5">
+        <SectionHeading label="Attendees" icon={<Users size={14} />}>
+          <button
+            onClick={() => setAttendees(prev => [...prev, { id: Date.now(), name: "", role: "" }])}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+          >
+            <UserPlus size={12} /> Add Attendee
+          </button>
+        </SectionHeading>
+        <div className="flex flex-wrap gap-2">
+          {attendees.map(a => (
+            <div key={a.id} className="flex items-center gap-2 bg-background/50 border border-card-border rounded-xl px-3 py-2">
+              <input
+                className="bg-transparent text-sm font-semibold text-foreground w-32 focus:outline-none placeholder:text-muted-foreground/40"
+                placeholder="Name"
+                value={a.name}
+                onChange={e => setAttendees(prev => prev.map(x => x.id === a.id ? { ...x, name: e.target.value } : x))}
+              />
+              <input
+                className="bg-cyan-500/10 border border-cyan-500/20 rounded px-2 py-0.5 text-xs font-semibold text-cyan-400 w-16 focus:outline-none placeholder:text-cyan-400/40"
+                placeholder="Role"
+                value={a.role}
+                onChange={e => setAttendees(prev => prev.map(x => x.id === a.id ? { ...x, role: e.target.value } : x))}
+              />
+              <button onClick={() => setAttendees(prev => prev.filter(x => x.id !== a.id))}
+                className="text-zinc-500 hover:text-red-400 transition-colors">
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ EXECUTIVE AGENDA ═══════════════════════════════════════════════ */}
+      <div className="bg-card border border-card-border rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-cyan-400"><Calendar size={14} /></span>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground"
+              style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Agenda — Executive Operations Meeting</h2>
+            <div className="w-20 h-px bg-card-border" />
+          </div>
+          <button
+            onClick={() => setExecAgenda(prev => [...prev, {
+              id: Date.now(), title: "New Agenda Item", duration: "5 min", presenter: "", notes: "", aiMinutes: "", status: "Pending",
+            }])}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+          >
+            <Plus size={13} /> Add Item
+          </button>
+        </div>
+        <div className="space-y-2">
+          {execAgenda.map((item, idx) => {
+            const isOpen = execExpanded.includes(item.id);
+            return (
+              <div key={item.id} className="border border-card-border rounded-xl overflow-hidden">
+                <div className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.02] transition-colors text-left">
+                  <button onClick={() => toggleExecAgenda(item.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                    <span className="text-sm font-bold text-cyan-400 w-5 flex-shrink-0">{idx + 1}.</span>
+                    <input
+                      className="flex-1 min-w-0 bg-transparent text-base font-semibold text-foreground focus:outline-none focus:bg-background/40 rounded px-1"
+                      style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}
+                      value={item.title}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => setExecAgenda(prev => prev.map(x => x.id === item.id ? { ...x, title: e.target.value } : x))}
+                    />
+                  </button>
+                  <input
+                    className="bg-background/60 border border-card-border rounded px-2 py-0.5 text-xs w-16 text-center focus:outline-none focus:border-cyan-500/40"
+                    value={item.duration}
+                    onChange={e => setExecAgenda(prev => prev.map(x => x.id === item.id ? { ...x, duration: e.target.value } : x))}
+                  />
+                  <button
+                    onClick={() => setExecAgenda(prev => prev.map(x => x.id === item.id ? { ...x, status: cycleAgendaStatus(x.status) } : x))}
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${agendaStatusCls[item.status]}`}
+                    title="Click to cycle status"
+                  >
+                    {item.status}
+                  </button>
+                  <button onClick={() => setExecAgenda(prev => prev.filter(x => x.id !== item.id))}
+                    className="text-zinc-500 hover:text-red-400 transition-colors flex-shrink-0">
+                    <Trash2 size={13} />
+                  </button>
+                  <button onClick={() => toggleExecAgenda(item.id)} className="flex-shrink-0">
+                    {isOpen ? <ChevronDown size={15} className="text-muted-foreground" /> : <ChevronRight size={15} className="text-muted-foreground" />}
+                  </button>
+                </div>
+                {isOpen && (
+                  <div className="px-4 pb-4 bg-background/30 space-y-3">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 block">Presenter</label>
+                      <input
+                        className="w-full bg-background/60 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-cyan-500/40"
+                        placeholder="Presenter name…"
+                        value={item.presenter}
+                        onChange={e => setExecAgenda(prev => prev.map(x => x.id === item.id ? { ...x, presenter: e.target.value } : x))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 block">Notes / Talking Points</label>
+                      <textarea
+                        className="w-full min-h-[80px] bg-background/60 border border-card-border rounded-lg p-3 text-sm text-foreground resize-y placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
+                        placeholder="Pre-fill talking points before the meeting…"
+                        value={item.notes}
+                        onChange={e => setExecAgenda(prev => prev.map(x => x.id === item.id ? { ...x, notes: e.target.value } : x))}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-cyan-400 mb-1 flex items-center gap-1.5">
+                        <FileTextIcon size={11} /> AI-Captured Minutes
+                      </label>
+                      <textarea
+                        className="w-full min-h-[70px] bg-cyan-500/5 border border-cyan-500/20 rounded-lg p-3 text-sm text-foreground resize-y placeholder:text-muted-foreground/40 focus:outline-none focus:border-cyan-500/40"
+                        placeholder="Populated automatically from AI meeting minutes, or edit manually…"
+                        value={item.aiMinutes}
+                        onChange={e => setExecAgenda(prev => prev.map(x => x.id === item.id ? { ...x, aiMinutes: e.target.value } : x))}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ══ ACTION ITEMS TRACKER ═════════════════════════════════════════════ */}
+      <div className="bg-card border border-card-border rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-cyan-400"><Clipboard size={14} /></span>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground"
+              style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Action Items Tracker</h2>
+            <div className="w-12 h-px bg-card-border" />
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 whitespace-nowrap">
+              {openActionsCount} open action{openActionsCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Filter */}
+            <div className="flex items-center gap-1 bg-background/50 border border-card-border rounded-lg p-0.5">
+              {(["All", "Open", "Complete"] as const).map(f => (
+                <button key={f} onClick={() => setActionFilter(f)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                    actionFilter === f ? "bg-cyan-500/20 text-cyan-400" : "text-muted-foreground hover:text-foreground"
+                  }`}>
+                  {f}
+                </button>
+              ))}
+            </div>
+            <button onClick={exportActionsAsText}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/5 border border-card-border text-muted-foreground hover:text-foreground transition-colors">
+              <Copy size={12} /> Export
+            </button>
+            <button onClick={addActionItem}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors">
+              <Plus size={13} /> Add Action
+            </button>
+          </div>
+        </div>
+
+        {filteredActions.length === 0 ? (
+          <div className="text-sm text-muted-foreground py-6 text-center">No action items yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="text-muted-foreground border-b border-card-border">
+                  <th className="text-left py-2 pr-3 text-xs font-semibold uppercase tracking-wider w-8">#</th>
+                  <th className="text-left py-2 pr-3 text-xs font-semibold uppercase tracking-wider">Action Description</th>
+                  <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider w-40">Owner</th>
+                  <th className="text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider w-40">Due Date</th>
+                  <th className="text-center py-2 px-3 text-xs font-semibold uppercase tracking-wider w-32">Status</th>
+                  <th className="text-center py-2 pl-3 text-xs font-semibold uppercase tracking-wider w-10"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-card-border">
+                {filteredActions.map((a, idx) => (
+                  <tr key={a.id} className="hover:bg-white/[0.02]">
+                    <td className="py-2.5 pr-3 text-sm text-muted-foreground tabular-nums">{idx + 1}</td>
+                    <td className="py-2.5 pr-3">
+                      <input
+                        className="w-full bg-background/60 border border-card-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-cyan-500/40"
+                        placeholder="Describe the action…"
+                        value={a.description}
+                        onChange={e => updateActionItem(a.id, { description: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <input
+                        className="w-full bg-background/60 border border-card-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-cyan-500/40"
+                        placeholder="Owner…"
+                        value={a.owner}
+                        onChange={e => updateActionItem(a.id, { owner: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <input
+                        type="date"
+                        className="w-full bg-background/60 border border-card-border rounded px-2 py-1 text-sm text-foreground focus:outline-none focus:border-cyan-500/40"
+                        value={a.dueDate}
+                        onChange={e => updateActionItem(a.id, { dueDate: e.target.value })}
+                      />
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <button
+                        onClick={() => updateActionItem(a.id, { status: cycleActionStatus(a.status) })}
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full border whitespace-nowrap ${statusChipCls[a.status]}`}
+                        title="Click to cycle status"
+                      >
+                        {a.status}
+                      </button>
+                    </td>
+                    <td className="py-2.5 pl-3 text-center">
+                      <button onClick={() => removeActionItem(a.id)}
+                        className="text-zinc-500 hover:text-red-400 transition-colors">
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 const CAN_EDIT_ROLES: UserRole[] = ["dispatcher", "senior_management", "admin", "safety"];
@@ -298,6 +782,40 @@ export default function MorningBrief({ role }: Props) {
 
   // Tab: "board" = live ops data, "smartsheet" = embedded Smartsheet
   const [activeTab, setActiveTab] = useState<"board" | "smartsheet">("board");
+
+  // Meeting view: "daily" = The 8:45, "executive" = Executive Operations Meeting
+  const [meetingView, setMeetingView] = useState<"daily" | "executive">("daily");
+
+  // ── Executive meeting state ──
+  const [execAgenda, setExecAgenda] = useState<ExecAgendaItem[]>(DEFAULT_EXEC_AGENDA);
+  const [execExpanded, setExecExpanded] = useState<number[]>([]);
+  const [attendees, setAttendees] = useState<Attendee[]>(DEFAULT_ATTENDEES);
+  const [execMeetingStatus, setExecMeetingStatus] = useState<MeetingStatus>("Not Started");
+  const [execMeetingStart, setExecMeetingStart] = useState<Date | null>(null);
+  const [execElapsed, setExecElapsed] = useState(0);
+
+  // ── AI minutes / recording state (shared by both meeting types) ──
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [interimTranscript, setInterimTranscript] = useState("");
+  const [showTranscriptPanel, setShowTranscriptPanel] = useState(false);
+  const [isGeneratingMinutes, setIsGeneratingMinutes] = useState(false);
+  const [generatedMinutes, setGeneratedMinutes] = useState("");
+  const [minutesPanelOpen, setMinutesPanelOpen] = useState(true);
+  const [minutesError, setMinutesError] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
+  const [saveToAgendaId, setSaveToAgendaId] = useState<number | "">("");
+
+  // ── Action Items Tracker state ──
+  const [actionItems, setActionItems] = useState<ActionItem[]>(DEFAULT_ACTION_ITEMS);
+  const [actionFilter, setActionFilter] = useState<"All" | "Open" | "Complete">("All");
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Edit mode
   const [editMode, setEditMode]   = useState(false);
@@ -483,6 +1001,168 @@ export default function MorningBrief({ role }: Props) {
     setExpandedAgenda(prev => prev.includes(num) ? prev.filter(n => n !== num) : [...prev, num]);
   }
 
+  function toggleExecAgenda(id: number) {
+    setExecExpanded(prev => prev.includes(id) ? prev.filter(n => n !== id) : [...prev, id]);
+  }
+
+  function fmtElapsed(totalSeconds: number) {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+
+  // Executive meeting elapsed timer
+  useEffect(() => {
+    if (execMeetingStatus !== "In Progress" || !execMeetingStart) return;
+    const id = setInterval(() => {
+      setExecElapsed(Math.floor((Date.now() - execMeetingStart.getTime()) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [execMeetingStatus, execMeetingStart]);
+
+  function startExecMeeting() {
+    setExecMeetingStatus("In Progress");
+    setExecMeetingStart(new Date());
+    setExecElapsed(0);
+  }
+  function completeExecMeeting() {
+    setExecMeetingStatus("Complete");
+  }
+  function resetExecMeeting() {
+    setExecMeetingStatus("Not Started");
+    setExecMeetingStart(null);
+    setExecElapsed(0);
+  }
+
+  // ── Recording / Web Speech / MediaRecorder handlers ─────────────────────
+
+  const startRecording = useCallback(async () => {
+    setMinutesError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+
+      // Web Speech API — live transcription
+      const SpeechRecognitionCtor =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (SpeechRecognitionCtor) {
+        const recognition = new SpeechRecognitionCtor();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-AU";
+        recognition.onresult = (event: any) => {
+          let finalText = "";
+          let interimText = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcriptPiece = event.results[i][0].transcript;
+            if (event.results[i].isFinal) finalText += transcriptPiece + " ";
+            else interimText += transcriptPiece;
+          }
+          if (finalText) setLiveTranscript(prev => (prev ? prev + " " : "") + finalText.trim());
+          setInterimTranscript(interimText);
+        };
+        recognition.onerror = (e: any) => {
+          console.error("Speech recognition error:", e);
+        };
+        recognition.onend = () => {
+          // auto-restart while still recording (some browsers stop after silence)
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            try { recognition.start(); } catch { /* already started */ }
+          }
+        };
+        recognitionRef.current = recognition;
+        try { recognition.start(); } catch { /* ignore */ }
+      }
+
+      setIsRecording(true);
+      setRecordSeconds(0);
+      recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000);
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+      setMinutesError("Microphone access denied or unavailable.");
+    }
+  }, []);
+
+  const stopRecording = useCallback(async () => {
+    setIsRecording(false);
+    if (recordTimerRef.current) { clearInterval(recordTimerRef.current); recordTimerRef.current = null; }
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.onend = null; recognitionRef.current.stop(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach(t => t.stop());
+      mediaStreamRef.current = null;
+    }
+
+    setIsTranscribing(true);
+    // Transcript is already captured live via Web Speech API — finalize it
+    setTimeout(() => {
+      setIsTranscribing(false);
+      setShowTranscriptPanel(true);
+    }, 600);
+  }, []);
+
+  const generateMinutes = useCallback(async (meetingType: "daily" | "executive") => {
+    const transcript = (liveTranscript + " " + interimTranscript).trim();
+    if (!transcript) {
+      setMinutesError("No transcript to generate minutes from. Record or paste a transcript first.");
+      return;
+    }
+    setIsGeneratingMinutes(true);
+    setMinutesError(null);
+    try {
+      const res = await apiRequest("POST", "/api/minutes", { transcript, meetingType });
+      const data = await res.json();
+      setGeneratedMinutes(data.minutes || "");
+      setMinutesPanelOpen(true);
+    } catch (err) {
+      console.error("Minutes generation failed:", err);
+      setMinutesError("Failed to generate minutes. Please try again.");
+    } finally {
+      setIsGeneratingMinutes(false);
+    }
+  }, [liveTranscript, interimTranscript]);
+
+  const copyMinutes = useCallback(() => {
+    if (!generatedMinutes) return;
+    navigator.clipboard.writeText(generatedMinutes).then(() => {
+      setCopyMsg("Copied ✓");
+      setTimeout(() => setCopyMsg(null), 2000);
+    }).catch(() => {
+      setCopyMsg("Copy failed");
+      setTimeout(() => setCopyMsg(null), 2000);
+    });
+  }, [generatedMinutes]);
+
+  const saveMinutesToAgenda = useCallback(() => {
+    if (!generatedMinutes || saveToAgendaId === "") return;
+    const id = Number(saveToAgendaId);
+    setExecAgenda(prev => prev.map(item =>
+      item.id === id ? { ...item, aiMinutes: (item.aiMinutes ? item.aiMinutes + "\n\n" : "") + generatedMinutes } : item
+    ));
+    setCopyMsg("Saved to agenda ✓");
+    setTimeout(() => setCopyMsg(null), 2000);
+  }, [generatedMinutes, saveToAgendaId]);
+
+  // Clean up media on unmount
+  useEffect(() => {
+    return () => {
+      if (recordTimerRef.current) clearInterval(recordTimerRef.current);
+      if (recognitionRef.current) { try { recognitionRef.current.stop(); } catch { /* ignore */ } }
+      if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach(t => t.stop());
+    };
+  }, []);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -537,6 +1217,38 @@ export default function MorningBrief({ role }: Props) {
       )}
 
       <div className={presentMode ? "px-4 lg:px-8 pb-8 pt-4 space-y-5" : "contents"}>
+      {/* ══ MEETING SELECTOR (top-level, above everything) ══════════════════ */}
+      {!presentMode && (
+        <div className="flex items-center gap-1 bg-card border border-card-border rounded-xl p-1 w-fit mb-5">
+          <button
+            onClick={() => setMeetingView("daily")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+              meetingView === "daily"
+                ? "bg-cyan-500/15 border border-cyan-500/30 text-cyan-400"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}
+          >
+            <Radio size={15} />
+            The 8:45
+          </button>
+          <button
+            onClick={() => setMeetingView("executive")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${
+              meetingView === "executive"
+                ? "bg-cyan-500/15 border border-cyan-500/30 text-cyan-400"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}
+          >
+            <Briefcase size={15} />
+            Executive
+          </button>
+        </div>
+      )}
+
+      {meetingView === "daily" && (
+      <>
       {/* ══ HERO HEADER ══════════════════════════════════════════════════════ */}
       <div className="bg-card border border-card-border rounded-2xl p-5 lg:p-6">
         <div className="flex flex-col lg:flex-row lg:items-start gap-4">
@@ -1273,6 +1985,195 @@ export default function MorningBrief({ role }: Props) {
             </div>
           </div>
         </>
+      )}
+      </>
+      )}
+
+      {meetingView === "executive" && (
+        <ExecutiveMeetingView
+          clock={clock}
+          fmtDate={fmtDate}
+          fmtTime={fmtTime}
+          execAgenda={execAgenda}
+          setExecAgenda={setExecAgenda}
+          execExpanded={execExpanded}
+          toggleExecAgenda={toggleExecAgenda}
+          attendees={attendees}
+          setAttendees={setAttendees}
+          execMeetingStatus={execMeetingStatus}
+          execElapsed={execElapsed}
+          fmtElapsed={fmtElapsed}
+          startExecMeeting={startExecMeeting}
+          completeExecMeeting={completeExecMeeting}
+          resetExecMeeting={resetExecMeeting}
+          actionItems={actionItems}
+          setActionItems={setActionItems}
+          actionFilter={actionFilter}
+          setActionFilter={setActionFilter}
+        />
+      )}
+
+      {/* ══ FLOATING RECORDING TOOLBAR (both meeting types) ═══════════════════════════════════ */}
+      {!presentMode && (
+        <div className="fixed bottom-6 right-6 z-[9000] flex flex-col items-end gap-3">
+          {isRecording ? (
+            <button
+              onClick={stopRecording}
+              className="flex items-center gap-3 pl-4 pr-5 py-3.5 rounded-full shadow-2xl transition-all active:scale-95 bg-red-500 text-white animate-pulse"
+              style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}
+            >
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
+              </span>
+              <span className="font-bold text-sm tabular-nums">REC {fmtElapsed(recordSeconds)}</span>
+              <span className="flex items-center gap-1.5 text-sm font-bold border-l border-white/30 pl-3">
+                <Square size={14} />
+                Stop Recording
+              </span>
+            </button>
+          ) : isTranscribing ? (
+            <div className="flex items-center gap-2.5 px-5 py-3.5 rounded-full shadow-2xl bg-card border border-cyan-500/40 text-cyan-400">
+              <RefreshCw size={16} className="animate-spin" />
+              <span className="font-bold text-sm">Transcribing…</span>
+            </div>
+          ) : (
+            <button
+              onClick={startRecording}
+              className="flex items-center gap-2.5 px-5 py-3.5 rounded-full shadow-2xl transition-all hover:opacity-90 active:scale-95 bg-background border-2 border-cyan-400 text-cyan-400"
+              style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}
+            >
+              <Mic size={18} />
+              <span className="font-bold text-sm">Record Meeting</span>
+            </button>
+          )}
+
+          {minutesError && (
+            <div className="max-w-xs px-4 py-2 rounded-xl bg-red-500/15 border border-red-500/40 text-red-400 text-xs font-semibold shadow-xl">
+              {minutesError}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══ TRANSCRIPT / MINUTES MODAL PANEL ════════════════════════════════════════════ */}
+      {(showTranscriptPanel || isRecording) && !presentMode && (
+        <div className="fixed inset-0 z-[9500] flex items-end lg:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => { if (!isRecording) setShowTranscriptPanel(false); }}>
+          <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-card border border-card-border rounded-2xl p-5 lg:p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <FileTextIcon size={16} className="text-cyan-400" />
+                <h2 className="text-lg font-bold text-foreground" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                  Meeting Transcript
+                </h2>
+                {isRecording && (
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-green-400 ml-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400" />
+                    </span>
+                    Live transcript
+                  </span>
+                )}
+              </div>
+              {!isRecording && (
+                <button onClick={() => setShowTranscriptPanel(false)}
+                  className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+
+            <textarea
+              className="w-full min-h-[160px] bg-background/60 border border-card-border rounded-lg p-3 text-sm text-foreground resize-y focus:outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20"
+              placeholder="Transcript will appear here as you speak — you can also paste or edit manually…"
+              value={liveTranscript}
+              onChange={e => setLiveTranscript(e.target.value)}
+            />
+            {interimTranscript && (
+              <p className="text-sm text-muted-foreground/60 italic mt-1 px-1">{interimTranscript}</p>
+            )}
+
+            <div className="flex flex-wrap items-center gap-2 mt-4">
+              <button
+                onClick={() => generateMinutes(meetingView)}
+                disabled={isGeneratingMinutes || !liveTranscript.trim()}
+                className="flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-lg bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/25 transition-colors disabled:opacity-40"
+              >
+                {isGeneratingMinutes ? <RefreshCw size={14} className="animate-spin" /> : <FileTextIcon size={14} />}
+                {isGeneratingMinutes ? "Generating…" : "Generate Minutes"}
+              </button>
+              {!isRecording && (
+                <button onClick={() => setShowTranscriptPanel(false)}
+                  className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg bg-white/5 border border-card-border text-muted-foreground hover:text-foreground transition-colors">
+                  Close
+                </button>
+              )}
+            </div>
+
+            {/* Generated minutes panel */}
+            {generatedMinutes && (
+              <div className="mt-5 border border-cyan-500/25 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setMinutesPanelOpen(o => !o)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-cyan-500/10 hover:bg-cyan-500/15 transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-cyan-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                    <FileTextIcon size={14} />
+                    AI-Generated Minutes
+                  </span>
+                  {minutesPanelOpen ? <ChevronUp size={15} className="text-cyan-400" /> : <ChevronDown size={15} className="text-cyan-400" />}
+                </button>
+                {minutesPanelOpen && (
+                  <div className="p-4 bg-background/40 space-y-3">
+                    <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">{generatedMinutes}</pre>
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-card-border">
+                      <button onClick={copyMinutes}
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-white/5 border border-card-border text-muted-foreground hover:text-foreground transition-colors">
+                        <Copy size={12} /> Copy to Clipboard
+                      </button>
+                      {meetingView === "executive" && (
+                        <>
+                          <select
+                            value={saveToAgendaId}
+                            onChange={e => setSaveToAgendaId(e.target.value ? Number(e.target.value) : "")}
+                            className="text-xs bg-background/80 border border-card-border rounded-lg px-2 py-1.5 text-foreground focus:outline-none focus:border-cyan-500/40"
+                          >
+                            <option value="">Save to agenda item…</option>
+                            {execAgenda.map(item => (
+                              <option key={item.id} value={item.id}>{item.id}. {item.title}</option>
+                            ))}
+                          </select>
+                          <button onClick={saveMinutesToAgenda} disabled={saveToAgendaId === ""}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-green-500/15 border border-green-500/40 text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-40">
+                            <Save size={12} /> Save to Agenda
+                          </button>
+                          <button onClick={() => {
+                            const parsed = parseActionItemsFromMinutes(generatedMinutes);
+                            if (parsed.length > 0) {
+                              setActionItems(prev => [...prev, ...parsed]);
+                              setCopyMsg(`Added ${parsed.length} action item${parsed.length > 1 ? "s" : ""} ✓`);
+                              setTimeout(() => setCopyMsg(null), 2500);
+                            } else {
+                              setCopyMsg("No action items detected");
+                              setTimeout(() => setCopyMsg(null), 2500);
+                            }
+                          }}
+                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-400 hover:bg-amber-500/25 transition-colors">
+                            <Clipboard size={12} /> Add Actions to Tracker
+                          </button>
+                        </>
+                      )}
+                      {copyMsg && <span className="text-xs font-semibold text-green-400">{copyMsg}</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
       </div>{/* end present/normal content wrapper */}
     </div>
