@@ -1809,6 +1809,7 @@ function TheoryKnowledgeSection() {
   const [timeLeft, setTimeLeft]         = useState(EXAM_DURATION_MINUTES * 60);
   const [results, setResults]           = useState<ExamResult[]>([]);
   const [bestScores, setBestScores]     = useState<BestScores>({});
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const timerRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
   const answersRef                      = useRef<(number | null)[]>([]);
   const questionsRef                    = useRef<ExamQuestion[]>([]);
@@ -1920,6 +1921,27 @@ function TheoryKnowledgeSection() {
 
         {/* ── PROGRESS TRACKER CARD ── */}
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+
+          {/* Reset confirmation overlay */}
+          {showResetConfirm && (
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-red-300">Reset all progress?</p>
+                <p className="text-xs text-muted-foreground mt-0.5">This will clear all best scores and start counts. This cannot be undone.</p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-3 py-1.5 text-xs rounded-md border border-border bg-muted/40 hover:bg-muted text-foreground transition-colors"
+                >Cancel</button>
+                <button
+                  onClick={() => { setBestScores({}); setShowResetConfirm(false); }}
+                  className="px-3 py-1.5 text-xs rounded-md bg-red-500/80 hover:bg-red-500 text-white font-semibold transition-colors"
+                >Yes, reset</button>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex items-start gap-3">
               <Trophy size={22} className="text-emerald-400 mt-0.5 shrink-0" />
@@ -1930,20 +1952,33 @@ function TheoryKnowledgeSection() {
                 </p>
               </div>
             </div>
-            {/* Summary stats */}
-            <div className="flex gap-4 shrink-0">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-emerald-400 tabular-nums">{passedCount}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Passed</p>
+            {/* Summary stats + reset */}
+            <div className="flex items-start gap-4 shrink-0">
+              <div className="flex gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-emerald-400 tabular-nums">{passedCount}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Passed</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-foreground tabular-nums">{attemptedCount}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Attempted</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-muted-foreground tabular-nums">{totalExams}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</p>
+                </div>
               </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-foreground tabular-nums">{attemptedCount}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Attempted</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-muted-foreground tabular-nums">{totalExams}</p>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</p>
-              </div>
+              {/* Reset button — only shown when there is progress to clear */}
+              {attemptedCount > 0 && (
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  title="Reset all progress"
+                  className="mt-1 p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  data-testid="button-reset-progress"
+                >
+                  <RotateCcw size={15} />
+                </button>
+              )}
             </div>
           </div>
 
