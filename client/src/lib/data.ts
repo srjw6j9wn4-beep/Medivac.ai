@@ -144,21 +144,21 @@ export interface Aircraft {
 
 export const AIRCRAFT: Aircraft[] = [
   // ── King Air B200 series (10) ───────────────────────────────────────────────
-  { rego: 'VH-LTQ', type: 'King Air B200C', base: 'Sydney (YSSY)',        status: 'Serviceable', nextService: '120 hrs (62 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
+  { rego: 'VH-LTQ', type: 'King Air B200C', base: 'Bankstown (YSBK)',     status: 'Serviceable', nextService: '120 hrs (62 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MVW', type: 'King Air B200',  base: 'Dubbo (YSDU)',         status: 'Airborne',    nextService: '120 hrs (28 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MVX', type: 'King Air B200C', base: 'Broken Hill (YBHI)',   status: 'Serviceable', nextService: '120 hrs (55 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MWH', type: 'King Air B200',  base: 'Dubbo (YSDU)',         status: 'Serviceable', nextService: '120 hrs (71 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MWK', type: 'King Air B200C', base: 'Dubbo (YSDU)',         status: 'Serviceable', nextService: '120 hrs (44 remaining)', techLogState: 'Current',  defects: 1, maintenanceRelease: true  },
-  { rego: 'VH-RFD', type: 'King Air B200C', base: 'Canberra (YSCB)',      status: 'Serviceable', nextService: '120 hrs (91 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
+  { rego: 'VH-RFD', type: 'King Air B200C', base: 'Bankstown (YSBK)',     status: 'Serviceable', nextService: '120 hrs (91 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-XYJ', type: 'King Air B200C', base: 'Broken Hill (YBHI)',   status: 'Serviceable', nextService: '120 hrs (37 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
-  { rego: 'VH-XYO', type: 'King Air B200C', base: 'Sydney (YSSY)',        status: 'Serviceable', nextService: '120 hrs (48 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
+  { rego: 'VH-XYO', type: 'King Air B200C', base: 'Bankstown (YSBK)',     status: 'Serviceable', nextService: '120 hrs (48 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-XYR', type: 'King Air B200',  base: 'Broken Hill (YBHI)',   status: 'Serviceable', nextService: '120 hrs (88 remaining)', techLogState: 'Current',  defects: 1, maintenanceRelease: true  },
   { rego: 'VH-XYU', type: 'King Air B200',  base: 'Dubbo (YSDU)',         status: 'Maintenance', nextService: 'In maintenance',          techLogState: 'Pending',  defects: 3, maintenanceRelease: false },
   // ── King Air B350 series (4) ────────────────────────────────────────────────
   { rego: 'VH-MQD', type: 'King Air B350',  base: 'Dubbo (YSDU)',         status: 'Airborne',    nextService: '300 hrs (44 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
-  { rego: 'VH-MQK', type: 'King Air B350',  base: 'Sydney (YSSY)',        status: 'Serviceable', nextService: '300 hrs (112 remaining)', techLogState: 'Current', defects: 0, maintenanceRelease: true  },
+  { rego: 'VH-MQK', type: 'King Air B350',  base: 'Bankstown (YSBK)',     status: 'Serviceable', nextService: '300 hrs (112 remaining)', techLogState: 'Current', defects: 0, maintenanceRelease: true  },
   { rego: 'VH-NAJ', type: 'King Air B350',  base: 'Broken Hill (YBHI)',   status: 'Serviceable', nextService: '300 hrs (87 remaining)',  techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
-  { rego: 'VH-VPQ', type: 'King Air B350',  base: 'Launceston (YMLT)',   status: 'Serviceable', nextService: '300 hrs (156 remaining)', techLogState: 'Current', defects: 0, maintenanceRelease: true  },
+  { rego: 'VH-VPQ', type: 'King Air B350',  base: 'Bankstown (YSBK)',     status: 'Serviceable', nextService: '300 hrs (156 remaining)', techLogState: 'Current', defects: 0, maintenanceRelease: true  },
 ];
 
 export interface CrewMember {
