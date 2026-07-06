@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { type UserRole } from "@/lib/data";
-import { FileText, Download, BarChart3, Shield, Calendar, CheckCircle, AlertTriangle, TrendingUp } from "lucide-react";
+import { FileText, Download, BarChart3, Shield, Calendar, CheckCircle, AlertTriangle, TrendingUp, ClipboardList } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
+import { generateNopPDF, type NopPDFData } from "@/lib/generateNopPDF";
 
 interface Props { role: UserRole; }
 
@@ -270,7 +272,79 @@ const AUDIT_EVENTS = [
   { time: "04:45", event: "APG release BLOCKED", user: "System", mission: "MEDIVAC 02", ok: false },
 ];
 
+const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function buildNopData(month: number, year: number): NopPDFData {
+  const monthName = MONTHS[month];
+  const missionCount = 94 + Math.floor((month * 7) % 12);
+  const flightHours = (208 + (month * 3) % 20).toFixed(1);
+  const completionRate = (98.5 + (month % 3) * 0.4).toFixed(1);
+  const p1ResponseTime = 20 + (month % 4);
+  const p2ResponseTime = 35 + (month % 5);
+  return {
+    month: `${monthName} ${year}`,
+    reference: `NOP-NEPT-${String(month + 1).padStart(2, "0")}-${year}`,
+    preparedBy: "Director of Operations",
+    reviewedBy: "RFDS SE Operations Management",
+    contractRef: "NSW Health NEPT Contract 2024–2027",
+    totalMissions: missionCount,
+    nepTMissions: Math.floor(missionCount * 0.88),
+    p1Missions: Math.floor(missionCount * 0.08),
+    dentalMissions: Math.floor(missionCount * 0.04),
+    totalFlightHours: parseFloat(flightHours),
+    missionCompletionRate: parseFloat(completionRate),
+    avgP1ResponseMin: p1ResponseTime,
+    avgP2ResponseMin: p2ResponseTime,
+    patientTransfers: Math.floor(missionCount * 0.92),
+    fleet: [
+      { rego: "VH-MVW", type: "B200",  base: "Dubbo" },
+      { rego: "VH-MQD", type: "B350",  base: "Dubbo" },
+      { rego: "VH-XYR", type: "B200",  base: "Bankstown" },
+      { rego: "VH-MWH", type: "B200",  base: "Bankstown" },
+      { rego: "VH-MVX", type: "B200C", base: "Bankstown" },
+      { rego: "VH-MWK", type: "B200C", base: "Broken Hill" },
+      { rego: "VH-NAJ", type: "B350",  base: "Broken Hill" },
+    ],
+    crew: [
+      { name: "Capt. R. Hughes",  role: "Captain",          base: "Dubbo",       dutyHours: 38 },
+      { name: "Capt. S. Nguyen",  role: "Captain",          base: "Bankstown",   dutyHours: 35 },
+      { name: "FO J. Walsh",      role: "First Officer",    base: "Dubbo",       dutyHours: 32 },
+      { name: "FO M. Carter",     role: "First Officer",    base: "Broken Hill", dutyHours: 28 },
+      { name: "J. Thompson RN",   role: "Flight Nurse",     base: "Dubbo",       dutyHours: 36 },
+      { name: "S. Patel RN",      role: "Flight Nurse",     base: "Bankstown",   dutyHours: 33 },
+      { name: "M. Clarke RN",     role: "Flight Nurse",     base: "Broken Hill", dutyHours: 29 },
+    ],
+    incidents: [
+      { category: "Operational", description: "APG weather release delayed 18 min — alternate routing approved", action: "Closed — no further action" },
+      { category: "Maintenance", description: "Minor avionics snag VH-XYR — rectified on ground", action: "Closed — MEL nil" },
+    ],
+    narrative: `RFDS South Eastern Section maintained full NEPT contract compliance during ${monthName} ${year}. All ${missionCount} missions were completed within contracted response parameters. Fleet availability averaged 93% across all three bases (Bankstown, Dubbo, Broken Hill). No CASA notifiable events occurred. Two minor operational issues were identified and resolved without patient impact. Crew fatigue management remained fully compliant with FRMS protocols. All pre-flight and post-flight Jotform submissions were completed for every sector.`,
+    checklistItems: [
+      { item: "All missions logged and cross-referenced with NSW Health CAD", complete: true },
+      { item: "Fleet serviceability records current — no outstanding MEL items", complete: true },
+      { item: "Crew duty records reviewed — EBA compliant", complete: true },
+      { item: "FRMS fatigue declarations completed for all crew", complete: true },
+      { item: "Incident register reviewed and actioned", complete: true },
+      { item: "Drug and Alcohol declarations on file", complete: true },
+      { item: "Jotform pre/post-flight submissions verified complete", complete: true },
+      { item: "CASA AOC conditions reviewed — no breaches", complete: true },
+      { item: "Director of Operations signature obtained", complete: true },
+    ],
+  };
+}
+
 export default function AuditReports({ role }: Props) {
+  const now = new Date();
+  const [nopMonth, setNopMonth] = useState(now.getMonth());
+  const [nopYear, setNopYear] = useState(now.getFullYear());
+
+  function exportNopPDF() {
+    generateNopPDF(buildNopData(nopMonth, nopYear));
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -330,6 +404,49 @@ export default function AuditReports({ role }: Props) {
             </button>
           </div>
         ))}
+
+        {/* Notice of Ops card — month/year selectable */}
+        <div className="bg-card rounded-xl border border-card-border p-5 flex flex-col">
+          <div className="flex items-center gap-3 mb-3">
+            <ClipboardList size={18} className="text-emerald-400" />
+            <h3 className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk',sans-serif" }}>Notice of Ops</h3>
+            <span className="ml-auto status-green text-xs px-2 py-0.5 rounded-full">NEPT</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">Monthly NEPT operations notice — mission KPIs, fleet declaration, crew, incidents &amp; checklist for NSW Health</p>
+
+          {/* Month / Year selectors */}
+          <div className="flex gap-2 mb-3">
+            <select
+              value={nopMonth}
+              onChange={e => setNopMonth(Number(e.target.value))}
+              className="flex-1 bg-muted/40 border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            >
+              {MONTHS.map((m, idx) => (
+                <option key={m} value={idx}>{m}</option>
+              ))}
+            </select>
+            <select
+              value={nopYear}
+              onChange={e => setNopYear(Number(e.target.value))}
+              className="w-20 bg-muted/40 border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            >
+              {[2024, 2025, 2026, 2027].map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="text-[10px] text-muted-foreground mb-4 font-mono">
+            Ref: NOP-NEPT-{String(nopMonth + 1).padStart(2, "0")}-{nopYear}
+          </div>
+
+          <button
+            onClick={exportNopPDF}
+            className="mt-auto w-full flex items-center justify-center gap-2 p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 hover:bg-emerald-500/20 active:bg-emerald-500/30 transition-colors font-semibold"
+          >
+            <Download size={12} /> Export PDF
+          </button>
+        </div>
       </div>
 
       {/* Recent audit log */}
