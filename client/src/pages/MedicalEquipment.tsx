@@ -1407,22 +1407,20 @@ export default function MedicalEquipment({ role }: Props) {
         function markComplete() {
           const name = chestCheckedBy[selectedChestId]?.trim();
           if (!name) { alert("Enter your name before marking complete."); return; }
-          // push reorder items to localStorage for StockUsage to read
+          // push reorder items to server queue for StockUsage to read
           if (reorderItems.length > 0) {
-            const existing: { stockId: string; qty: number; note: string }[] =
-              JSON.parse(localStorage.getItem("medivac_chest_reorders") ?? "[]");
-            const merged = [...existing];
-            reorderItems.forEach(item => {
-              if (!item.stockCatalogueId) return;
-              const entry = checks[item.id];
-              const idx = merged.findIndex(e => e.stockId === item.stockCatalogueId);
-              if (idx >= 0) {
-                merged[idx].qty = Math.max(merged[idx].qty, entry.used);
-              } else {
-                merged.push({ stockId: item.stockCatalogueId, qty: entry.used, note: entry.note || `Chest restock — ${chest.name}` });
-              }
-            });
-            localStorage.setItem("medivac_chest_reorders", JSON.stringify(merged));
+            const items = reorderItems
+              .filter(item => item.stockCatalogueId)
+              .map(item => ({
+                stockId: item.stockCatalogueId!,
+                qty: checks[item.id]?.used ?? 1,
+                note: checks[item.id]?.note || `Chest restock — ${chest.name}`,
+              }));
+            fetch("/api/chest-reorder-queue", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(items),
+            }).catch(() => { /* best-effort */ });
           }
           setChestSentReorder(prev => ({ ...prev, [selectedChestId]: true }));
         }

@@ -864,6 +864,32 @@ export async function registerRoutes(
     }
   });
 
+  // ── Chest reorder queue (in-memory bridge replacing localStorage) ──────────
+  // Stores pending reorder items so StockUsage can consume them cross-page
+  const chestReorderQueue: { stockId: string; qty: number; note: string }[] = [];
+
+  app.get("/api/chest-reorder-queue", (_req: Request, res: Response) => {
+    res.json([...chestReorderQueue]);
+  });
+
+  app.post("/api/chest-reorder-queue", (req: Request, res: Response) => {
+    const items: { stockId: string; qty: number; note: string }[] = req.body ?? [];
+    items.forEach(item => {
+      const idx = chestReorderQueue.findIndex(e => e.stockId === item.stockId);
+      if (idx >= 0) {
+        chestReorderQueue[idx].qty = Math.max(chestReorderQueue[idx].qty, item.qty);
+      } else {
+        chestReorderQueue.push(item);
+      }
+    });
+    res.json({ ok: true, count: chestReorderQueue.length });
+  });
+
+  app.delete("/api/chest-reorder-queue", (_req: Request, res: Response) => {
+    chestReorderQueue.length = 0;
+    res.json({ ok: true });
+  });
+
   // ── Video streaming route (byte-range aware) ─────────────────────────────
   // S3 static hosting does not support Range requests. Serve all video files
   // through Express so browsers can seek and autoplay reliably.

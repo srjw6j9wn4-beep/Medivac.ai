@@ -180,33 +180,31 @@ const BLANK_ENTRY = (): UsageEntry => ({
 export default function StockUsage({ role }: Props) {
   const [entries, setEntries] = useState<UsageEntry[]>(DEMO_ENTRIES);
 
-  // ─ Auto-import chest reorders from MedicalEquipment page ───────────────────
+  // ─ Auto-import chest reorders from server queue (replaces localStorage) ─────
   const [chestReorderBanner, setChestReorderBanner] = useState(false);
   useEffect(() => {
-    const raw = localStorage.getItem("medivac_chest_reorders");
-    if (!raw) return;
-    try {
-      const pending: { stockId: string; qty: number; note: string }[] = JSON.parse(raw);
-      if (pending.length === 0) return;
-      // Create a synthetic usage entry for today so they appear in this week's order
-      const entry: UsageEntry = {
-        id: `chest-${Date.now()}`,
-        date: new Date().toISOString().split("T")[0],
-        missionRef: "CHEST-RESTOCK",
-        aircraft: "Ground Stock",
-        nurse: "Station Medical Chest",
-        items: pending.map(p => ({ stockId: p.stockId, qty: p.qty, notes: p.note })),
-        locked: true,
-      };
-      setEntries(prev => {
-        // avoid duplicates if already imported
-        if (prev.some(e => e.missionRef === "CHEST-RESTOCK" && e.date === entry.date)) return prev;
-        return [...prev, entry];
-      });
-      localStorage.removeItem("medivac_chest_reorders");
-      setChestReorderBanner(true);
-      setTimeout(() => setChestReorderBanner(false), 6000);
-    } catch { /* ignore malformed data */ }
+    fetch("/api/chest-reorder-queue")
+      .then(r => r.json())
+      .then((pending: { stockId: string; qty: number; note: string }[]) => {
+        if (!pending || pending.length === 0) return;
+        const entry: UsageEntry = {
+          id: `chest-${Date.now()}`,
+          date: new Date().toISOString().split("T")[0],
+          missionRef: "CHEST-RESTOCK",
+          aircraft: "Ground Stock",
+          nurse: "Station Medical Chest",
+          items: pending.map(p => ({ stockId: p.stockId, qty: p.qty, notes: p.note })),
+          locked: true,
+        };
+        setEntries(prev => {
+          if (prev.some(e => e.missionRef === "CHEST-RESTOCK" && e.date === entry.date)) return prev;
+          return [...prev, entry];
+        });
+        fetch("/api/chest-reorder-queue", { method: "DELETE" }).catch(() => {});
+        setChestReorderBanner(true);
+        setTimeout(() => setChestReorderBanner(false), 6000);
+      })
+      .catch(() => {});
   }, []);
   const [weekOffset, setWeekOffset] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);

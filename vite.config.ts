@@ -11,6 +11,8 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      // Shim loglevel to remove localStorage usage (used by livekit/heygen SDK)
+      "loglevel": path.resolve(import.meta.dirname, "client", "src", "shims", "loglevel.ts"),
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
