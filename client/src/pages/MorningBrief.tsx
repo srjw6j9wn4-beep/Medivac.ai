@@ -22,7 +22,16 @@ interface WeatherCurrent {
   windDir: number; humidity: number; code: number;
 }
 interface WeatherDay { date: string; code: number; high: number; low: number; }
-interface WeatherData { current: WeatherCurrent; daily: WeatherDay[]; locationName: string; }
+interface WeatherHour { time: string; code: number; temp: number; windSpeed: number; windDir: number; precip: number; }
+interface WeatherData { current: WeatherCurrent; daily: WeatherDay[]; hourly: WeatherHour[]; locationName: string; }
+
+const BASES = [
+  { id: "BHI",  name: "Broken Hill", lat: -31.9920, lon: 141.4722, tz: "Australia/Sydney" },
+  { id: "DU",   name: "Dubbo",       lat: -32.2169, lon: 148.5740, tz: "Australia/Sydney" },
+  { id: "BK",   name: "Bankstown",   lat: -33.9244, lon: 150.9883, tz: "Australia/Sydney" },
+  { id: "ESS",  name: "Essendon",    lat: -37.7279, lon: 144.9018, tz: "Australia/Melbourne" },
+  { id: "TAS",  name: "Launceston",  lat: -41.5450, lon: 147.2140, tz: "Australia/Hobart" },
+];
 
 function wmoLabel(code: number): string {
   if (code === 0)    return "Clear";
@@ -283,9 +292,9 @@ export default function MorningBrief({ role }: Props) {
   const [expandedAgenda, setExpandedAgenda] = useState<number[]>([]);
   const [agendaNotes, setAgendaNotes] = useState<Record<number, string>>({});
   const [expandedMel, setExpandedMel] = useState<string | null>(null);
-  const [weather, setWeather]         = useState<WeatherData | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(true);
-  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [baseWeather, setBaseWeather]   = useState<Record<string, WeatherData | null>>({});
+  const [baseWeatherLoading, setBaseWeatherLoading] = useState(true);
+  const [activeBase, setActiveBase]     = useState("BHI");
 
   // Tab: "board" = live ops data, "smartsheet" = embedded Smartsheet
   const [activeTab, setActiveTab] = useState<"board" | "smartsheet">("board");
@@ -405,44 +414,52 @@ export default function MorningBrief({ role }: Props) {
     return () => clearInterval(id);
   }, []);
 
-  // Weather
-  const fetchWeather = useCallback((lat: number, lon: number, locationName: string) => {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
-      `&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,relative_humidity_2m,weather_code` +
-      `&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`;
-    fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        const c = data.current; const d = data.daily;
-        setWeather({
-          locationName,
-          current: {
-            temperature: Math.round(c.temperature_2m),
-            feelsLike:   Math.round(c.apparent_temperature),
-            windSpeed:   Math.round(c.wind_speed_10m),
-            windDir:     Math.round(c.wind_direction_10m),
-            humidity:    Math.round(c.relative_humidity_2m),
-            code:        c.weather_code,
-          },
-          daily: (d.time as string[]).map((date: string, i: number) => ({
-            date, code: d.weather_code[i],
-            high: Math.round(d.temperature_2m_max[i]),
-            low:  Math.round(d.temperature_2m_min[i]),
-          })),
-        });
-        setWeatherLoading(false);
-      })
-      .catch(() => { setWeatherError("Could not load weather data"); setWeatherLoading(false); });
+  // Weather — all 5 bases with hourly + 7-day
+  const fetchAllBases = useCallback(() => {
+    setBaseWeatherLoading(true);
+    Promise.all(BASES.map(base => {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${base.lat}&longitude=${base.lon}` +
+        `&current=temperature_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,relative_humidity_2m,weather_code` +
+        `&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation_probability&forecast_hours=24` +
+        `&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=${encodeURIComponent(base.tz)}&forecast_days=7`;
+      return fetch(url).then(r => r.json()).then(d => {
+        const c = d.current;
+        const nowH = new Date().getHours();
+        const hourly: WeatherHour[] = (d.hourly.time as string[]).map((t: string, i: number) => ({
+          time: t.slice(11, 16),
+          code: d.hourly.weather_code[i],
+          temp: Math.round(d.hourly.temperature_2m[i]),
+          windSpeed: Math.round(d.hourly.wind_speed_10m[i]),
+          windDir: d.hourly.wind_direction_10m[i],
+          precip: d.hourly.precipitation_probability[i],
+        })).filter((_: WeatherHour, i: number) => parseInt((d.hourly.time[i] as string).slice(11,13)) >= nowH).slice(0, 24);
+        return {
+          id: base.id,
+          data: {
+            locationName: base.name,
+            hourly,
+            current: {
+              temperature: Math.round(c.temperature_2m), feelsLike: Math.round(c.apparent_temperature),
+              windSpeed: Math.round(c.wind_speed_10m), windDir: c.wind_direction_10m,
+              humidity: c.relative_humidity_2m, code: c.weather_code,
+            },
+            daily: (d.daily.time as string[]).map((date: string, i: number) => ({
+              date, code: d.daily.weather_code[i],
+              high: Math.round(d.daily.temperature_2m_max[i]),
+              low:  Math.round(d.daily.temperature_2m_min[i]),
+            })),
+          } as WeatherData,
+        };
+      }).catch(() => ({ id: base.id, data: null }));
+    })).then(results => {
+      const map: Record<string, WeatherData | null> = {};
+      results.forEach(r => { map[r.id] = r.data; });
+      setBaseWeather(map);
+      setBaseWeatherLoading(false);
+    });
   }, []);
 
-  useEffect(() => {
-    if (!navigator.geolocation) { fetchWeather(-32.2569, 148.6011, "Dubbo NSW"); return; }
-    navigator.geolocation.getCurrentPosition(
-      pos => fetchWeather(pos.coords.latitude, pos.coords.longitude, "Your Location"),
-      ()  => fetchWeather(-32.2569, 148.6011, "Dubbo NSW"),
-      { timeout: 6000 }
-    );
-  }, [fetchWeather]);
+  useEffect(() => { fetchAllBases(); }, [fetchAllBases]);
 
   const handleRefresh = useCallback(() => {
     setRefreshSpin(true);
@@ -621,86 +638,146 @@ export default function MorningBrief({ role }: Props) {
         )}
       </div>
 
-      {/* ══ WEATHER WIDGET ══════════════════════════════════════════════════ */}
+      {/* ══ MULTI-BASE WEATHER ══════════════════════════════════════════════ */}
       <div className="bg-card border border-card-border rounded-2xl overflow-hidden">
-        {weatherLoading && (
-          <div className="flex items-center justify-center gap-3 py-8 text-muted-foreground">
-            <RefreshCw size={16} className="animate-spin" />
-            <span className="text-sm">Loading weather…</span>
+        <div className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-cyan-400"><Wind size={14} /></span>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground"
+              style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Base Weather</h2>
+            <div className="flex-1 h-px bg-card-border" />
+            <button onClick={fetchAllBases} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-cyan-400 transition-colors">
+              <RefreshCw size={11} className={baseWeatherLoading ? "animate-spin" : ""} /> Refresh
+            </button>
           </div>
-        )}
-        {weatherError && (
-          <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
-            <AlertCircle size={15} /><span className="text-sm">{weatherError}</span>
+
+          {/* Base selector tabs */}
+          <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
+            {BASES.map(base => {
+              const bw = baseWeather[base.id];
+              return (
+                <button key={base.id} onClick={() => setActiveBase(base.id)}
+                  className={`flex-shrink-0 flex flex-col items-center gap-1 px-3 py-2 rounded-xl border transition-all ${
+                    activeBase === base.id
+                      ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-400"
+                      : "bg-background/50 border-card-border text-muted-foreground hover:text-foreground hover:border-white/10"
+                  }`}>
+                  <span className="text-[11px] font-bold uppercase tracking-wider whitespace-nowrap">{base.name}</span>
+                  {bw ? (
+                    <div className="flex items-center gap-1">
+                      <span className={wmoIconColor(bw.current.code)}><WmoIcon code={bw.current.code} size={14} /></span>
+                      <span className="text-sm font-extrabold tabular-nums">{bw.current.temperature}°</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs">{baseWeatherLoading ? "…" : "—"}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        )}
-        {weather && !weatherLoading && (
-          <div className="p-5">
-            <div className="flex items-center gap-2 mb-5">
-              <span className="text-cyan-400"><Wind size={14} /></span>
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground"
-                style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Weather Outlook</h2>
-              <div className="flex-1 h-px bg-card-border" />
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MapPin size={11} />{weather.locationName}
-              </span>
+
+          {/* Loading */}
+          {baseWeatherLoading && (
+            <div className="flex items-center gap-2 text-muted-foreground py-8 justify-center">
+              <RefreshCw size={14} className="animate-spin" />
+              <span className="text-sm">Loading weather for all bases…</span>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-5">
-              <div className="flex flex-col justify-center gap-3 bg-background/50 rounded-xl p-5 min-w-[200px]">
-                <div className="flex items-center gap-4">
-                  <div className={`flex-shrink-0 ${wmoIconColor(weather.current.code)}`}>
-                    <WmoIcon code={weather.current.code} size={48} />
+          )}
+
+          {/* Selected base detail */}
+          {!baseWeatherLoading && (() => {
+            const bw = baseWeather[activeBase];
+            if (!bw) return <div className="text-sm text-muted-foreground py-4 text-center">Weather unavailable</div>;
+            return (
+              <div className="space-y-4">
+                {/* Current conditions */}
+                <div className="flex items-center gap-5 bg-background/50 rounded-xl p-4 border border-card-border">
+                  <div className={`flex-shrink-0 ${wmoIconColor(bw.current.code)}`}>
+                    <WmoIcon code={bw.current.code} size={44} />
                   </div>
                   <div>
-                    <div className="text-5xl font-extrabold text-foreground leading-none tabular-nums"
-                      style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{weather.current.temperature}°</div>
-                    <div className="text-sm font-semibold text-muted-foreground mt-1">{wmoLabel(weather.current.code)}</div>
+                    <div className="text-4xl font-extrabold text-foreground leading-none tabular-nums"
+                      style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{bw.current.temperature}°</div>
+                    <div className="text-sm text-muted-foreground mt-0.5">{wmoLabel(bw.current.code)}</div>
                   </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-card-border">
-                  <div className="flex flex-col items-center gap-1">
-                    <Thermometer size={13} className="text-orange-400" />
-                    <span className="text-xs text-muted-foreground">Feels</span>
-                    <span className="text-sm font-bold tabular-nums">{weather.current.feelsLike}°</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <Navigation size={13} className="text-cyan-400"
-                      style={{ transform: `rotate(${weather.current.windDir}deg)` }} />
-                    <span className="text-xs text-muted-foreground">Wind</span>
-                    <span className="text-sm font-bold tabular-nums">{weather.current.windSpeed} <span className="text-xs font-normal">km/h</span></span>
-                    <span className="text-[10px] text-muted-foreground">{windDirLabel(weather.current.windDir)}</span>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <Droplets size={13} className="text-blue-400" />
-                    <span className="text-xs text-muted-foreground">Humidity</span>
-                    <span className="text-sm font-bold tabular-nums">{weather.current.humidity}%</span>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-5 gap-2">
-                {weather.daily.map((day, i) => {
-                  const date = new Date(day.date + "T12:00:00");
-                  const dayLabel = i === 0 ? "Today" : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()];
-                  return (
-                    <div key={day.date}
-                      className={`flex flex-col items-center justify-between gap-2 rounded-xl px-2 py-4 transition-colors ${
-                        i === 0 ? "bg-cyan-500/10 border border-cyan-500/25" : "bg-background/50 border border-card-border hover:bg-white/[0.03]"
-                      }`}>
-                      <span className={`text-xs font-bold uppercase tracking-wider ${i === 0 ? "text-cyan-400" : "text-muted-foreground"}`}>{dayLabel}</span>
-                      <div className={wmoIconColor(day.code)}><WmoIcon code={day.code} size={28} /></div>
-                      <span className="text-[10px] text-muted-foreground text-center leading-tight">{wmoLabel(day.code)}</span>
-                      <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-base font-extrabold text-foreground tabular-nums"
-                          style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{day.high}°</span>
-                        <span className="text-xs text-muted-foreground tabular-nums">{day.low}°</span>
-                      </div>
+                  <div className="flex-1" />
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <Thermometer size={13} className="text-orange-400 mx-auto mb-1" />
+                      <div className="text-xs text-muted-foreground">Feels</div>
+                      <div className="text-sm font-bold tabular-nums">{bw.current.feelsLike}°</div>
                     </div>
-                  );
-                })}
+                    <div>
+                      <Navigation size={13} className="text-cyan-400 mx-auto mb-1"
+                        style={{ transform: `rotate(${bw.current.windDir}deg)` }} />
+                      <div className="text-xs text-muted-foreground">Wind</div>
+                      <div className="text-sm font-bold tabular-nums">{bw.current.windSpeed} <span className="text-[10px] font-normal">km/h</span></div>
+                      <div className="text-[10px] text-muted-foreground">{windDirLabel(bw.current.windDir)}</div>
+                    </div>
+                    <div>
+                      <Droplets size={13} className="text-blue-400 mx-auto mb-1" />
+                      <div className="text-xs text-muted-foreground">Humidity</div>
+                      <div className="text-sm font-bold tabular-nums">{bw.current.humidity}%</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 24-hour bubble strip */}
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Next 24 Hours</div>
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {bw.hourly.map((h, i) => (
+                      <div key={i} className={`flex-shrink-0 flex flex-col items-center gap-1.5 rounded-xl px-2.5 py-3 border ${
+                        i === 0 ? "bg-cyan-500/10 border-cyan-500/25" : "bg-background/50 border-card-border"
+                      }`} style={{ minWidth: 54 }}>
+                        <span className={`text-[10px] font-bold ${i === 0 ? "text-cyan-400" : "text-muted-foreground"}`}>
+                          {i === 0 ? "Now" : h.time}
+                        </span>
+                        <div className={wmoIconColor(h.code)}><WmoIcon code={h.code} size={18} /></div>
+                        <span className="text-sm font-extrabold tabular-nums text-foreground">{h.temp}°</span>
+                        {h.precip > 0 && (
+                          <div className="flex items-center gap-0.5">
+                            <Droplets size={8} className="text-blue-400" />
+                            <span className="text-[9px] text-blue-400 tabular-nums">{h.precip}%</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-0.5">
+                          <Navigation size={8} className="text-muted-foreground"
+                            style={{ transform: `rotate(${h.windDir}deg)` }} />
+                          <span className="text-[9px] text-muted-foreground tabular-nums">{h.windSpeed}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 7-day overview */}
+                <div>
+                  <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">7-Day Outlook</div>
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {bw.daily.map((day, i) => {
+                      const date = new Date(day.date + "T12:00:00");
+                      const label = i === 0 ? "Today" : ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()];
+                      return (
+                        <div key={day.date} className={`flex flex-col items-center gap-1.5 rounded-xl px-1 py-3 border ${
+                          i === 0 ? "bg-cyan-500/10 border-cyan-500/25" : "bg-background/50 border-card-border"
+                        }`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                            i === 0 ? "text-cyan-400" : "text-muted-foreground"
+                          }`}>{label}</span>
+                          <div className={wmoIconColor(day.code)}><WmoIcon code={day.code} size={20} /></div>
+                          <span className="text-[9px] text-muted-foreground text-center leading-tight">{wmoLabel(day.code)}</span>
+                          <span className="text-sm font-extrabold tabular-nums text-foreground">{day.high}°</span>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">{day.low}°</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            );
+          })()}
+        </div>
       </div>
 
       {/* ══ TAB BAR: Ops Board / Smartsheet ═════════════════════════════════ */}
