@@ -1583,12 +1583,30 @@ export default function CheckTraining({ role }: Props) {
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => setSelectedOpsStaffId(null)}
-                    className="p-1.5 rounded-lg hover:bg-muted/40 transition-colors"
-                  >
-                    <X size={14} className="text-muted-foreground" />
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {staff.renewalDue && (
+                      <button
+                        onClick={() => {
+                          const today = new Date().toISOString().split("T")[0];
+                          setOpsStaff(prev => prev.map(s =>
+                            s.id === staff.id
+                              ? { ...s, completedDate: today, renewalDue: addMonths(today, 24) }
+                              : s
+                          ));
+                        }}
+                        title="Reset 24-month review cycle from today"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-500/10 border border-green-500/30 rounded-lg text-[11px] text-green-400 hover:bg-green-500/20 transition-colors font-semibold"
+                      >
+                        <RefreshCw size={11} /> Reset Review
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedOpsStaffId(null)}
+                      className="p-1.5 rounded-lg hover:bg-muted/40 transition-colors"
+                    >
+                      <X size={14} className="text-muted-foreground" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-5 space-y-5">
