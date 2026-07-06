@@ -1795,6 +1795,9 @@ interface ExamResult {
   date: string;
 }
 
+// Best result keyed by examId
+type BestScores = Record<string, { score: number; total: number; passed: boolean; date: string }>;
+
 function TheoryKnowledgeSection() {
   const [phase, setPhase]               = useState<ExamPhase>("select");
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
@@ -1805,6 +1808,7 @@ function TheoryKnowledgeSection() {
   const [result, setResult]             = useState<ExamResult | null>(null);
   const [timeLeft, setTimeLeft]         = useState(EXAM_DURATION_MINUTES * 60);
   const [results, setResults]           = useState<ExamResult[]>([]);
+  const [bestScores, setBestScores]     = useState<BestScores>({});
   const timerRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
   const answersRef                      = useRef<(number | null)[]>([]);
   const questionsRef                    = useRef<ExamQuestion[]>([]);
@@ -1880,6 +1884,13 @@ function TheoryKnowledgeSection() {
     };
     setResult(res);
     setResults(prev => [res, ...prev.slice(0, 19)]);
+    setBestScores(prev => {
+      const existing = prev[res.examId];
+      if (!existing || res.score > existing.score) {
+        return { ...prev, [res.examId]: { score: res.score, total: res.total, passed: res.passed, date: res.date } };
+      }
+      return prev;
+    });
     setPhase("results");
   }
 
@@ -1896,114 +1907,213 @@ function TheoryKnowledgeSection() {
   const OPTION_LABELS = ["A", "B", "C", "D"];
 
   // ─── SELECT SCREEN ───────────────────────────────────────────────────────────
-  if (phase === "select") return (
-    <div className="p-4 space-y-6">
-      {/* Banner */}
-      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-start gap-3">
-        <Brain size={24} className="text-emerald-400 mt-0.5 shrink-0" />
-        <div>
-          <p className="font-bold text-emerald-300 text-base">Theory Knowledge Testing</p>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            12 exams · 20 questions each · 30-minute timer · Pass mark {PASS_MARK}%
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            All questions sourced directly from RFDS SE King Air manuals. Every answer includes the source document and chapter for full transparency.
-          </p>
-        </div>
-      </div>
+  if (phase === "select") {
+    const totalExams      = EXAMS.length;
+    const passedCount     = EXAMS.filter(e => bestScores[e.id]?.passed).length;
+    const attemptedCount  = EXAMS.filter(e => bestScores[e.id]).length;
+    const overallPct      = Math.round((passedCount / totalExams) * 100);
+    const dedicatedExams  = EXAMS.filter(e => !e.title.includes("Mixed"));
+    const mixedExams      = EXAMS.filter(e => e.title.includes("Mixed"));
 
-      {/* Past results */}
-      {results.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent Results</p>
-          <div className="space-y-2">
-            {results.slice(0, 5).map((r, i) => {
-              const exam = EXAMS.find(e => e.id === r.examId);
-              return (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground truncate flex-1">{exam?.title ?? r.examId}</span>
-                  <div className="flex items-center gap-3 ml-4">
-                    <span className="text-xs text-muted-foreground">{r.date}</span>
-                    <span className={`font-bold text-sm ${r.passed ? "text-emerald-400" : "text-red-400"}`}>
-                      {pct(r.score, r.total)}% {r.passed ? "✓" : "✗"}
-                    </span>
+    return (
+      <div className="p-4 space-y-6">
+
+        {/* ── PROGRESS TRACKER CARD ── */}
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-start gap-3">
+              <Trophy size={22} className="text-emerald-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold text-emerald-300 text-base">Theory Knowledge Testing</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  20 questions · 30-min timer · Pass mark {PASS_MARK}% · Best score tracked per exam
+                </p>
+              </div>
+            </div>
+            {/* Summary stats */}
+            <div className="flex gap-4 shrink-0">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-emerald-400 tabular-nums">{passedCount}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Passed</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-foreground tabular-nums">{attemptedCount}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Attempted</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-muted-foreground tabular-nums">{totalExams}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Total</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Overall progress bar */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">{passedCount} of {totalExams} exams passed</span>
+              <span className={`font-bold ${
+                overallPct === 100 ? "text-emerald-400" :
+                overallPct >= 50  ? "text-amber-400"   : "text-muted-foreground"
+              }`}>{overallPct}%</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-border overflow-hidden">
+              <div
+                className="h-2.5 rounded-full bg-emerald-500 transition-all duration-500"
+                style={{ width: `${overallPct}%` }}
+              />
+            </div>
+            {overallPct === 100 && (
+              <p className="text-xs text-emerald-400 font-semibold text-center pt-1">🎖 All exams passed — well done!</p>
+            )}
+          </div>
+
+          {/* Per-exam mini grid */}
+          {attemptedCount > 0 && (
+            <div className="mt-4 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5">
+              {EXAMS.map((exam, i) => {
+                const best = bestScores[exam.id];
+                const isMixed = exam.title.includes("Mixed");
+                let bg = "bg-border/50"; // not attempted
+                if (best?.passed)       bg = "bg-emerald-500";
+                else if (best)          bg = "bg-red-500/70";
+                return (
+                  <div
+                    key={exam.id}
+                    title={`${exam.title}${best ? ` — Best: ${pct(best.score, best.total)}% (${best.passed ? "PASS" : "FAIL"})` : " — Not attempted"}`}
+                    className={`relative h-7 rounded flex items-center justify-center text-[10px] font-bold text-white cursor-default transition-all ${
+                      bg
+                    } ${isMixed ? "ring-1 ring-purple-400/40" : ""}`}
+                  >
+                    {i + 1}
+                    {best?.passed && (
+                      <span className="absolute -top-1 -right-1 text-[8px]">✓</span>
+                    )}
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── DEDICATED EXAMS ── */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dedicated Exams — One Manual Per Exam</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {dedicatedExams.map(exam => {
+              const best = bestScores[exam.id];
+              const scorePct = best ? pct(best.score, best.total) : null;
+              return (
+                <button
+                  key={exam.id}
+                  onClick={() => startExam(exam)}
+                  className="text-left rounded-xl border border-border bg-card hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all p-4 group"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <BookMarked size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    {best ? (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        best.passed ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
+                      }`}>
+                        {best.passed ? "PASS" : "FAIL"} · {scorePct}%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/40">Not attempted</span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-sm mt-2 group-hover:text-emerald-300 transition-colors">{exam.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
+
+                  {/* Score bar */}
+                  {best && (
+                    <div className="mt-3 space-y-1">
+                      <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            best.passed ? "bg-emerald-500" : "bg-red-500/70"
+                          }`}
+                          style={{ width: `${scorePct}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>Best: {best.score}/{best.total}</span>
+                        <span>{best.date}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {!best && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckSquare size={11} /> <span>20 questions</span>
+                      <Timer size={11} className="ml-1" /> <span>30 min</span>
+                    </div>
+                  )}
+                </button>
               );
             })}
           </div>
         </div>
-      )}
 
-      {/* Dedicated exams */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dedicated Exams — One Manual Per Exam</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {EXAMS.filter(e => !e.title.includes("Mixed")).map(exam => {
-            const lastResult = results.find(r => r.examId === exam.id);
-            return (
-              <button
-                key={exam.id}
-                onClick={() => startExam(exam)}
-                className="text-left rounded-xl border border-border bg-card hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all p-4 group"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <BookMarked size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-                  {lastResult && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      lastResult.passed ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
-                    }`}>
-                      {pct(lastResult.score, lastResult.total)}%
-                    </span>
-                  )}
-                </div>
-                <p className="font-semibold text-sm mt-2 group-hover:text-emerald-300 transition-colors">{exam.title}</p>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
-                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                  <CheckSquare size={11} /> <span>20 questions</span>
-                  <Timer size={11} className="ml-1" /> <span>30 min</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        {/* ── MIXED EXAMS ── */}
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Combined Exams — Mixed Across All Manuals</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {mixedExams.map(exam => {
+              const best = bestScores[exam.id];
+              const scorePct = best ? pct(best.score, best.total) : null;
+              return (
+                <button
+                  key={exam.id}
+                  onClick={() => startExam(exam)}
+                  className="text-left rounded-xl border border-border bg-card hover:border-purple-500/40 hover:bg-purple-500/5 transition-all p-4 group"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <Brain size={16} className="text-purple-400 shrink-0 mt-0.5" />
+                    {best ? (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        best.passed ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
+                      }`}>
+                        {best.passed ? "PASS" : "FAIL"} · {scorePct}%
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/40">Not attempted</span>
+                    )}
+                  </div>
+                  <p className="font-semibold text-sm mt-2 group-hover:text-purple-300 transition-colors">{exam.title}</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
 
-      {/* Mixed exams */}
-      <div>
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Combined Exams — Mixed Across All Manuals</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {EXAMS.filter(e => e.title.includes("Mixed")).map(exam => {
-            const lastResult = results.find(r => r.examId === exam.id);
-            return (
-              <button
-                key={exam.id}
-                onClick={() => startExam(exam)}
-                className="text-left rounded-xl border border-border bg-card hover:border-purple-500/40 hover:bg-purple-500/5 transition-all p-4 group"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <Brain size={16} className="text-purple-400 shrink-0 mt-0.5" />
-                  {lastResult && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      lastResult.passed ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
-                    }`}>
-                      {pct(lastResult.score, lastResult.total)}%
-                    </span>
+                  {/* Score bar */}
+                  {best && (
+                    <div className="mt-3 space-y-1">
+                      <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            best.passed ? "bg-emerald-500" : "bg-red-500/70"
+                          }`}
+                          style={{ width: `${scorePct}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] text-muted-foreground">
+                        <span>Best: {best.score}/{best.total}</span>
+                        <span>{best.date}</span>
+                      </div>
+                    </div>
                   )}
-                </div>
-                <p className="font-semibold text-sm mt-2 group-hover:text-purple-300 transition-colors">{exam.title}</p>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
-                <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                  <CheckSquare size={11} /> <span>20 questions</span>
-                  <Timer size={11} className="ml-1" /> <span>30 min</span>
-                </div>
-              </button>
-            );
-          })}
+
+                  {!best && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckSquare size={11} /> <span>20 questions</span>
+                      <Timer size={11} className="ml-1" /> <span>30 min</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
+
       </div>
-    </div>
-  );
+    );
+  }
 
   // ─── IN-PROGRESS SCREEN ──────────────────────────────────────────────────────
   if (phase === "in-progress" && selectedExam) {
