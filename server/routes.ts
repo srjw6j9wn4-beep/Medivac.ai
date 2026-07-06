@@ -128,6 +128,7 @@ export async function registerRoutes(
 
     try {
       const apiKey = process.env.LIVEAVATAR_API_KEY
+        || process.env.HEYGEN_API_KEY
         || process.env.CUSTOM_CRED_API_LIVEAVATAR_COM_TOKEN;
       if (!apiKey) {
         return res.status(503).json({ error: "LIVEAVATAR_API_KEY not set in server environment." });
