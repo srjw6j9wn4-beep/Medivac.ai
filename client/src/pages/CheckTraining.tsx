@@ -1587,6 +1587,8 @@ export default function CheckTraining({ role }: Props) {
                     {staff.renewalDue && (
                       <button
                         onClick={() => {
+                          if (!window.confirm(`Reset the 24-month review cycle for ${staff.name}?\n\nThis will record today as the review completion date and set the next review due in 24 months. This cannot be undone.`))
+                            return;
                           const today = new Date().toISOString().split("T")[0];
                           setOpsStaff(prev => prev.map(s =>
                             s.id === staff.id
