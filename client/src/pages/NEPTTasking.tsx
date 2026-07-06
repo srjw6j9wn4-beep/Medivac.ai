@@ -8,7 +8,7 @@ import {
   Clock, Plane, User, MapPin, ChevronDown, Filter, Search,
   RefreshCw, ClipboardList, ArrowRight, Ambulance, GripVertical, ChevronsRight,
   FileText, CheckSquare, ChevronRight, Calendar, BarChart3,
-  Shield, Printer, Send, RotateCcw, AlertCircle, Check,
+  Shield, Printer, Send, RotateCcw, AlertCircle, Check, ExternalLink,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -806,10 +806,20 @@ function emptyNop(month: number, year: number): NopData {
   };
 }
 
-function NoticeOfOps({ tasks }: { tasks: NeptTask[] }) {
+function NoticeOfOps({ tasks, month, year, setMonth, setYear }: {
+  tasks: NeptTask[];
+  month?: number;
+  year?: number;
+  setMonth?: (m: number) => void;
+  setYear?: (y: number) => void;
+}) {
   const now = new Date();
-  const [selMonth, setSelMonth] = useState(now.getMonth());
-  const [selYear, setSelYear]   = useState(now.getFullYear());
+  const [_selMonth, _setSelMonth] = useState(now.getMonth());
+  const [_selYear, _setSelYear]   = useState(now.getFullYear());
+  const selMonth   = month    !== undefined ? month    : _selMonth;
+  const selYear    = year     !== undefined ? year     : _selYear;
+  const setSelMonth = setMonth !== undefined ? setMonth : _setSelMonth;
+  const setSelYear  = setYear  !== undefined ? setYear  : _setSelYear;
   const [nop, setNop]           = useState<NopData>(() => emptyNop(now.getMonth(), now.getFullYear()));
   const [showPrint, setShowPrint] = useState(false);
   const [newChange, setNewChange] = useState<Partial<OpsChange>>({
@@ -1352,6 +1362,9 @@ export default function NEPTTasking({ role }: Props) {
   const [expandedId, setExpandedId]   = useState<number | null>(null);
   const [etaSort, setEtaSort]         = useState<"asc" | "desc" | null>("asc");
   const [activeTab, setActiveTab]     = useState<"board" | "notice-of-ops">("board");
+  const nowDate = new Date();
+  const [nopMonth, setNopMonth] = useState(nowDate.getMonth());
+  const [nopYear,  setNopYear]  = useState(nowDate.getFullYear());
 
   const canDispatch = !["pilot", "nurse", "engineer"].includes(role);
 
@@ -1483,6 +1496,15 @@ export default function NEPTTasking({ role }: Props) {
           >
             <RefreshCw size={14} />
           </button>
+          {/* Ops Room Display launcher */}
+          <button
+            onClick={() => window.open(window.location.href.replace(/#.*$/, "") + "#/ops-display", "_blank", "noopener,noreferrer")}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-500/10 border border-slate-500/30 rounded-lg text-xs text-slate-300 font-semibold hover:bg-slate-500/20 hover:border-slate-400/50 transition-colors"
+            title="Open live ops room display in a new window"
+          >
+            <Monitor size={13} /> Ops Display
+            <ExternalLink size={11} className="opacity-60" />
+          </button>
           {canDispatch && (
             <button
               onClick={() => { setEditTask(null); setShowModal(true); }}
@@ -1519,7 +1541,7 @@ export default function NEPTTasking({ role }: Props) {
 
       {/* Notice of Ops Tab */}
       {activeTab === "notice-of-ops" && (
-        <NoticeOfOps tasks={tasks} />
+        <NoticeOfOps tasks={tasks} month={nopMonth} year={nopYear} setMonth={setNopMonth} setYear={setNopYear} />
       )}
 
       {/* Tasking Board Tab */}

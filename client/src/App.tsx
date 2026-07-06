@@ -44,6 +44,7 @@ import MissionOptimiser from "@/pages/MissionOptimiser";
 import ManifestSign from "@/pages/ManifestSign";
 import TechLogEmbed from "@/pages/TechLogEmbed";
 import NEPTTasking from "@/pages/NEPTTasking";
+import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
 import { FEATURES } from "@/lib/config";
 import type { UserRole } from "@/lib/data";
 
@@ -116,9 +117,14 @@ function App() {
       <TooltipProvider>
         <Toaster />
         <Router hook={useHashLocation}>
-          <Layout role={role} onRoleChange={setRole}>
-            <AppRouter role={role} />
-          </Layout>
+          {/* Standalone routes — no Layout wrapper */}
+          <Route path="/ops-display" component={OpsRoomDisplay} />
+          {/* All other routes wrapped in Layout */}
+          <Route>
+            <Layout role={role} onRoleChange={setRole}>
+              <AppRouter role={role} />
+            </Layout>
+          </Route>
         </Router>
       </TooltipProvider>
     </QueryClientProvider>
