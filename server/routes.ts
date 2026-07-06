@@ -815,10 +815,11 @@ export async function registerRoutes(
         const route = task.pickupLocation && task.destLocation
           ? `${task.pickupLocation} → ${task.destLocation}`
           : task.taskRef;
+        const patient = task.patientName ? ` · Patient: ${task.patientName}` : "";
         storage.createNotification({
           type:    "task_released",
           title:   `Task Released to Gate`,
-          body:    `${task.taskRef} — ${route}${ task.aircraftReg ? ` · ${task.aircraftReg}` : "" }`,
+          body:    `${task.taskRef} — ${route}${ task.aircraftReg ? ` · ${task.aircraftReg}` : "" }${patient}`,
           taskRef: task.taskRef,
           taskId:  task.id,
         });
