@@ -147,7 +147,7 @@ export const AIRCRAFT: Aircraft[] = [
   { rego: 'VH-LTQ', type: 'King Air B200C', base: 'Sydney (YSSY)',        status: 'Serviceable', nextService: '120 hrs (62 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MVW', type: 'King Air B200',  base: 'Dubbo (YSDU)',         status: 'Airborne',    nextService: '120 hrs (28 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MVX', type: 'King Air B200C', base: 'Broken Hill (YBHI)',   status: 'Serviceable', nextService: '120 hrs (55 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
-  { rego: 'VH-MWH', type: 'King Air B200',  base: 'Orange (YORG)',        status: 'Serviceable', nextService: '120 hrs (71 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
+  { rego: 'VH-MWH', type: 'King Air B200',  base: 'Dubbo (YSDU)',         status: 'Serviceable', nextService: '120 hrs (71 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MWK', type: 'King Air B200C', base: 'Dubbo (YSDU)',         status: 'Serviceable', nextService: '120 hrs (44 remaining)', techLogState: 'Current',  defects: 1, maintenanceRelease: true  },
   { rego: 'VH-RFD', type: 'King Air B200C', base: 'Canberra (YSCB)',      status: 'Serviceable', nextService: '120 hrs (91 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-XYJ', type: 'King Air B200C', base: 'Broken Hill (YBHI)',   status: 'Serviceable', nextService: '120 hrs (37 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
