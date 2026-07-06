@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { type UserRole } from "@/lib/data";
 import {
   Package, Plus, Trash2, Send, Download, CheckCircle,
@@ -179,6 +179,35 @@ const BLANK_ENTRY = (): UsageEntry => ({
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function StockUsage({ role }: Props) {
   const [entries, setEntries] = useState<UsageEntry[]>(DEMO_ENTRIES);
+
+  // ─ Auto-import chest reorders from MedicalEquipment page ───────────────────
+  const [chestReorderBanner, setChestReorderBanner] = useState(false);
+  useEffect(() => {
+    const raw = localStorage.getItem("medivac_chest_reorders");
+    if (!raw) return;
+    try {
+      const pending: { stockId: string; qty: number; note: string }[] = JSON.parse(raw);
+      if (pending.length === 0) return;
+      // Create a synthetic usage entry for today so they appear in this week's order
+      const entry: UsageEntry = {
+        id: `chest-${Date.now()}`,
+        date: new Date().toISOString().split("T")[0],
+        missionRef: "CHEST-RESTOCK",
+        aircraft: "Ground Stock",
+        nurse: "Station Medical Chest",
+        items: pending.map(p => ({ stockId: p.stockId, qty: p.qty, notes: p.note })),
+        locked: true,
+      };
+      setEntries(prev => {
+        // avoid duplicates if already imported
+        if (prev.some(e => e.missionRef === "CHEST-RESTOCK" && e.date === entry.date)) return prev;
+        return [...prev, entry];
+      });
+      localStorage.removeItem("medivac_chest_reorders");
+      setChestReorderBanner(true);
+      setTimeout(() => setChestReorderBanner(false), 6000);
+    } catch { /* ignore malformed data */ }
+  }, []);
   const [weekOffset, setWeekOffset] = useState(0);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editEntry, setEditEntry] = useState<UsageEntry | null>(null);
@@ -358,6 +387,15 @@ export default function StockUsage({ role }: Props) {
           )}
         </div>
       </div>
+
+      {/* Chest reorder import banner */}
+      {chestReorderBanner && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-500/30 bg-green-500/5 text-xs">
+          <CheckCircle size={13} className="text-green-400 shrink-0" />
+          <span className="text-green-300 font-semibold">Medical Chest reorder items imported</span>
+          <span className="text-muted-foreground">— added to this week’s usage log and order queue automatically.</span>
+        </div>
+      )}
 
       {/* Week navigator */}
       <div className="flex items-center gap-3">

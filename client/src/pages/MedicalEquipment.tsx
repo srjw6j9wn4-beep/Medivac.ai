@@ -6,7 +6,7 @@ import {
   Thermometer, TrendingUp, Zap, ChevronDown, ChevronRight,
   Calendar, BarChart3, Pill, Droplets, HeartPulse, Syringe,
   FlaskConical, Stethoscope, Wind, Radio, Boxes, Clipboard,
-  Plus, X, Check, Info, Lock, FileText, Star
+  Plus, X, Check, Info, Lock, FileText, Star, MapPin, ShoppingCart, Briefcase
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
 
@@ -76,6 +76,95 @@ interface ChecklistEntry {
   note: string;
   type: "used" | "checked" | "reorder" | "expiry" | "restock";
 }
+
+// ─── Medical Chest Types ────────────────────────────────────────────────────
+interface ChestItem {
+  id: string;
+  name: string;
+  category: "S8 Controlled" | "S4 Prescription" | "S3 Pharmacist" | "IV Fluid" | "Consumable" | "Equipment";
+  stockCatalogueId: string | null;  // links to StockUsage CATALOGUE id for reorder
+  parQty: number;         // full par level
+  unit: string;
+  expiryDate?: string;    // optional
+  storageNote?: string;
+}
+
+interface MedicalChest {
+  id: string;
+  name: string;           // e.g. "Dubbo Base — Medical Chest A"
+  station: string;        // base location
+  location: string;       // room / shelf label
+  lastChecked?: string;
+  checkedBy?: string;
+}
+
+interface ChestCheckEntry {
+  chestId: string;
+  itemId: string;
+  qtyPresent: number;     // how many on hand right now
+  used: number;           // used = par - qtyPresent
+  note: string;
+  flagReorder: boolean;
+}
+
+// ─── Station Medical Chests ───────────────────────────────────────────────────
+const MEDICAL_CHESTS: MedicalChest[] = [
+  { id: "ch-dub-a", name: "Dubbo Base — Chest A",           station: "Dubbo",       location: "Medical Store Room 1 — Shelf A",     lastChecked: "2026-07-05", checkedBy: "S. Williams (SFN)" },
+  { id: "ch-dub-b", name: "Dubbo Base — Chest B (S8)",      station: "Dubbo",       location: "Medical Store Room 1 — Controlled",  lastChecked: "2026-07-05", checkedBy: "S. Williams (SFN)" },
+  { id: "ch-bhi-a", name: "Broken Hill Base — Chest A",     station: "Broken Hill", location: "Medical Store Room — Shelf A",       lastChecked: "2026-07-04", checkedBy: "M. Nguyen (RN)" },
+  { id: "ch-bhi-b", name: "Broken Hill Base — Chest B (S8)",station: "Broken Hill", location: "Medical Store Room — Controlled",    lastChecked: "2026-07-04", checkedBy: "M. Nguyen (RN)" },
+  { id: "ch-bkb-a", name: "Bankstown Base — Chest A",       station: "Bankstown",   location: "Medical Store — Bay 2, Shelf A",    lastChecked: "2026-07-06", checkedBy: "B. Thompson (RN)" },
+  { id: "ch-ess-a", name: "Essendon Base — Chest A",        station: "Essendon",    location: "Medical Supply Room — Shelf A",     lastChecked: "2026-07-03", checkedBy: "K. Brennan (RN)" },
+  { id: "ch-las-a", name: "Launceston Base — Chest A",      station: "Launceston",  location: "Medical Store — Shelf A",           lastChecked: "2026-07-02", checkedBy: "J. Park (RN)" },
+];
+
+// ─── Chest Contents (par levels — shared across all chests, qty may vary) ────
+const CHEST_ITEMS: ChestItem[] = [
+  // S8 Controlled
+  { id: "ci-s8-01", name: "Morphine Sulphate 10mg/mL",        category: "S8 Controlled",   stockCatalogueId: "s8-01", parQty: 10, unit: "ampoule",   storageNote: "Locked controlled cabinet" },
+  { id: "ci-s8-02", name: "Fentanyl 50mcg/mL",                category: "S8 Controlled",   stockCatalogueId: "s8-02", parQty: 10, unit: "ampoule",   storageNote: "Locked controlled cabinet" },
+  { id: "ci-s8-03", name: "Ketamine 200mg/mL",                category: "S8 Controlled",   stockCatalogueId: "s8-03", parQty: 5,  unit: "vial",      storageNote: "Locked controlled cabinet" },
+  { id: "ci-s8-04", name: "Midazolam 5mg/mL",                 category: "S8 Controlled",   stockCatalogueId: "s8-04", parQty: 5,  unit: "ampoule",   storageNote: "Locked controlled cabinet" },
+  // S4
+  { id: "ci-s4-01", name: "Adrenaline 1mg/mL",                category: "S4 Prescription", stockCatalogueId: "s4-01", parQty: 10, unit: "ampoule" },
+  { id: "ci-s4-02", name: "Metaraminol 10mg/mL",              category: "S4 Prescription", stockCatalogueId: "s4-02", parQty: 5,  unit: "ampoule" },
+  { id: "ci-s4-03", name: "Paracetamol IV 10mg/mL 100mL",    category: "S4 Prescription", stockCatalogueId: "s4-03", parQty: 6,  unit: "bag" },
+  { id: "ci-s4-04", name: "Ondansetron 2mg/mL",               category: "S4 Prescription", stockCatalogueId: "s4-04", parQty: 6,  unit: "ampoule" },
+  { id: "ci-s4-05", name: "Salbutamol 5mg/mL nebule",         category: "S4 Prescription", stockCatalogueId: "s4-05", parQty: 10, unit: "nebule" },
+  { id: "ci-s4-06", name: "Rocuronium 10mg/mL",               category: "S4 Prescription", stockCatalogueId: "s4-06", parQty: 2,  unit: "vial" },
+  { id: "ci-s4-07", name: "Suxamethonium 50mg/mL",            category: "S4 Prescription", stockCatalogueId: "s4-07", parQty: 2,  unit: "ampoule" },
+  { id: "ci-s4-08", name: "Tranexamic Acid 100mg/mL",         category: "S4 Prescription", stockCatalogueId: "s4-08", parQty: 4,  unit: "ampoule" },
+  { id: "ci-s4-09", name: "Dexamethasone 4mg/mL",             category: "S4 Prescription", stockCatalogueId: "s4-09", parQty: 4,  unit: "ampoule" },
+  // IV Fluids
+  { id: "ci-iv-01", name: "Normal Saline 0.9% 1000mL",       category: "IV Fluid",        stockCatalogueId: "iv-01", parQty: 6,  unit: "bag" },
+  { id: "ci-iv-02", name: "Hartmann's Solution 1000mL",      category: "IV Fluid",        stockCatalogueId: "iv-02", parQty: 6,  unit: "bag" },
+  { id: "ci-iv-03", name: "Normal Saline 0.9% 500mL",        category: "IV Fluid",        stockCatalogueId: "iv-03", parQty: 6,  unit: "bag" },
+  // Consumables
+  { id: "ci-cn-01", name: "Defibrillator Pads (ZOLL adult)", category: "Consumable",      stockCatalogueId: "cn-01", parQty: 2,  unit: "set" },
+  { id: "ci-cn-02", name: "Intubation Kit (disposable)",     category: "Consumable",      stockCatalogueId: "cn-03", parQty: 2,  unit: "kit" },
+  { id: "ci-cn-03", name: "IV Cannula 18g",                  category: "Consumable",      stockCatalogueId: "cn-05", parQty: 20, unit: "each" },
+  { id: "ci-cn-04", name: "IV Cannula 20g",                  category: "Consumable",      stockCatalogueId: "cn-06", parQty: 20, unit: "each" },
+  { id: "ci-cn-05", name: "IV Giving Set",                   category: "Consumable",      stockCatalogueId: "cn-07", parQty: 10, unit: "each" },
+  { id: "ci-cn-06", name: "Chest Seal (Bolin vented)",       category: "Consumable",      stockCatalogueId: "cn-10", parQty: 4,  unit: "each" },
+  { id: "ci-cn-07", name: "Tourniquet (CAT Gen 7)",          category: "Consumable",      stockCatalogueId: "cn-11", parQty: 2,  unit: "each" },
+  { id: "ci-cn-08", name: "ECG Electrodes (10-lead set)",    category: "Consumable",      stockCatalogueId: "cn-13", parQty: 10, unit: "set" },
+  { id: "ci-cn-09", name: "Glucometer Strips (Accu-Chek)",   category: "Consumable",      stockCatalogueId: "cn-15", parQty: 50, unit: "strip" },
+  { id: "ci-cn-10", name: "iSTAT Cartridge CG8+",            category: "Consumable",      stockCatalogueId: "cn-04", parQty: 10, unit: "cartridge" },
+  { id: "ci-cn-11", name: "Urinary Catheter 14Fr Foley",     category: "Consumable",      stockCatalogueId: "cn-14", parQty: 4,  unit: "each" },
+  { id: "ci-cn-12", name: "SpO2 Probe (Masimo adult)",       category: "Consumable",      stockCatalogueId: "cn-12", parQty: 2,  unit: "each" },
+  { id: "ci-cn-13", name: "NPA 7.0",                         category: "Consumable",      stockCatalogueId: "cn-08", parQty: 4,  unit: "each" },
+  { id: "ci-cn-14", name: "Aspirin 300mg",                   category: "S3 Pharmacist",   stockCatalogueId: "s3-01", parQty: 20, unit: "tablet" },
+  { id: "ci-cn-15", name: "GTN Spray 400mcg/dose",           category: "S3 Pharmacist",   stockCatalogueId: "s3-02", parQty: 10, unit: "dose" },
+];
+
+const CHEST_CAT_COLOR: Record<string, string> = {
+  "S8 Controlled":   "bg-red-500/15 text-red-400 border border-red-500/30",
+  "S4 Prescription": "bg-orange-500/15 text-orange-400 border border-orange-500/30",
+  "S3 Pharmacist":   "bg-blue-500/15 text-blue-400 border border-blue-500/30",
+  "IV Fluid":        "bg-green-500/15 text-green-400 border border-green-500/30",
+  "Consumable":      "bg-slate-500/15 text-slate-300 border border-slate-500/30",
+  "Equipment":       "bg-purple-500/15 text-purple-400 border border-purple-500/30",
+};
 
 // ─── Equipment Data ───────────────────────────────────────────────────────────
 const EQUIPMENT: Equipment[] = [
@@ -260,7 +349,15 @@ const reordersToday= CHECKLIST.filter(c => c.type === "reorder").length;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function MedicalEquipment({ role }: Props) {
-  const [activeTab, setActiveTab] = useState<"overview" | "equipment" | "drugs" | "bloods" | "checklist" | "audit">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "equipment" | "drugs" | "bloods" | "checklist" | "audit" | "chests">("overview");
+
+  // ─ Medical Chest state ──────────────────────────────────────────────────
+  const [selectedChestId, setSelectedChestId] = useState<string>(MEDICAL_CHESTS[0].id);
+  // chestChecks: { [chestId]: { [itemId]: ChestCheckEntry } }
+  const [chestChecks, setChestChecks] = useState<Record<string, Record<string, ChestCheckEntry>>>({});
+  const [chestCheckedBy, setChestCheckedBy] = useState<Record<string, string>>({});
+  const [chestSentReorder, setChestSentReorder] = useState<Record<string, boolean>>({});
+  const [showChestReorderModal, setShowChestReorderModal] = useState(false);
   const [eqCat, setEqCat]       = useState("All");
   const [eqAircraft, setEqAircraft] = useState("All");
   const [eqSearch, setEqSearch] = useState("");
@@ -302,6 +399,7 @@ export default function MedicalEquipment({ role }: Props) {
     { id: "drugs",     label: "Drug Register",      icon: <Pill size={14} /> },
     { id: "bloods",    label: "Blood Products",     icon: <Droplets size={14} /> },
     { id: "checklist", label: "Daily Checklist",    icon: <Clipboard size={14} /> },
+    { id: "chests",    label: "Medical Chests",     icon: <Briefcase size={14} /> },
     { id: "audit",     label: "AI Audit",           icon: <Sparkles size={14} /> },
   ];
 
@@ -993,6 +1091,350 @@ export default function MedicalEquipment({ role }: Props) {
       )}
 
       {/* ══════════════════ AI AUDIT TAB ══════════════════ */}
+      {/* ══════════════════ MEDICAL CHESTS TAB ══════════════════ */}
+      {activeTab === "chests" && (() => {
+        const chest = MEDICAL_CHESTS.find(c => c.id === selectedChestId)!;
+        const checks = chestChecks[selectedChestId] ?? {};
+
+        // items that need reorder: flagged or used > 0
+        const reorderItems = CHEST_ITEMS.filter(item => {
+          const c = checks[item.id];
+          return c && (c.flagReorder || c.used > 0);
+        });
+
+        // helper — get or create a check entry for an item
+        function getCheck(itemId: string): ChestCheckEntry {
+          return checks[itemId] ?? {
+            chestId: selectedChestId,
+            itemId,
+            qtyPresent: CHEST_ITEMS.find(i => i.id === itemId)!.parQty,
+            used: 0,
+            note: "",
+            flagReorder: false,
+          };
+        }
+
+        function setQtyPresent(itemId: string, val: number) {
+          const item = CHEST_ITEMS.find(i => i.id === itemId)!;
+          const used = Math.max(0, item.parQty - val);
+          setChestChecks(prev => ({
+            ...prev,
+            [selectedChestId]: {
+              ...(prev[selectedChestId] ?? {}),
+              [itemId]: { ...getCheck(itemId), qtyPresent: val, used, flagReorder: used > 0 },
+            },
+          }));
+        }
+
+        function toggleReorder(itemId: string) {
+          const c = getCheck(itemId);
+          setChestChecks(prev => ({
+            ...prev,
+            [selectedChestId]: {
+              ...(prev[selectedChestId] ?? {}),
+              [itemId]: { ...c, flagReorder: !c.flagReorder },
+            },
+          }));
+        }
+
+        function setNote(itemId: string, note: string) {
+          const c = getCheck(itemId);
+          setChestChecks(prev => ({
+            ...prev,
+            [selectedChestId]: {
+              ...(prev[selectedChestId] ?? {}),
+              [itemId]: { ...c, note },
+            },
+          }));
+        }
+
+        function markComplete() {
+          const name = chestCheckedBy[selectedChestId]?.trim();
+          if (!name) { alert("Enter your name before marking complete."); return; }
+          // push reorder items to localStorage for StockUsage to read
+          if (reorderItems.length > 0) {
+            const existing: { stockId: string; qty: number; note: string }[] =
+              JSON.parse(localStorage.getItem("medivac_chest_reorders") ?? "[]");
+            const merged = [...existing];
+            reorderItems.forEach(item => {
+              if (!item.stockCatalogueId) return;
+              const entry = checks[item.id];
+              const idx = merged.findIndex(e => e.stockId === item.stockCatalogueId);
+              if (idx >= 0) {
+                merged[idx].qty = Math.max(merged[idx].qty, entry.used);
+              } else {
+                merged.push({ stockId: item.stockCatalogueId, qty: entry.used, note: entry.note || `Chest restock — ${chest.name}` });
+              }
+            });
+            localStorage.setItem("medivac_chest_reorders", JSON.stringify(merged));
+          }
+          setChestSentReorder(prev => ({ ...prev, [selectedChestId]: true }));
+        }
+
+        // group items by category
+        const categories = Array.from(new Set(CHEST_ITEMS.map(i => i.category)));
+
+        return (
+          <div className="space-y-5">
+
+            {/* Banner */}
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-cyan-500/20" style={{ background: "rgba(6,182,212,0.04)" }}>
+              <Briefcase size={14} className="text-cyan-400 shrink-0" />
+              <div className="flex-1 text-xs">
+                <span className="font-semibold text-cyan-400">Station Medical Chests</span>
+                <span className="text-muted-foreground ml-1.5">— Select a chest, record qty present, flag used items, and push automatically to the reorder queue.</span>
+              </div>
+            </div>
+
+            {/* Chest selector */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {MEDICAL_CHESTS.map(ch => {
+                const isSelected = ch.id === selectedChestId;
+                const chChecks = chestChecks[ch.id] ?? {};
+                const usedCount = CHEST_ITEMS.filter(i => (chChecks[i.id]?.used ?? 0) > 0).length;
+                const sent = chestSentReorder[ch.id];
+                return (
+                  <button
+                    key={ch.id}
+                    onClick={() => setSelectedChestId(ch.id)}
+                    className={`text-left p-3.5 rounded-xl border transition-all ${
+                      isSelected ? "bg-cyan-500/10 border-cyan-400/40" : "bg-card border-card-border hover:border-cyan-400/30"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <div className="text-xs font-bold leading-tight" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{ch.name}</div>
+                      {sent && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-semibold shrink-0">Reorder Sent</span>}
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <MapPin size={9} /> {ch.station}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5">{ch.location}</div>
+                    {ch.lastChecked && (
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        Last checked: {new Date(ch.lastChecked).toLocaleDateString("en-AU")} · {ch.checkedBy}
+                      </div>
+                    )}
+                    {usedCount > 0 && (
+                      <div className="mt-1.5 text-[10px] text-amber-400 font-semibold">{usedCount} item{usedCount > 1 ? "s" : ""} used</div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Selected chest detail */}
+            <div className="bg-card rounded-xl border border-cyan-500/30 overflow-hidden">
+              <div className="px-5 py-4 border-b border-card-border flex items-center justify-between flex-wrap gap-3" style={{ background: "rgba(6,182,212,0.03)" }}>
+                <div>
+                  <div className="text-base font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                    <Briefcase size={15} className="text-cyan-400" /> {chest.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    <MapPin size={10} className="inline mr-1" />{chest.location}
+                    {chest.lastChecked && ` · Last checked ${new Date(chest.lastChecked).toLocaleDateString("en-AU")} by ${chest.checkedBy}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Your name / role"
+                    value={chestCheckedBy[selectedChestId] ?? ""}
+                    onChange={e => setChestCheckedBy(prev => ({ ...prev, [selectedChestId]: e.target.value }))}
+                    className="bg-background/50 border border-card-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-cyan-400/50 w-48"
+                  />
+                  {reorderItems.length > 0 && !chestSentReorder[selectedChestId] && (
+                    <button
+                      onClick={() => setShowChestReorderModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400 hover:bg-amber-500/20 transition-colors font-semibold"
+                    >
+                      <ShoppingCart size={12} /> Reorder ({reorderItems.length})
+                    </button>
+                  )}
+                  {chestSentReorder[selectedChestId] && (
+                    <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/30 rounded-lg text-xs text-green-400 font-semibold">
+                      <CheckCircle size={12} /> Reorder queued
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* KPI bar */}
+              <div className="px-5 py-3 border-b border-card-border bg-muted/10 flex flex-wrap gap-6 text-xs">
+                <div><span className="text-muted-foreground">Items</span> <span className="font-bold ml-1">{CHEST_ITEMS.length}</span></div>
+                <div><span className="text-muted-foreground">Used / low</span> <span className={`font-bold ml-1 ${reorderItems.length > 0 ? "text-amber-400" : "text-green-400"}`}>{reorderItems.length}</span></div>
+                <div><span className="text-muted-foreground">Checked</span> <span className="font-bold ml-1">{Object.keys(checks).length} of {CHEST_ITEMS.length}</span></div>
+              </div>
+
+              {/* Item checklist by category */}
+              <div className="divide-y divide-card-border">
+                {categories.map(cat => {
+                  const catItems = CHEST_ITEMS.filter(i => i.category === cat);
+                  return (
+                    <div key={cat}>
+                      <div className="px-5 py-2 bg-muted/10 flex items-center gap-2">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${CHEST_CAT_COLOR[cat]}`}>{cat}</span>
+                        {cat === "S8 Controlled" && (
+                          <span className="text-[10px] text-red-400 font-semibold">Dual count required — witness signature</span>
+                        )}
+                      </div>
+                      <div className="divide-y divide-border">
+                        {catItems.map(item => {
+                          const c = getCheck(item.id);
+                          const usedQty = c.used;
+                          const isLow = usedQty > 0 || c.flagReorder;
+                          return (
+                            <div key={item.id} className={`px-5 py-3 flex items-center gap-3 flex-wrap ${
+                              isLow ? "bg-amber-500/5" : ""
+                            }`}>
+                              {/* Reorder toggle */}
+                              <button
+                                onClick={() => toggleReorder(item.id)}
+                                title={c.flagReorder ? "Remove from reorder" : "Flag for reorder"}
+                                className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                                  c.flagReorder
+                                    ? "bg-amber-500/20 border-amber-500/50 text-amber-400"
+                                    : "bg-background/50 border-card-border text-transparent hover:border-amber-400/40"
+                                }`}
+                              >
+                                <ShoppingCart size={10} />
+                              </button>
+
+                              {/* Name */}
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-semibold">{item.name}</div>
+                                <div className="text-[10px] text-muted-foreground">
+                                  Par: {item.parQty} {item.unit}{item.parQty > 1 ? "s" : ""}
+                                  {item.storageNote && <span className="ml-2 text-amber-400/80">⚠️ {item.storageNote}</span>}
+                                </div>
+                              </div>
+
+                              {/* Qty present input */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                <label className="text-[10px] text-muted-foreground">Qty on hand</label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={item.parQty}
+                                  value={c.qtyPresent}
+                                  onChange={e => setQtyPresent(item.id, parseInt(e.target.value) || 0)}
+                                  className={`w-16 bg-background/50 border rounded-lg px-2 py-1 text-xs text-center focus:outline-none ${
+                                    usedQty > 0 ? "border-amber-500/50 text-amber-400" : "border-card-border"
+                                  }`}
+                                />
+                              </div>
+
+                              {/* Used badge */}
+                              {usedQty > 0 && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-semibold border border-amber-500/30 shrink-0">
+                                  −{usedQty} used → reorder
+                                </span>
+                              )}
+
+                              {/* Note field */}
+                              <input
+                                type="text"
+                                placeholder="Note (optional)"
+                                value={c.note}
+                                onChange={e => setNote(item.id, e.target.value)}
+                                className="w-36 bg-background/50 border border-card-border rounded-lg px-2 py-1 text-[11px] focus:outline-none focus:border-cyan-400/40 shrink-0"
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer actions */}
+              <div className="px-5 py-4 border-t border-card-border flex items-center gap-3 flex-wrap bg-muted/5">
+                {reorderItems.length > 0 && !chestSentReorder[selectedChestId] ? (
+                  <>
+                    <div className="text-xs text-amber-400 font-semibold">
+                      {reorderItems.length} item{reorderItems.length > 1 ? "s" : ""} flagged for reorder
+                    </div>
+                    <button
+                      onClick={() => setShowChestReorderModal(true)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400 hover:bg-amber-500/20 transition-colors font-semibold"
+                    >
+                      <ShoppingCart size={12} /> Review &amp; Send to Reorder
+                    </button>
+                  </>
+                ) : chestSentReorder[selectedChestId] ? (
+                  <span className="text-xs text-green-400 font-semibold flex items-center gap-1.5">
+                    <CheckCircle size={12} /> Reorder items queued in Stock Usage page
+                  </span>
+                ) : (
+                  <span className="text-xs text-green-400 font-semibold flex items-center gap-1.5">
+                    <CheckCircle size={12} /> All items at par — no reorder needed
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Reorder confirmation modal */}
+            {showChestReorderModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setShowChestReorderModal(false)}>
+                <div
+                  className="bg-[#0f1623] border border-card-border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-5 py-4 border-b border-card-border">
+                    <div>
+                      <h2 className="font-bold text-base" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Confirm Reorder</h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">{chest.name} — {reorderItems.length} item{reorderItems.length > 1 ? "s" : ""} to restock</p>
+                    </div>
+                    <button onClick={() => setShowChestReorderModal(false)} className="text-muted-foreground hover:text-foreground"><X size={18} /></button>
+                  </div>
+
+                  <div className="p-5 max-h-[50vh] overflow-y-auto space-y-2">
+                    {reorderItems.map(item => {
+                      const c = checks[item.id];
+                      return (
+                        <div key={item.id} className="flex items-center justify-between text-xs bg-muted/20 rounded-lg px-3 py-2.5">
+                          <div>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold mr-2 ${CHEST_CAT_COLOR[item.category]}`}>
+                              {item.category.split(" ")[0]}
+                            </span>
+                            <span className="font-medium">{item.name}</span>
+                          </div>
+                          <div className="text-right shrink-0 ml-3">
+                            <div className="font-bold text-amber-400">× {c?.used ?? item.parQty} {item.unit}{(c?.used ?? 1) > 1 ? "s" : ""}</div>
+                            <div className="text-[10px] text-muted-foreground">par {item.parQty}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {reorderItems.some(i => i.category === "S8 Controlled") && (
+                      <div className="flex items-center gap-2 text-red-400 text-xs p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <AlertTriangle size={13} /> S8 items require a signed controlled drug requisition and witness countersign.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 px-5 py-4 border-t border-card-border">
+                    <button
+                      onClick={() => setShowChestReorderModal(false)}
+                      className="px-4 py-2 text-xs text-muted-foreground border border-card-border rounded-lg hover:text-foreground transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { setShowChestReorderModal(false); markComplete(); }}
+                      className="flex-1 flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold bg-amber-500/20 border border-amber-400/40 text-amber-400 hover:bg-amber-500/30 rounded-lg transition-colors"
+                    >
+                      <ShoppingCart size={13} /> Confirm — Send to Reorder Queue
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        );
+      })()}
+
       {activeTab === "audit" && (
         <div className="space-y-4">
           <div className="bg-card border border-card-border rounded-xl p-4">
