@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { type UserRole } from "@/lib/data";
 import {
   Plus, X, Save, Pencil, Trash2, AlertTriangle, CheckCircle2,
   Clock, Plane, User, MapPin, ChevronDown, Filter, Search,
-  RefreshCw, ClipboardList, ArrowRight, Ambulance
+  RefreshCw, ClipboardList, ArrowRight, Ambulance, GripVertical, ChevronsRight,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -13,6 +13,15 @@ interface Props { role: UserRole; }
 // ─── Types ────────────────────────────────────────────────────────────────
 type TaskStatus   = "Pending" | "Assigned" | "En Route" | "Complete" | "Cancelled";
 type TaskPriority = "Routine" | "Urgent" | "Emergency";
+
+/** A single flight leg within a multi-sector task */
+interface Sector {
+  from:     string;       // location / hospital
+  fromIcao: string;       // ICAO code
+  to:       string;
+  toIcao:   string;
+  eta:      string | null; // sector-level ETA (ISO or null)
+}
 
 interface NeptTask {
   id: number;
@@ -39,6 +48,7 @@ interface NeptTask {
   actualArrive: string | null;
   completedAt: string | null;
   notes: string | null;
+  sectors: Sector[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,9 +68,11 @@ const AIRCRAFT_OPTIONS = [
 const PILOT_OPTIONS = ["Capt. R. Hughes", "Capt. T. Barnes", "Capt. M. Clarke"];
 const NURSE_OPTIONS = ["S. Mitchell RN", "Dr. K. Patel", "J. O'Brien RN"];
 
-const BASES = ["Bankstown (YSBK)", "Dubbo (YSDU)", "Broken Hill (YBHI)"];
-
 // ─── Helpers ─────────────────────────────────────────────────────────────
+function emptySector(): Sector {
+  return { from: "", fromIcao: "", to: "", toIcao: "", eta: null };
+}
+
 function nextRef(tasks: NeptTask[]): string {
   const year = new Date().getFullYear();
   const nums = tasks
@@ -97,6 +109,28 @@ function fmtDT(iso: string | null) {
   } catch { return iso; }
 }
 
+/** Build an ICAO chain string: YSDU → YSSY → YMHB */
+function icaoChain(sectors: Sector[]): string {
+  if (!sectors.length) return "";
+  const nodes: string[] = [];
+  sectors.forEach((s, i) => {
+    if (i === 0) nodes.push(s.fromIcao || s.from || "?");
+    nodes.push(s.toIcao || s.to || "?");
+  });
+  return nodes.join(" → ");
+}
+
+/** Build a plain location chain for display */
+function locationChain(sectors: Sector[]): string {
+  if (!sectors.length) return "";
+  const nodes: string[] = [];
+  sectors.forEach((s, i) => {
+    if (i === 0) nodes.push(s.from || s.fromIcao || "?");
+    nodes.push(s.to || s.toIcao || "?");
+  });
+  return nodes.join(" → ");
+}
+
 // ── Live countdown hook ─────────────────────────────────────────────────────
 function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => Date.now());
@@ -126,9 +160,9 @@ function ETACountdown({ eta, status }: { eta: string | null; status: TaskStatus 
   const colour = past
     ? "text-red-400 font-bold"
     : diffMs < 5 * 60_000
-      ? "text-orange-400 font-semibold"   // < 5 min
+      ? "text-orange-400 font-semibold"
       : diffMs < 15 * 60_000
-        ? "text-amber-300 font-semibold"  // < 15 min
+        ? "text-amber-300 font-semibold"
         : "text-cyan-300";
 
   return (
@@ -163,6 +197,7 @@ function emptyDraft(ref: string): TaskDraft {
     actualArrive: null,
     completedAt: null,
     notes: null,
+    sectors: [emptySector()],
   };
 }
 
@@ -186,6 +221,177 @@ function PriorityBadge({ priority }: { priority: TaskPriority }) {
   );
 }
 
+// ─── SectorEditor ─────────────────────────────────────────────────────────
+function SectorEditor({
+  sectors, onChange,
+}: {
+  sectors: Sector[];
+  onChange: (s: Sector[]) => void;
+}) {
+  const fieldCls = "w-full bg-background/50 border border-card-border rounded-lg px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-400/50";
+  const labelCls = "block text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-1";
+
+  function updateSector(idx: number, key: keyof Sector, val: string | null) {
+    const next = sectors.map((s, i) => i === idx ? { ...s, [key]: val ?? "" } : s);
+    onChange(next);
+  }
+
+  function addSector() {
+    // Pre-fill new sector's "from" with previous sector's "to"
+    const prev = sectors[sectors.length - 1];
+    const newSec: Sector = {
+      from:     prev ? prev.to : "",
+      fromIcao: prev ? prev.toIcao : "",
+      to:       "",
+      toIcao:   "",
+      eta:      null,
+    };
+    onChange([...sectors, newSec]);
+  }
+
+  function removeSector(idx: number) {
+    if (sectors.length <= 1) return; // always keep at least one sector
+    onChange(sectors.filter((_, i) => i !== idx));
+  }
+
+  function moveSector(idx: number, dir: -1 | 1) {
+    const next = [...sectors];
+    const target = idx + dir;
+    if (target < 0 || target >= next.length) return;
+    [next[idx], next[target]] = [next[target], next[idx]];
+    onChange(next);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="text-xs font-semibold text-cyan-400/80 flex items-center gap-1.5" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+          <ChevronsRight size={12} /> Flight Sectors
+        </div>
+        <button
+          type="button"
+          onClick={addSector}
+          className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-lg border border-cyan-400/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-colors"
+        >
+          <Plus size={11} /> Add Sector
+        </button>
+      </div>
+
+      {/* Chain preview */}
+      {sectors.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap px-3 py-2 bg-muted/10 rounded-lg border border-card-border text-[10px] font-mono">
+          {sectors.map((s, i) => (
+            <span key={i} className="flex items-center gap-1">
+              {i === 0 && (
+                <span className="text-cyan-300 font-semibold">{s.fromIcao || s.from || "?"}</span>
+              )}
+              <ArrowRight size={9} className="text-muted-foreground" />
+              <span className={`font-semibold ${i === sectors.length - 1 ? "text-green-300" : "text-cyan-300"}`}>
+                {s.toIcao || s.to || "?"}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Sector rows */}
+      <div className="space-y-2">
+        {sectors.map((s, i) => (
+          <div key={i} className="bg-muted/10 border border-card-border rounded-xl p-3 space-y-2">
+            {/* Sector header */}
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-cyan-400/70 uppercase tracking-widest">
+                Leg {i + 1}{i === 0 ? " — Origin" : i === sectors.length - 1 ? " — Final" : ""}
+              </span>
+              <div className="flex items-center gap-1">
+                {/* Move up / down */}
+                {i > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => moveSector(i, -1)}
+                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors text-[9px]"
+                    title="Move up"
+                  >▲</button>
+                )}
+                {i < sectors.length - 1 && (
+                  <button
+                    type="button"
+                    onClick={() => moveSector(i, 1)}
+                    className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-white/5 transition-colors text-[9px]"
+                    title="Move down"
+                  >▼</button>
+                )}
+                {sectors.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeSector(i)}
+                    className="p-1 rounded text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title="Remove sector"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* From / To rows */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className={labelCls}>Departure / From</label>
+                <input
+                  className={fieldCls}
+                  placeholder="e.g. Dubbo Base Hospital"
+                  value={s.from}
+                  onChange={e => updateSector(i, "from", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>ICAO</label>
+                <input
+                  className={fieldCls}
+                  placeholder="YSDU"
+                  value={s.fromIcao}
+                  onChange={e => updateSector(i, "fromIcao", e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <label className={labelCls}>Arrival / To</label>
+                <input
+                  className={fieldCls}
+                  placeholder="e.g. Royal Prince Alfred Hospital"
+                  value={s.to}
+                  onChange={e => updateSector(i, "to", e.target.value)}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>ICAO</label>
+                <input
+                  className={fieldCls}
+                  placeholder="YSSY"
+                  value={s.toIcao}
+                  onChange={e => updateSector(i, "toIcao", e.target.value)}
+                />
+              </div>
+            </div>
+            {/* Per-sector ETA */}
+            <div>
+              <label className={labelCls}>Sector ETA (optional)</label>
+              <input
+                type="datetime-local"
+                className={`${fieldCls} border-cyan-400/20 focus:border-cyan-400/50`}
+                value={s.eta?.slice(0, 16) ?? ""}
+                onChange={e => updateSector(i, "eta", e.target.value || null)}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Task Form Modal ──────────────────────────────────────────────────────
 function TaskModal({
   task, onClose, onSave, isNew,
@@ -195,12 +401,52 @@ function TaskModal({
   onSave: (d: TaskDraft) => void;
   isNew: boolean;
 }) {
-  const [d, setD] = useState<TaskDraft>({ ...task } as TaskDraft);
+  const [d, setD] = useState<TaskDraft>(() => {
+    const base = { ...task } as TaskDraft;
+    // Ensure sectors is always at least one empty sector
+    if (!base.sectors || base.sectors.length === 0) {
+      base.sectors = [{
+        from:     base.pickupLocation ?? "",
+        fromIcao: base.pickupIcao ?? "",
+        to:       base.destLocation ?? "",
+        toIcao:   base.destIcao ?? "",
+        eta:      null,
+      }];
+    }
+    return base;
+  });
+
   const set = (k: keyof TaskDraft, v: string | null) =>
     setD(prev => ({ ...prev, [k]: v || null }));
 
+  const setSectors = useCallback((sectors: Sector[]) => {
+    setD(prev => ({ ...prev, sectors }));
+  }, []);
+
   const fieldCls = "w-full bg-background/50 border border-card-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-400/50";
   const labelCls = "block text-[10px] text-muted-foreground font-semibold uppercase tracking-wide mb-1";
+
+  function handleSave() {
+    const sectors = d.sectors ?? [];
+    if (sectors.length === 0 || !sectors[0].from) {
+      alert("At least one sector with a departure location is required.");
+      return;
+    }
+    // Sync pickupLocation/destLocation from first/last sector
+    const first = sectors[0];
+    const last  = sectors[sectors.length - 1];
+    const synced: TaskDraft = {
+      ...d,
+      sectors,
+      pickupLocation: first.from || first.fromIcao,
+      pickupIcao:     first.fromIcao || null,
+      destLocation:   last.to   || last.toIcao,
+      destIcao:       last.toIcao   || null,
+      // Overall ETA = last sector ETA if set, else keep existing
+      estimatedEta: last.eta ?? d.estimatedEta,
+    };
+    onSave(synced);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto" onClick={onClose}>
@@ -248,45 +494,22 @@ function TaskModal({
               <label className={labelCls}>Request Time</label>
               <input type="datetime-local" className={fieldCls} value={d.requestTime?.slice(0,16) ?? ""} onChange={e => set("requestTime", e.target.value)} />
             </div>
+            <div>
+              <label className={labelCls}>Required By</label>
+              <input type="datetime-local" className={fieldCls} value={d.requiredBy?.slice(0,16) ?? ""} onChange={e => set("requiredBy", e.target.value || null)} />
+            </div>
           </div>
 
-          {/* Row 3 — pickup */}
-          <div>
-            <div className="text-xs font-semibold text-cyan-400/80 mb-2 flex items-center gap-1.5" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-              <MapPin size={12} /> Pickup
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
-                <label className={labelCls}>Location / Address</label>
-                <input className={fieldCls} placeholder="e.g. Dubbo Base Hospital" value={d.pickupLocation} onChange={e => set("pickupLocation", e.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>Airport (ICAO)</label>
-                <input className={fieldCls} placeholder="YSDU" value={d.pickupIcao ?? ""} onChange={e => set("pickupIcao", e.target.value)} />
-              </div>
-            </div>
-            <div className="mt-2">
+          {/* Sector Editor — replaces the old Pickup / Destination rows */}
+          <SectorEditor sectors={d.sectors ?? [emptySector()]} onChange={setSectors} />
+
+          {/* Referring / Receiving hospitals */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className={labelCls}>Referring Hospital</label>
               <input className={fieldCls} placeholder="Referring facility" value={d.referringHospital ?? ""} onChange={e => set("referringHospital", e.target.value)} />
             </div>
-          </div>
-
-          {/* Row 4 — destination */}
-          <div>
-            <div className="text-xs font-semibold text-cyan-400/80 mb-2 flex items-center gap-1.5" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-              <ArrowRight size={12} /> Destination
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-2">
-                <label className={labelCls}>Location / Address</label>
-                <input className={fieldCls} placeholder="e.g. Royal Prince Alfred Hospital" value={d.destLocation} onChange={e => set("destLocation", e.target.value)} />
-              </div>
-              <div>
-                <label className={labelCls}>Airport (ICAO)</label>
-                <input className={fieldCls} placeholder="YSSY" value={d.destIcao ?? ""} onChange={e => set("destIcao", e.target.value)} />
-              </div>
-            </div>
-            <div className="mt-2">
+            <div>
               <label className={labelCls}>Receiving Hospital</label>
               <input className={fieldCls} placeholder="Receiving facility" value={d.receivingHospital ?? ""} onChange={e => set("receivingHospital", e.target.value)} />
             </div>
@@ -348,19 +571,15 @@ function TaskModal({
             </div>
           </div>
 
-          {/* Row 7 — ETA + required by */}
+          {/* Row 7 — overall ETA (auto-filled from last sector but editable) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Estimated ETA</label>
+              <label className={labelCls}>Overall ETA <span className="normal-case font-normal text-muted-foreground">(auto from last sector)</span></label>
               <input type="datetime-local" className={`${fieldCls} border-cyan-400/30 focus:border-cyan-400/60`} value={d.estimatedEta?.slice(0,16) ?? ""} onChange={e => set("estimatedEta", e.target.value || null)} />
-            </div>
-            <div>
-              <label className={labelCls}>Required By</label>
-              <input type="datetime-local" className={fieldCls} value={d.requiredBy?.slice(0,16) ?? ""} onChange={e => set("requiredBy", e.target.value || null)} />
             </div>
           </div>
 
-          {/* Row 8 — actual times (for completion) */}
+          {/* Row 8 — actual times */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Actual Departure</label>
@@ -391,7 +610,7 @@ function TaskModal({
             Cancel
           </button>
           <button
-            onClick={() => { if (!d.pickupLocation || !d.destLocation) { alert("Pickup and destination are required."); return; } onSave(d); }}
+            onClick={handleSave}
             className="flex-1 flex items-center justify-center gap-2 px-5 py-2 text-xs font-bold bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 hover:bg-cyan-500/25 rounded-lg transition-colors"
           >
             <Save size={13} /> {isNew ? "Create Task" : "Save Changes"}
@@ -437,6 +656,69 @@ function QuickStatus({ task, onUpdate }: { task: NeptTask; onUpdate: (id: number
   );
 }
 
+// ─── Sector Chain display (table cell) ───────────────────────────────────
+function RouteCell({ task }: { task: NeptTask }) {
+  const sectors = task.sectors;
+  if (sectors && sectors.length > 0) {
+    const chain = locationChain(sectors);
+    const icao  = icaoChain(sectors);
+    const multiLeg = sectors.length > 1;
+    return (
+      <div className="max-w-[240px]">
+        <div className="font-medium text-foreground truncate text-xs">{chain}</div>
+        {multiLeg && (
+          <div className="text-[10px] text-amber-300/80 font-semibold mt-0.5">
+            {sectors.length} legs
+          </div>
+        )}
+        <div className="text-[10px] text-cyan-400/70 font-mono mt-0.5 truncate">{icao}</div>
+      </div>
+    );
+  }
+  // Fallback to legacy fields
+  return (
+    <div className="max-w-[220px]">
+      <div className="font-medium text-foreground truncate">{task.pickupLocation}</div>
+      <div className="flex items-center gap-1 text-muted-foreground mt-0.5">
+        <ArrowRight size={10} />
+        <span className="truncate">{task.destLocation}</span>
+      </div>
+      {(task.pickupIcao || task.destIcao) && (
+        <div className="text-[10px] text-cyan-400/70 font-mono mt-0.5">
+          {task.pickupIcao ?? "—"} → {task.destIcao ?? "—"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Expanded row sector list ─────────────────────────────────────────────
+function SectorList({ sectors }: { sectors: Sector[] }) {
+  return (
+    <div className="space-y-1.5">
+      {sectors.map((s, i) => (
+        <div key={i} className="flex items-start gap-2 text-xs">
+          <span className="text-[10px] font-bold text-cyan-400/60 w-12 shrink-0 pt-0.5">Leg {i + 1}</span>
+          <div className="flex-1">
+            <span className="text-foreground font-medium">{s.from || s.fromIcao || "?"}</span>
+            {s.fromIcao && s.from && (
+              <span className="text-muted-foreground ml-1 font-mono text-[10px]">({s.fromIcao})</span>
+            )}
+            <ArrowRight size={10} className="inline mx-1 text-muted-foreground" />
+            <span className="text-foreground font-medium">{s.to || s.toIcao || "?"}</span>
+            {s.toIcao && s.to && (
+              <span className="text-muted-foreground ml-1 font-mono text-[10px]">({s.toIcao})</span>
+            )}
+            {s.eta && (
+              <span className="ml-2 text-cyan-300 font-mono text-[10px]">ETA {fmtDT(s.eta)}</span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────
 export default function NEPTTasking({ role }: Props) {
   const qc = useQueryClient();
@@ -451,20 +733,39 @@ export default function NEPTTasking({ role }: Props) {
   const canDispatch = !["pilot", "nurse", "engineer"].includes(role);
 
   // ── Queries ──────────────────────────────────────────────────────────────
-  const { data: tasks = [], isLoading } = useQuery<NeptTask[]>({
+  const { data: rawTasks = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/nept-tasks"],
     refetchInterval: 30_000,
   });
 
+  // Parse sectors JSON string from server
+  const tasks: NeptTask[] = useMemo(() =>
+    rawTasks.map(t => ({
+      ...t,
+      sectors: t.sectors
+        ? (typeof t.sectors === "string" ? JSON.parse(t.sectors) : t.sectors)
+        : null,
+    })),
+  [rawTasks]);
+
   // ── Mutations ────────────────────────────────────────────────────────────
+  function serializeForApi(d: TaskDraft) {
+    return {
+      ...d,
+      sectors: d.sectors ? JSON.stringify(d.sectors) : null,
+    };
+  }
+
   const createMutation = useMutation({
-    mutationFn: (d: TaskDraft) => apiRequest("POST", "/api/nept-tasks", d),
+    mutationFn: (d: TaskDraft) => apiRequest("POST", "/api/nept-tasks", serializeForApi(d)),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/nept-tasks"] }); setShowModal(false); },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<NeptTask> }) =>
-      apiRequest("PATCH", `/api/nept-tasks/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<NeptTask> }) => {
+      const payload = { ...data, sectors: data.sectors ? JSON.stringify(data.sectors) : data.sectors };
+      return apiRequest("PATCH", `/api/nept-tasks/${id}`, payload);
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/nept-tasks"] }),
   });
 
@@ -480,6 +781,7 @@ export default function NEPTTasking({ role }: Props) {
       if (filterPriority !== "All" && t.priority !== filterPriority) return false;
       if (search) {
         const q = search.toLowerCase();
+        const chain = t.sectors ? locationChain(t.sectors).toLowerCase() : "";
         return (
           t.taskRef.toLowerCase().includes(q) ||
           t.pickupLocation.toLowerCase().includes(q) ||
@@ -487,14 +789,14 @@ export default function NEPTTasking({ role }: Props) {
           (t.patientName ?? "").toLowerCase().includes(q) ||
           (t.aircraftReg ?? "").toLowerCase().includes(q) ||
           (t.referringHospital ?? "").toLowerCase().includes(q) ||
-          (t.receivingHospital ?? "").toLowerCase().includes(q)
+          (t.receivingHospital ?? "").toLowerCase().includes(q) ||
+          chain.includes(q)
         );
       }
       return true;
     });
     if (etaSort) {
       list.sort((a, b) => {
-        // Tasks with no ETA always go to the bottom
         if (!a.estimatedEta && !b.estimatedEta) return 0;
         if (!a.estimatedEta) return 1;
         if (!b.estimatedEta) return -1;
@@ -611,9 +913,7 @@ export default function NEPTTasking({ role }: Props) {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-colors ${accent[s]}`}
               >
                 {s}
-                <span className={`text-[10px] font-semibold tabular-nums ${
-                  active ? "opacity-100" : "opacity-60"
-                }`}>{count}</span>
+                <span className={`text-[10px] font-semibold tabular-nums ${active ? "opacity-100" : "opacity-60"}`}>{count}</span>
               </button>
             );
           })}
@@ -652,7 +952,7 @@ export default function NEPTTasking({ role }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-card-border bg-muted/10">
-                {["Task Ref", "Priority", "Status", "Pickup → Destination", "Patient / Ref", "Aircraft & Crew"].map(h => (
+                {["Task Ref", "Priority", "Status", "Route", "Patient / Ref", "Aircraft & Crew"].map(h => (
                   <th key={h} className="text-left text-muted-foreground font-medium px-3 py-3 whitespace-nowrap">{h}</th>
                 ))}
                 {/* Sortable ETA header */}
@@ -660,7 +960,7 @@ export default function NEPTTasking({ role }: Props) {
                   <button
                     onClick={() => setEtaSort(s => s === "asc" ? "desc" : "asc")}
                     className="flex items-center gap-1 text-muted-foreground font-medium hover:text-cyan-300 transition-colors group"
-                    title={etaSort === "asc" ? "Sorted: earliest first — click for latest first" : "Sorted: latest first — click for earliest first"}
+                    title={etaSort === "asc" ? "Sorted: earliest first" : "Sorted: latest first"}
                   >
                     ETA
                     <span className="text-[10px] transition-colors group-hover:text-cyan-300">
@@ -700,17 +1000,8 @@ export default function NEPTTasking({ role }: Props) {
                         ? <QuickStatus task={t} onUpdate={handleStatusChange} />
                         : <StatusBadge status={t.status} />}
                     </td>
-                    <td className="px-3 py-3 max-w-[220px]">
-                      <div className="font-medium text-foreground truncate">{t.pickupLocation}</div>
-                      <div className="flex items-center gap-1 text-muted-foreground mt-0.5">
-                        <ArrowRight size={10} />
-                        <span className="truncate">{t.destLocation}</span>
-                      </div>
-                      {(t.pickupIcao || t.destIcao) && (
-                        <div className="text-[10px] text-cyan-400/70 font-mono mt-0.5">
-                          {t.pickupIcao ?? "—"} → {t.destIcao ?? "—"}
-                        </div>
-                      )}
+                    <td className="px-3 py-3">
+                      <RouteCell task={t} />
                     </td>
                     <td className="px-3 py-3">
                       {t.patientName
@@ -767,17 +1058,33 @@ export default function NEPTTasking({ role }: Props) {
                     <tr key={`${t.id}-exp`} className="border-b border-card-border bg-muted/5">
                       <td colSpan={8} className="px-5 py-4">
                         <div className="grid sm:grid-cols-3 gap-4 text-xs">
+                          {/* Route / Sectors */}
                           <div className="space-y-1.5">
-                            <div className="font-semibold text-foreground/60 uppercase tracking-wide text-[10px] mb-2">Route Detail</div>
-                            <div><span className="text-muted-foreground">Pickup: </span>{t.pickupLocation}</div>
-                            {t.referringHospital && <div><span className="text-muted-foreground">Referring: </span>{t.referringHospital}</div>}
-                            <div><span className="text-muted-foreground">Destination: </span>{t.destLocation}</div>
-                            {t.receivingHospital && <div><span className="text-muted-foreground">Receiving: </span>{t.receivingHospital}</div>}
+                            <div className="font-semibold text-foreground/60 uppercase tracking-wide text-[10px] mb-2">
+                              {t.sectors && t.sectors.length > 1 ? `Route — ${t.sectors.length} Sectors` : "Route Detail"}
+                            </div>
+                            {t.sectors && t.sectors.length > 0 ? (
+                              <SectorList sectors={t.sectors} />
+                            ) : (
+                              <>
+                                <div><span className="text-muted-foreground">Pickup: </span>{t.pickupLocation}</div>
+                                {t.referringHospital && <div><span className="text-muted-foreground">Referring: </span>{t.referringHospital}</div>}
+                                <div><span className="text-muted-foreground">Destination: </span>{t.destLocation}</div>
+                                {t.receivingHospital && <div><span className="text-muted-foreground">Receiving: </span>{t.receivingHospital}</div>}
+                              </>
+                            )}
+                            {t.referringHospital && t.sectors && t.sectors.length > 0 && (
+                              <div className="mt-1"><span className="text-muted-foreground">Referring: </span>{t.referringHospital}</div>
+                            )}
+                            {t.receivingHospital && t.sectors && t.sectors.length > 0 && (
+                              <div><span className="text-muted-foreground">Receiving: </span>{t.receivingHospital}</div>
+                            )}
                           </div>
+                          {/* Times */}
                           <div className="space-y-1.5">
                             <div className="font-semibold text-foreground/60 uppercase tracking-wide text-[10px] mb-2">Times</div>
                             <div><span className="text-muted-foreground">Requested: </span>{fmtDT(t.requestTime)}</div>
-                            {t.estimatedEta && <div><span className="text-muted-foreground">ETA: </span><span className="text-cyan-300 font-semibold">{fmtDT(t.estimatedEta)}</span></div>}
+                            {t.estimatedEta && <div><span className="text-muted-foreground">Overall ETA: </span><span className="text-cyan-300 font-semibold">{fmtDT(t.estimatedEta)}</span></div>}
                             <div><span className="text-muted-foreground">Required by: </span>{fmtDT(t.requiredBy)}</div>
                             <div><span className="text-muted-foreground">Actual depart: </span>{fmtDT(t.actualDepart)}</div>
                             <div><span className="text-muted-foreground">Actual arrive: </span>{fmtDT(t.actualArrive)}</div>
@@ -790,6 +1097,7 @@ export default function NEPTTasking({ role }: Props) {
                             )}
                             {t.dispatchedBy && <div><span className="text-muted-foreground">Dispatched by: </span>{t.dispatchedBy}</div>}
                           </div>
+                          {/* Notes */}
                           <div className="space-y-1.5">
                             <div className="font-semibold text-foreground/60 uppercase tracking-wide text-[10px] mb-2">Notes</div>
                             <div className="text-foreground/80 leading-relaxed whitespace-pre-wrap">{t.notes || "—"}</div>
@@ -829,16 +1137,28 @@ export default function NEPTTasking({ role }: Props) {
                     : <StatusBadge status={t.status} />}
                 </div>
               </div>
-              {/* Route */}
+              {/* Route — multi-sector aware */}
               <div className="bg-muted/10 rounded-lg p-2.5 text-xs space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <MapPin size={10} className="text-cyan-400 shrink-0" />
-                  <span className="text-foreground font-medium">{t.pickupLocation}</span>
-                </div>
-                <div className="flex items-center gap-1.5 pl-1">
-                  <ArrowRight size={10} className="text-muted-foreground shrink-0" />
-                  <span className="text-foreground">{t.destLocation}</span>
-                </div>
+                {t.sectors && t.sectors.length > 0 ? (
+                  <>
+                    <div className="font-mono text-[10px] text-cyan-400/80">{icaoChain(t.sectors)}</div>
+                    <div className="text-foreground text-[10px] leading-relaxed">{locationChain(t.sectors)}</div>
+                    {t.sectors.length > 1 && (
+                      <div className="text-[10px] text-amber-300/80 font-semibold">{t.sectors.length} legs</div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      <MapPin size={10} className="text-cyan-400 shrink-0" />
+                      <span className="text-foreground font-medium">{t.pickupLocation}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 pl-1">
+                      <ArrowRight size={10} className="text-muted-foreground shrink-0" />
+                      <span className="text-foreground">{t.destLocation}</span>
+                    </div>
+                  </>
+                )}
               </div>
               {/* Patient + Aircraft */}
               <div className="grid grid-cols-2 gap-2 text-xs">
@@ -853,7 +1173,7 @@ export default function NEPTTasking({ role }: Props) {
                   {t.pilotName && <div className="text-[10px] text-muted-foreground">{t.pilotName}</div>}
                 </div>
               </div>
-              {/* Completed At on mobile */}
+              {/* Completed At */}
               {t.completedAt && t.status === "Complete" && (
                 <div className="flex items-center gap-1.5 text-xs">
                   <CheckCircle2 size={11} className="text-green-400" />
@@ -861,7 +1181,7 @@ export default function NEPTTasking({ role }: Props) {
                   <span className="text-green-400 font-semibold">{fmtDT(t.completedAt)}</span>
                 </div>
               )}
-              {/* ETA pill on mobile */}
+              {/* ETA */}
               {t.estimatedEta && (
                 <div className="flex items-center gap-1.5 text-xs">
                   <Clock size={11} className="text-cyan-400" />

@@ -94,10 +94,11 @@ export const neptTasks = sqliteTable("nept_tasks", {
   priority:      text("priority").notNull().default("Routine"), // Routine | Urgent | Emergency
   requestTime:   text("request_time").notNull(),      // ISO datetime
   requiredBy:    text("required_by"),                 // ISO datetime — requested departure
-  pickupLocation:text("pickup_location").notNull(),   // free text — hospital / address
-  pickupIcao:    text("pickup_icao"),                 // airport code if applicable
-  destLocation:  text("dest_location").notNull(),     // free text
-  destIcao:      text("dest_icao"),
+  pickupLocation:text("pickup_location").notNull(),   // free text — mirrors sectors[0].from
+  pickupIcao:    text("pickup_icao"),                 // mirrors sectors[0].fromIcao
+  destLocation:  text("dest_location").notNull(),     // mirrors sectors[last].to
+  destIcao:      text("dest_icao"),                   // mirrors sectors[last].toIcao
+  sectors:       text("sectors"),                     // JSON: [{from,fromIcao,to,toIcao,eta}]
   patientName:   text("patient_name"),                // identify only — no clinical data
   patientRef:    text("patient_ref"),                 // task ID / UR number
   escortName:    text("escort_name"),

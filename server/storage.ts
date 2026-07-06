@@ -119,6 +119,7 @@ sqlite.exec(`
     pickup_icao TEXT,
     dest_location TEXT NOT NULL,
     dest_icao TEXT,
+    sectors TEXT,
     patient_name TEXT,
     patient_ref TEXT,
     escort_name TEXT,
@@ -146,6 +147,9 @@ if (!neptColNames.includes("estimated_eta")) {
 }
 if (!neptColNames.includes("completed_at")) {
   sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN completed_at TEXT");
+}
+if (!neptColNames.includes("sectors")) {
+  sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN sectors TEXT");
 }
 
 export const db = drizzle(sqlite);

@@ -33,12 +33,12 @@ const BASE_NAV: NavItem[] = [
     icon: <Activity size={16} />,
     iconLg: <Activity size={28} />,
     children: [
+      { label: "NEPT Tasking", path: "/nept-tasking" },
       { label: "The 8:45", path: "/morning-brief" },
       { label: "Passenger Manifest", path: "/passenger-manifest" },
       { label: "Mission Board", path: "/missions" },
       { label: "NSW Flight Map", path: "/map" },
       { label: "Dispatch & Intake", path: "/dispatch" },
-      { label: "NEPT Tasking", path: "/nept-tasking" },
       { label: "Operational Risk Assessment", path: "/ora" },
       { label: "Flight Planning", path: "/flight-planning" },
       { label: "Mission Optimiser", path: "/mission-optimiser" },
