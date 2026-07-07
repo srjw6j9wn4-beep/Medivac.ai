@@ -232,3 +232,33 @@ export const quoteRates = sqliteTable('quote_rates', {
 
 export type QuoteRate = typeof quoteRates.$inferSelect;
 export type InsertQuoteRate = typeof quoteRates.$inferInsert;
+
+// ── Cost Optimizer — config store ────────────────────────────────────────────
+export const costOptimizerConfig = sqliteTable('cost_optimizer_config', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  key: text('key').notNull().unique(),
+  value: text('value').notNull(), // JSON string
+  category: text('category').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export type CostOptimizerConfig = typeof costOptimizerConfig.$inferSelect;
+export type InsertCostOptimizerConfig = typeof costOptimizerConfig.$inferInsert;
+
+// ── Cost Optimizer — Action Plan items ───────────────────────────────────────
+export const actionPlanItems = sqliteTable('action_plan_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  title: text('title').notNull(),
+  category: text('category').notNull(), // 'staffing' | 'asset' | 'ops'
+  estimatedAnnualValue: integer('estimated_annual_value').notNull(), // cents
+  priority: text('priority').notNull(), // 'high' | 'medium' | 'low'
+  status: text('status').notNull().default('proposed'), // 'proposed' | 'in_progress' | 'complete'
+  notes: text('notes'),
+  sourceType: text('source_type'), // 'leakage' | 'staffing' | 'asset' | 'manual'
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+export const insertActionPlanItemSchema = createInsertSchema(actionPlanItems).omit({ id: true });
+export type InsertActionPlanItem = z.infer<typeof insertActionPlanItemSchema>;
+export type ActionPlanItem = typeof actionPlanItems.$inferSelect;

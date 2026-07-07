@@ -1175,6 +1175,64 @@ export async function registerRoutes(
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
+  // ── Cost Optimizer ───────────────────────────────────────────────────────
+  app.get("/api/cost-optimizer/config", (_req: Request, res: Response) => {
+    try {
+      res.json(storage.getCostConfig());
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.put("/api/cost-optimizer/config/:key", (req: Request, res: Response) => {
+    try {
+      const key = String(req.params.key);
+      const { value, category } = req.body as { value?: string; category?: string };
+      if (value === undefined || value === null) {
+        return res.status(400).json({ error: "value is required" });
+      }
+      const row = storage.upsertCostConfig(key, String(value), category ?? "general");
+      res.json(row);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.get("/api/action-plan", (_req: Request, res: Response) => {
+    try {
+      res.json(storage.getActionPlan());
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/action-plan", (req: Request, res: Response) => {
+    try {
+      const body = req.body;
+      const item = storage.createActionItem({
+        title: body.title,
+        category: body.category,
+        estimatedAnnualValue: body.estimatedAnnualValue,
+        priority: body.priority,
+        status: body.status ?? "proposed",
+        notes: body.notes ?? null,
+        sourceType: body.sourceType ?? "manual",
+      } as any);
+      res.status(201).json(item);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.put("/api/action-plan/:id", (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = storage.updateActionItem(id, req.body);
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json(updated);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.delete("/api/action-plan/:id", (req: Request, res: Response) => {
+    try {
+      const ok = storage.deleteActionItem(parseInt(req.params.id));
+      if (!ok) return res.status(404).json({ error: "Not found" });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
   // ── Quote Rates — live rate monitor for Charter Quote engine ────────────────
 
   // GET /api/quote-rates — all rates, ordered by category then label

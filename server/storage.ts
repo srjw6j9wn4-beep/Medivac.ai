@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions, invoices, charterQuotes, quoteRates } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession, Invoice, CharterQuote, InsertCharterQuote, QuoteRate } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions, invoices, charterQuotes, quoteRates, costOptimizerConfig, actionPlanItems } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession, Invoice, CharterQuote, InsertCharterQuote, QuoteRate, CostOptimizerConfig, ActionPlanItem, InsertActionPlanItem } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -239,6 +239,29 @@ sqlite.exec(`
   );
 `);
 
+// ── Cost Optimizer — config & action plan ────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS cost_optimizer_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    key TEXT NOT NULL UNIQUE,
+    value TEXT NOT NULL,
+    category TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS action_plan_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    estimated_annual_value INTEGER NOT NULL,
+    priority TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'proposed',
+    notes TEXT,
+    source_type TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+`);
+
 // ── Special Mission QC Sessions ──────────────────────────────────────────────
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS special_mission_sessions (
@@ -327,6 +350,13 @@ export interface IStorage {
   updateCharterQuote(id: number, data: Partial<InsertCharterQuote>): CharterQuote | undefined;
   deleteCharterQuote(id: number): boolean;
   getNextQuoteNumber(): string;
+  // Cost Optimizer
+  getCostConfig(): CostOptimizerConfig[];
+  upsertCostConfig(key: string, value: string, category: string): CostOptimizerConfig;
+  getActionPlan(): ActionPlanItem[];
+  createActionItem(item: Omit<InsertActionPlanItem, 'createdAt' | 'updatedAt'>): ActionPlanItem;
+  updateActionItem(id: number, updates: Partial<ActionPlanItem>): ActionPlanItem | undefined;
+  deleteActionItem(id: number): boolean;
   // Quote Rates
   getAllRates(): QuoteRate[];
   getRateByKey(key: string): QuoteRate | undefined;
@@ -869,6 +899,52 @@ export class DatabaseStorage implements IStorage {
       notes: notes ?? null,
     });
     return this.getRateByKey(key);
+  }
+
+  // ── Cost Optimizer — config ─────────────────────────────────────────────────
+  getCostConfig(): CostOptimizerConfig[] {
+    return db.select().from(costOptimizerConfig).all()
+      .sort((a, b) => a.category.localeCompare(b.category) || a.key.localeCompare(b.key));
+  }
+
+  upsertCostConfig(key: string, value: string, category: string): CostOptimizerConfig {
+    const now = new Date().toISOString();
+    const existing = db.select().from(costOptimizerConfig).where(eq(costOptimizerConfig.key, key)).get();
+    if (existing) {
+      return db.update(costOptimizerConfig)
+        .set({ value, category, updatedAt: now })
+        .where(eq(costOptimizerConfig.key, key))
+        .returning().get()!;
+    }
+    return db.insert(costOptimizerConfig)
+      .values({ key, value, category, updatedAt: now })
+      .returning().get()!;
+  }
+
+  // ── Cost Optimizer — action plan ────────────────────────────────────────────
+  getActionPlan(): ActionPlanItem[] {
+    return db.select().from(actionPlanItems).all()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  createActionItem(item: Omit<InsertActionPlanItem, 'createdAt' | 'updatedAt'>): ActionPlanItem {
+    const now = new Date().toISOString();
+    return db.insert(actionPlanItems)
+      .values({ ...item, createdAt: now, updatedAt: now } as InsertActionPlanItem)
+      .returning().get()!;
+  }
+
+  updateActionItem(id: number, updates: Partial<ActionPlanItem>): ActionPlanItem | undefined {
+    const { id: _id, createdAt: _c, ...rest } = updates as any;
+    return db.update(actionPlanItems)
+      .set({ ...rest, updatedAt: new Date().toISOString() })
+      .where(eq(actionPlanItems.id, id))
+      .returning().get();
+  }
+
+  deleteActionItem(id: number): boolean {
+    const result = db.delete(actionPlanItems).where(eq(actionPlanItems.id, id)).run();
+    return (result as any).changes > 0;
   }
 }
 

@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronRight, Activity, Users, Shield, Settings,
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
   Moon, Sun, Menu, X, PanelLeftClose, PanelLeftOpen,
-  Bell, BellRing, CheckCheck, ExternalLink,
+  Bell, BellRing, CheckCheck, ExternalLink, TrendingUp,
 } from "lucide-react";
 import EmergencyButton from "@/components/EmergencyButton";
 import { FEATURES } from "@/lib/config";
@@ -243,6 +243,7 @@ const BASE_NAV: NavItem[] = [
     iconLg: <Shield size={28} />,
     children: [
       { label: "Invoicing", path: "/invoicing" },
+      { label: "Cost Optimizer", path: "/cost-optimizer" },
       { label: "ISO Compliance", path: "/iso", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
       { label: "Contract Compliance", path: "/contracts", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
       { label: "Fuel & Finance", path: "/finance", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },

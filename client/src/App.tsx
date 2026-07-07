@@ -47,6 +47,7 @@ import NEPTTasking from "@/pages/NEPTTasking";
 import Invoicing from "@/pages/Invoicing";
 import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
 import CharterQuote from "@/pages/CharterQuote";
+import CostOptimizer from "@/pages/CostOptimizer";
 import { FEATURES } from "@/lib/config";
 import type { UserRole } from "@/lib/data";
 
@@ -73,6 +74,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/map" component={() => <FlightMap role={role} />} />
       <Route path="/dispatch" component={() => <Dispatch role={role} />} />
       <Route path="/charter-quote" component={() => <CharterQuote />} />
+      <Route path="/cost-optimizer" component={() => <CostOptimizer />} />
       <Route path="/nept-tasking" component={() => <NEPTTasking role={role} />} />
       <Route path="/invoicing" component={() => <Invoicing role={role} />} />
       <Route path="/ora" component={() => <OperationalRiskAssessment role={role} />} />
