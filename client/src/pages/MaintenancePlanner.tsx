@@ -4,8 +4,9 @@ import {
   Brain, Plane, Wrench, Calendar, Clock, ChevronRight,
   AlertTriangle, CheckCircle, Download, RefreshCw, Zap,
   ArrowRight, MapPin, User, Package, Shield, BarChart2,
-  AlertCircle, Info, Play, ChevronLeft, Grid3x3
+  AlertCircle, Info, Play, ChevronLeft, Grid3x3, BarChart
 } from "lucide-react";
+import { SkynetTimeline } from "@/components/SkynetTimeline";
 import { generatePDF } from "@/lib/generatePDF";
 
 interface Props { role: UserRole; }
@@ -505,7 +506,7 @@ function MaintenanceCalendar({ onSelectEvent }: { onSelectEvent: (id: string) =>
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 
 export default function MaintenancePlanner({ role }: Props) {
-  const [tab, setTab] = useState<"planner" | "calendar">("planner");
+  const [tab, setTab] = useState<"planner" | "calendar" | "timeline">("planner");
   const [selectedEvent, setSelectedEvent] = useState(UPCOMING_EVENTS[1]);
   const [runningAI, setRunningAI] = useState(false);
   const [aiRun, setAiRun] = useState(true);
@@ -515,6 +516,10 @@ export default function MaintenancePlanner({ role }: Props) {
   );
 
   function handleCalendarSelect(id: string) {
+    const evt = UPCOMING_EVENTS.find(e => e.id === id);
+    if (evt) { setSelectedEvent(evt); setTab("planner"); }
+  }
+  function handleTimelineSelect(id: string) {
     const evt = UPCOMING_EVENTS.find(e => e.id === id);
     if (evt) { setSelectedEvent(evt); setTab("planner"); }
   }
@@ -640,8 +645,9 @@ export default function MaintenancePlanner({ role }: Props) {
       {/* ── TAB BAR ── */}
       <div className="flex gap-1 bg-muted/30 p-1 rounded-xl border border-card-border w-fit">
         {([
-          { id: "planner",  icon: <Brain size={13} />,     label: "AI Planner" },
-          { id: "calendar", icon: <Calendar size={13} />,  label: "Maintenance Calendar" },
+          { id: "planner",  icon: <Brain size={13} />,       label: "AI Planner" },
+          { id: "calendar", icon: <Calendar size={13} />,    label: "Maintenance Calendar" },
+          { id: "timeline", icon: <BarChart size={13} />,    label: "Skynet Timeline" },
         ] as const).map(t => (
           <button
             key={t.id}
@@ -661,6 +667,11 @@ export default function MaintenancePlanner({ role }: Props) {
       {/* ── CALENDAR TAB ── */}
       {tab === "calendar" && (
         <MaintenanceCalendar onSelectEvent={handleCalendarSelect} />
+      )}
+
+      {/* ── TIMELINE TAB ── */}
+      {tab === "timeline" && (
+        <SkynetTimeline onSelectEvent={handleTimelineSelect} />
       )}
 
       {/* ── PLANNER TAB ── */}
