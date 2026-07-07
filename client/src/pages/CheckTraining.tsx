@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
 import { EXAMS, PASS_MARK, EXAM_DURATION_MINUTES, type Exam, type ExamQuestion } from "@/data/theoryExams";
+import { EXAMS_B350 } from "@/data/theoryExamsB350";
 
 interface Props { role: UserRole; }
 
@@ -1799,6 +1800,7 @@ interface ExamResult {
 type BestScores = Record<string, { score: number; total: number; passed: boolean; date: string }>;
 
 function TheoryKnowledgeSection() {
+  const [aircraftType, setAircraftType] = useState<"B200" | "B350">("B200");
   const [phase, setPhase]               = useState<ExamPhase>("select");
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [questions, setQuestions]       = useState<ExamQuestion[]>([]);
@@ -1812,6 +1814,9 @@ function TheoryKnowledgeSection() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const timerRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
   const answersRef                      = useRef<(number | null)[]>([]);
+
+  // Active exam bank — switches between B200 and B350
+  const ACTIVE_EXAMS = aircraftType === "B350" ? EXAMS_B350 : EXAMS;
   const questionsRef                    = useRef<ExamQuestion[]>([]);
 
   useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -1909,18 +1914,46 @@ function TheoryKnowledgeSection() {
 
   // ─── SELECT SCREEN ───────────────────────────────────────────────────────────
   if (phase === "select") {
-    const totalExams      = EXAMS.length;
-    const passedCount     = EXAMS.filter(e => bestScores[e.id]?.passed).length;
-    const attemptedCount  = EXAMS.filter(e => bestScores[e.id]).length;
+    const totalExams      = ACTIVE_EXAMS.length;
+    const passedCount     = ACTIVE_EXAMS.filter(e => bestScores[e.id]?.passed).length;
+    const attemptedCount  = ACTIVE_EXAMS.filter(e => bestScores[e.id]).length;
     const overallPct      = Math.round((passedCount / totalExams) * 100);
-    const dedicatedExams  = EXAMS.filter(e => !e.title.includes("Mixed"));
-    const mixedExams      = EXAMS.filter(e => e.title.includes("Mixed"));
+    const dedicatedExams  = ACTIVE_EXAMS.filter(e => !e.title.includes("Mixed"));
+    const mixedExams      = ACTIVE_EXAMS.filter(e => e.title.includes("Mixed"));
 
     return (
       <div className="p-4 space-y-6">
 
+        {/* ── AIRCRAFT TYPE SWITCHER ── */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mr-1">Aircraft:</span>
+          {(["B200", "B350"] as const).map(type => (
+            <button
+              key={type}
+              onClick={() => { setAircraftType(type); setBestScores(prev => ({ ...prev })); }}
+              data-testid={`button-aircraft-${type.toLowerCase()}`}
+              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all border ${
+                aircraftType === type
+                  ? type === "B350"
+                    ? "bg-blue-500/20 border-blue-400/60 text-blue-300"
+                    : "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
+                  : "bg-muted/30 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+              }`}
+            >
+              {type === "B200" ? "✈ King Air B200" : "✈ King Air B350"}
+            </button>
+          ))}
+          {aircraftType === "B350" && (
+            <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-400/30">DIFFERENCES TRAINING</span>
+          )}
+        </div>
+
         {/* ── PROGRESS TRACKER CARD ── */}
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+        <div className={`rounded-xl border p-5 ${
+          aircraftType === "B350"
+            ? "border-blue-500/20 bg-blue-500/5"
+            : "border-emerald-500/20 bg-emerald-500/5"
+        }`}>
 
           {/* Reset confirmation overlay */}
           {showResetConfirm && (
@@ -1987,29 +2020,29 @@ function TheoryKnowledgeSection() {
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">{passedCount} of {totalExams} exams passed</span>
               <span className={`font-bold ${
-                overallPct === 100 ? "text-emerald-400" :
+                overallPct === 100 ? (aircraftType === "B350" ? "text-blue-400" : "text-emerald-400") :
                 overallPct >= 50  ? "text-amber-400"   : "text-muted-foreground"
               }`}>{overallPct}%</span>
             </div>
             <div className="h-2.5 rounded-full bg-border overflow-hidden">
               <div
-                className="h-2.5 rounded-full bg-emerald-500 transition-all duration-500"
+                className={`h-2.5 rounded-full transition-all duration-500 ${aircraftType === "B350" ? "bg-blue-500" : "bg-emerald-500"}`}
                 style={{ width: `${overallPct}%` }}
               />
             </div>
             {overallPct === 100 && (
-              <p className="text-xs text-emerald-400 font-semibold text-center pt-1">🎖 All exams passed — well done!</p>
+              <p className={`text-xs font-semibold text-center pt-1 ${aircraftType === "B350" ? "text-blue-400" : "text-emerald-400"}`}>🏖 All {aircraftType} exams passed — well done!</p>
             )}
           </div>
 
           {/* Per-exam mini grid */}
           {attemptedCount > 0 && (
             <div className="mt-4 grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-12 gap-1.5">
-              {EXAMS.map((exam, i) => {
+              {ACTIVE_EXAMS.map((exam, i) => {
                 const best = bestScores[exam.id];
                 const isMixed = exam.title.includes("Mixed");
                 let bg = "bg-border/50"; // not attempted
-                if (best?.passed)       bg = "bg-emerald-500";
+                if (best?.passed)       bg = aircraftType === "B350" ? "bg-blue-500" : "bg-emerald-500";
                 else if (best)          bg = "bg-red-500/70";
                 return (
                   <div
@@ -2032,7 +2065,7 @@ function TheoryKnowledgeSection() {
 
         {/* ── DEDICATED EXAMS ── */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Dedicated Exams — One Manual Per Exam</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{aircraftType === "B350" ? "B350 Dedicated Exams — One Subject Per Exam" : "Dedicated Exams — One Manual Per Exam"}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {dedicatedExams.map(exam => {
               const best = bestScores[exam.id];
@@ -2041,13 +2074,13 @@ function TheoryKnowledgeSection() {
                 <button
                   key={exam.id}
                   onClick={() => startExam(exam)}
-                  className="text-left rounded-xl border border-border bg-card hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-all p-4 group"
+                  className={`text-left rounded-xl border border-border bg-card transition-all p-4 group ${aircraftType === "B350" ? "hover:border-blue-500/40 hover:bg-blue-500/5" : "hover:border-emerald-500/40 hover:bg-emerald-500/5"}`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <BookMarked size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <BookMarked size={16} className={`shrink-0 mt-0.5 ${aircraftType === "B350" ? "text-blue-400" : "text-emerald-400"}`} />
                     {best ? (
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        best.passed ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"
+                        best.passed ? (aircraftType === "B350" ? "bg-blue-500/20 text-blue-300" : "bg-emerald-500/20 text-emerald-300") : "bg-red-500/20 text-red-300"
                       }`}>
                         {best.passed ? "PASS" : "FAIL"} · {scorePct}%
                       </span>
@@ -2055,7 +2088,7 @@ function TheoryKnowledgeSection() {
                       <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/40">Not attempted</span>
                     )}
                   </div>
-                  <p className="font-semibold text-sm mt-2 group-hover:text-emerald-300 transition-colors">{exam.title}</p>
+                  <p className={`font-semibold text-sm mt-2 transition-colors ${aircraftType === "B350" ? "group-hover:text-blue-300" : "group-hover:text-emerald-300"}`}>{exam.title}</p>
                   <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
 
                   {/* Score bar */}
@@ -2064,7 +2097,7 @@ function TheoryKnowledgeSection() {
                       <div className="h-1.5 rounded-full bg-border overflow-hidden">
                         <div
                           className={`h-1.5 rounded-full transition-all ${
-                            best.passed ? "bg-emerald-500" : "bg-red-500/70"
+                            best.passed ? (aircraftType === "B350" ? "bg-blue-500" : "bg-emerald-500") : "bg-red-500/70"
                           }`}
                           style={{ width: `${scorePct}%` }}
                         />
@@ -2090,7 +2123,7 @@ function TheoryKnowledgeSection() {
 
         {/* ── MIXED EXAMS ── */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Combined Exams — Mixed Across All Manuals</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{aircraftType === "B350" ? "B350 Combined Exams — Mixed Across All Subject Areas" : "Combined Exams — Mixed Across All Manuals"}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {mixedExams.map(exam => {
               const best = bestScores[exam.id];
