@@ -37,14 +37,14 @@ export const TNC_RATES: Record<string, number> = {
   YMHB: 12.11, // Hobart
   YBNS: 16.36, // Ballina (special 2026 interim)
   // Regional (typical)
-  YDBO: 6.96,  // Dubbo
+  YSDU: 6.96,  // Dubbo
   YBHI: 6.96,  // Broken Hill
   YBTL: 6.96,  // Townsville
   YCSM: 6.96,  // Cessnock
   YARM: 6.96,  // Armidale
   YBUD: 6.96,  // Bundaberg
-  YLRD: 6.96,  // Lord Howe Island
-  YTWB: 6.96,  // Tamworth
+  YLHI: 6.96,  // Lord Howe Island
+  YSTW: 6.96,  // Tamworth
   YNTN: 6.96,  // Normanton
   DEFAULT: 6.96,
 };
@@ -54,13 +54,13 @@ const OUT_OF_HOURS_TNC_SURCHARGE = 261_00; // cents per movement, outside 0600-2
 
 // ─── Airport landing charges (Avdata schedule, $/tonne) ────────────────────
 export const LANDING_RATES: Record<string, number> = {
-  YDBO: 15.45,  // Dubbo
+  YSDU: 15.45,  // Dubbo
   YBHI: 15.45,  // Broken Hill
   YBTL: 16.00,  // Townsville
   YARM: 15.45,  // Armidale
   YBUD: 15.03,  // Bundaberg
-  YLRD: 22.00,  // Lord Howe Island (remote charge)
-  YTWB: 15.45,  // Tamworth
+  YLHI: 22.00,  // Lord Howe Island (remote charge)
+  YSTW: 15.45,  // Tamworth
   YNRM: 15.45,  // Narromine
   YORG: 14.00,  // Orange
   YBKE: 14.00,  // Bourke

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -7,6 +7,8 @@ import {
   type GroundTransportType,
 } from "@/lib/quoteEngine";
 import { generateCharterQuotePDF } from "@/lib/generateCharterQuotePDF";
+import { AirportLegPicker } from "@/components/AirportSearch";
+import { type Airport } from "@/lib/airportData";
 import {
   Plane, Plus, Trash2, Calculator, Save, FileDown, RotateCcw,
   AlertTriangle, ChevronDown, ChevronUp, Users, MapPin, Hotel, Percent, Eye, Edit3,
@@ -94,6 +96,8 @@ export default function CharterQuote() {
   const [departureDate, setDepartureDate] = useState(todayISO());
   const [aircraftType, setAircraftType] = useState<AircraftKey>("B200");
   const [legs, setLegs] = useState<LegInput[]>([emptyLeg()]);
+  // Airport objects parallel to legs[] — for autocomplete selection
+  const [legAirports, setLegAirports] = useState<Array<{ from: Airport | null; to: Airport | null }>>([{ from: null, to: null }]);
   const [includeReturnLeg, setIncludeReturnLeg] = useState(false);
   const [crew, setCrew] = useState<CrewConfig>({
     captain: true, firstOfficer: false, flightNurse: false, flightParamedic: false, icuDoctor: false, count: 1,
@@ -149,10 +153,36 @@ export default function CharterQuote() {
   }
   function addLeg() {
     setLegs(prev => [...prev, emptyLeg()]);
+    setLegAirports(prev => [...prev, { from: null, to: null }]);
   }
   function removeLeg(idx: number) {
-    setLegs(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
+    if (legs.length <= 1) return;
+    setLegs(prev => prev.filter((_, i) => i !== idx));
+    setLegAirports(prev => prev.filter((_, i) => i !== idx));
   }
+
+  // Airport selection handlers — update both airport object and LegInput ICAO/name
+  const setLegFrom = useCallback((idx: number, ap: Airport | null) => {
+    setLegAirports(prev => prev.map((la, i) => i === idx ? { ...la, from: ap } : la));
+    setLegs(prev => prev.map((l, i) => i === idx ? {
+      ...l,
+      fromICAO: ap?.icao ?? "",
+      fromName: ap ? (ap.city || ap.name) : "",
+    } : l));
+  }, []);
+
+  const setLegTo = useCallback((idx: number, ap: Airport | null) => {
+    setLegAirports(prev => prev.map((la, i) => i === idx ? { ...la, to: ap } : la));
+    setLegs(prev => prev.map((l, i) => i === idx ? {
+      ...l,
+      toICAO: ap?.icao ?? "",
+      toName: ap ? (ap.city || ap.name) : "",
+    } : l));
+  }, []);
+
+  const setLegDistance = useCallback((idx: number, nm: number) => {
+    setLegs(prev => prev.map((l, i) => i === idx ? { ...l, distanceNm: nm } : l));
+  }, []);
 
   // ─── Calculate ────────────────────────────────────────────────────────────
   function handleCalculate() {
@@ -358,41 +388,42 @@ export default function CharterQuote() {
                       </button>
                     )}
                   </div>
+                  {/* Airport autocomplete pickers — auto-calc distance on selection */}
+                  <div className="mb-2">
+                    <AirportLegPicker
+                      fromAirport={legAirports[idx]?.from ?? null}
+                      toAirport={legAirports[idx]?.to ?? null}
+                      onFromChange={ap => setLegFrom(idx, ap)}
+                      onToChange={ap => setLegTo(idx, ap)}
+                      onDistanceCalculated={nm => setLegDistance(idx, nm)}
+                    />
+                  </div>
+
+                  {/* Distance (auto-filled or manual override) + departure time */}
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">From ICAO</label>
-                      <input value={leg.fromICAO} onChange={e => updateLeg(idx, { fromICAO: e.target.value.toUpperCase() })}
-                        maxLength={4} placeholder="YDBO"
-                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 uppercase focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">From Name</label>
-                      <input value={leg.fromName} onChange={e => updateLeg(idx, { fromName: e.target.value })}
-                        placeholder="Dubbo"
-                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">To ICAO</label>
-                      <input value={leg.toICAO} onChange={e => updateLeg(idx, { toICAO: e.target.value.toUpperCase() })}
-                        maxLength={4} placeholder="YBHI"
-                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 uppercase focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">To Name</label>
-                      <input value={leg.toName} onChange={e => updateLeg(idx, { toName: e.target.value })}
-                        placeholder="Broken Hill"
-                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-muted-foreground block mb-0.5">Distance (nm)</label>
-                      <input type="number" value={leg.distanceNm || ""} onChange={e => updateLeg(idx, { distanceNm: parseFloat(e.target.value) || 0 })}
-                        placeholder="240"
-                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none" />
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">
+                        Distance (nm)
+                        {leg.distanceNm > 0 && legAirports[idx]?.from?.lat && legAirports[idx]?.to?.lat && (
+                          <span className="ml-1 text-[#4F98A3]">· auto</span>
+                        )}
+                      </label>
+                      <input
+                        type="number"
+                        value={leg.distanceNm || ""}
+                        onChange={e => updateLeg(idx, { distanceNm: parseFloat(e.target.value) || 0 })}
+                        placeholder="nm"
+                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none"
+                      />
                     </div>
                     <div>
                       <label className="text-[10px] text-muted-foreground block mb-0.5">Departure (HH:MM)</label>
-                      <input type="time" value={leg.departureTime} onChange={e => updateLeg(idx, { departureTime: e.target.value })}
-                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none" />
+                      <input
+                        type="time"
+                        value={leg.departureTime}
+                        onChange={e => updateLeg(idx, { departureTime: e.target.value })}
+                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none"
+                      />
                     </div>
                   </div>
                   <div className="flex items-center gap-4 mb-2">
