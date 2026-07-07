@@ -1,17 +1,16 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { type UserRole } from "@/lib/data";
 import {
   Brain, Plane, Wrench, Calendar, Clock, ChevronRight,
   AlertTriangle, CheckCircle, Download, RefreshCw, Zap,
   ArrowRight, MapPin, User, Package, Shield, BarChart2,
-  AlertCircle, Info, Play
+  AlertCircle, Info, Play, ChevronLeft, Grid3x3
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
 
 interface Props { role: UserRole; }
 
-// ── AI analysis engine data ──────────────────────────────────────────────────
-// Mirrors Engineering.tsx fleet — in production this would be a shared store / API
+// ── Maintenance event data ───────────────────────────────────────────────────
 
 const UPCOMING_EVENTS = [
   {
@@ -26,19 +25,19 @@ const UPCOMING_EVENTS = [
     dueHours: "14,864 hrs",
     remainingHours: 42,
     remainingDays: 23,
-    urgency: "plan",          // plan | watch | urgent | critical
+    urgency: "plan",
     urgencyColor: "text-blue-400",
     urgencyBg: "status-blue",
+    // Calendar span: ground time 3–4 days, window 20–24 Jun 2026
+    calStart: new Date(2026, 5, 20), // Jun 20
+    calEnd:   new Date(2026, 5, 24), // Jun 24
     components: [
       { name: "Propeller L/H overhaul", remaining: "260 hrs", due: "est. 28 Jun 2026", status: "warn" },
       { name: "Propeller R/H overhaul", remaining: "260 hrs", due: "est. 28 Jun 2026", status: "warn" },
     ],
     aiPlan: {
       summary: "VH-XYJ is currently based at Dubbo — the maintenance base. No ferry flight is required for the upcoming 120 hr check and propeller overhauls. I recommend scheduling the check window during a low-operational-tempo period to minimise mission impact. Based on current flying rate (~1.8 hrs/day), the aircraft will reach the 120 hr interval in approximately 23 days.",
-      ferryOutDate: null,
-      ferryOutRoute: null,
-      ferryReturnDate: null,
-      ferryReturnRoute: null,
+      ferryOutDate: null, ferryOutRoute: null, ferryReturnDate: null, ferryReturnRoute: null,
       groundTime: "3–4 days (120 hr check + prop overhauls combined)",
       pilotRequired: "Capt. R. Hughes or Capt. T. Barnes (ferry-endorsed)",
       windowRecommendation: "20–24 Jun 2026 (low NEPT demand historically — pre-school holiday window)",
@@ -67,15 +66,15 @@ const UPCOMING_EVENTS = [
     urgency: "plan",
     urgencyColor: "text-blue-400",
     urgencyBg: "status-blue",
+    calStart: new Date(2026, 5, 10), // Jun 10 (ferry out)
+    calEnd:   new Date(2026, 5, 17), // Jun 17 (RTS)
     components: [
       { name: "Cabin door seal replacement", remaining: "MEL — 13 Jun 2026", due: "13 Jun 2026", status: "warn" },
     ],
     aiPlan: {
       summary: "VH-XYR is based at Broken Hill. The 6-monthly check and active MEL item (cabin door seal) both require ferry to Dubbo — the nearest certified maintenance base. I recommend combining both defect rectification and the scheduled service in one maintenance visit to minimise total ground time and ferry movements. The MEL expiry on 13 Jun 2026 creates a hard deadline for the ferry-OUT departure.",
-      ferryOutDate: "10–11 Jun 2026",
-      ferryOutRoute: "YBHI → YSDU (ferry, no medical config)",
-      ferryReturnDate: "est. 17 Jun 2026",
-      ferryReturnRoute: "YSDU → YBHI (return to service)",
+      ferryOutDate: "10–11 Jun 2026", ferryOutRoute: "YBHI → YSDU (ferry, no medical config)",
+      ferryReturnDate: "est. 17 Jun 2026", ferryReturnRoute: "YSDU → YBHI (return to service)",
       groundTime: "5–6 days (defect + 6-monthly combined)",
       pilotRequired: "Capt. T. Barnes (Broken Hill based, ferry-endorsed)",
       windowRecommendation: "Ferry-OUT by 10 Jun 2026 — MEL hard deadline 13 Jun. Combined service window 10–16 Jun 2026.",
@@ -106,6 +105,8 @@ const UPCOMING_EVENTS = [
     urgency: "critical",
     urgencyColor: "text-red-400",
     urgencyBg: "status-red",
+    calStart: new Date(2026, 5, 1),  // Jun 1
+    calEnd:   new Date(2026, 5, 10), // Jun 10
     components: [
       { name: "R/H Brake Pack (AOG)", remaining: "Part ETA 7 Jun 2026", due: "7 Jun 2026", status: "fail" },
       { name: "Altimeter #2 static source check", remaining: "In progress", due: "In progress", status: "warn" },
@@ -113,10 +114,8 @@ const UPCOMING_EVENTS = [
     ],
     aiPlan: {
       summary: "VH-XYU is currently on maintenance hold at Dubbo — annual inspection in progress. R/H brake pack is AOG with part ETA 7 Jun 2026. Estimated return to service is 10 Jun 2026. No ferry flight is required — aircraft is already at the maintenance base. The priority is tracking part arrival and LAME completion of the brake pack, altimeter check, and engine oil trending before signing the maintenance release.",
-      ferryOutDate: null,
-      ferryOutRoute: null,
-      ferryReturnDate: "10 Jun 2026 (RTS target)",
-      ferryReturnRoute: "Return to operational service at YSDU",
+      ferryOutDate: null, ferryOutRoute: null,
+      ferryReturnDate: "10 Jun 2026 (RTS target)", ferryReturnRoute: "Return to operational service at YSDU",
       groundTime: "In progress — est. 5 days total (opened 01 Jun 2026)",
       pilotRequired: "N/A — aircraft at maintenance base. First flight after RTS: Capt. R. Hughes (test flight)",
       windowRecommendation: "Brake pack part arriving 7 Jun. Altimeter check scheduled 8 Jun. Target MR sign-off 10 Jun. Notify operations by 9 Jun for morning commitment.",
@@ -146,13 +145,12 @@ const UPCOMING_EVENTS = [
     urgency: "watch",
     urgencyColor: "text-amber-400",
     urgencyBg: "status-orange",
+    calStart: new Date(2026, 7, 10), // Aug 10
+    calEnd:   new Date(2026, 7, 20), // Aug 20
     components: [],
     aiPlan: {
       summary: "VH-MVW is based at Broken Hill. The annual inspection is due in approximately 71 days. As a Broken Hill-based aircraft the inspection can be conducted at the Broken Hill maintenance base. I recommend beginning LAME and slot booking within the next 30 days to avoid peak demand conflicts. No immediate action required but planning should commence now.",
-      ferryOutDate: null,
-      ferryOutRoute: null,
-      ferryReturnDate: null,
-      ferryReturnRoute: null,
+      ferryOutDate: null, ferryOutRoute: null, ferryReturnDate: null, ferryReturnRoute: null,
       groundTime: "est. 7–10 days (annual inspection scope)",
       pilotRequired: "Local Broken Hill crew",
       windowRecommendation: "Target window: 10–20 Aug 2026. Book LAME slot by 1 Jul 2026.",
@@ -166,96 +164,32 @@ const UPCOMING_EVENTS = [
   },
 ];
 
-// Ferry schedule computed by AI
 const FERRY_SCHEDULE = [
-  {
-    id: "FRY-001",
-    aircraft: "VH-XYR",
-    direction: "OUT",
-    route: "YBHI → YSDU",
-    fromICAO: "YBHI",
-    toICAO: "YSDU",
-    fromName: "Broken Hill",
-    toName: "Dubbo",
-    purpose: "Cabin door seal MEL rectification + 6-monthly check",
-    pilot: "Capt. T. Barnes",
-    aiRecommended: "10 Jun 2026",
-    deadline: "13 Jun 2026 (MEL expiry)",
-    flightTime: "1 hr 15 min",
-    urgency: "urgent",
-    eventId: "EVT-002",
-  },
-  {
-    id: "FRY-002",
-    aircraft: "VH-XYJ",
-    direction: "REPOSITION",
-    route: "YSDU → YBHI",
-    fromICAO: "YSDU",
-    toICAO: "YBHI",
-    fromName: "Dubbo",
-    toName: "Broken Hill",
-    purpose: "Operational cover while VH-XYR at Dubbo maintenance",
-    pilot: "Capt. R. Hughes",
-    aiRecommended: "10 Jun 2026",
-    deadline: "Cover required from 10 Jun",
-    flightTime: "1 hr 15 min",
-    urgency: "urgent",
-    eventId: "EVT-002",
-  },
-  {
-    id: "FRY-003",
-    aircraft: "VH-XYR",
-    direction: "RETURN",
-    route: "YSDU → YBHI",
-    fromICAO: "YSDU",
-    toICAO: "YBHI",
-    fromName: "Dubbo",
-    toName: "Broken Hill",
-    purpose: "Return to service — Broken Hill base",
-    pilot: "Capt. T. Barnes",
-    aiRecommended: "est. 17 Jun 2026",
-    deadline: "Post RTS sign-off",
-    flightTime: "1 hr 15 min",
-    urgency: "plan",
-    eventId: "EVT-002",
-  },
-  {
-    id: "FRY-004",
-    aircraft: "VH-XYJ",
-    direction: "REPOSITION",
-    route: "YBHI → YSDU",
-    fromICAO: "YBHI",
-    toICAO: "YSDU",
-    fromName: "Broken Hill",
-    toName: "Dubbo",
-    purpose: "Return to Dubbo base after XYR RTS",
-    pilot: "Capt. R. Hughes",
-    aiRecommended: "est. 17 Jun 2026",
-    deadline: "After VH-XYR returns to YBHI",
-    flightTime: "1 hr 15 min",
-    urgency: "plan",
-    eventId: "EVT-002",
-  },
-  {
-    id: "FRY-005",
-    aircraft: "VH-XYJ",
-    direction: "OUT",
-    route: "YSDU → YSDU",
-    fromICAO: "YSDU",
-    toICAO: "YSDU",
-    fromName: "Dubbo",
-    toName: "Dubbo (maintenance)",
-    purpose: "120 hr check + propeller overhauls — Dubbo base",
-    pilot: "N/A — at base",
-    aiRecommended: "20 Jun 2026",
-    deadline: "est. 28 Jun 2026",
-    flightTime: "No ferry required",
-    urgency: "plan",
-    eventId: "EVT-001",
-  },
+  { id: "FRY-001", aircraft: "VH-XYR", direction: "OUT", route: "YBHI → YSDU", fromICAO: "YBHI", toICAO: "YSDU", fromName: "Broken Hill", toName: "Dubbo", purpose: "Cabin door seal MEL + 6-monthly check", pilot: "Capt. T. Barnes", aiRecommended: "10 Jun 2026", deadline: "13 Jun 2026 (MEL expiry)", flightTime: "1 hr 15 min", urgency: "urgent", eventId: "EVT-002", calDate: new Date(2026, 5, 10) },
+  { id: "FRY-002", aircraft: "VH-XYJ", direction: "REPOSITION", route: "YSDU → YBHI", fromICAO: "YSDU", toICAO: "YBHI", fromName: "Dubbo", toName: "Broken Hill", purpose: "Cover while VH-XYR at Dubbo", pilot: "Capt. R. Hughes", aiRecommended: "10 Jun 2026", deadline: "Cover from 10 Jun", flightTime: "1 hr 15 min", urgency: "urgent", eventId: "EVT-002", calDate: new Date(2026, 5, 10) },
+  { id: "FRY-003", aircraft: "VH-XYR", direction: "RETURN", route: "YSDU → YBHI", fromICAO: "YSDU", toICAO: "YBHI", fromName: "Dubbo", toName: "Broken Hill", purpose: "Return to service — Broken Hill base", pilot: "Capt. T. Barnes", aiRecommended: "est. 17 Jun 2026", deadline: "Post RTS sign-off", flightTime: "1 hr 15 min", urgency: "plan", eventId: "EVT-002", calDate: new Date(2026, 5, 17) },
+  { id: "FRY-004", aircraft: "VH-XYJ", direction: "REPOSITION", route: "YBHI → YSDU", fromICAO: "YBHI", toICAO: "YSDU", fromName: "Broken Hill", toName: "Dubbo", purpose: "Return to Dubbo base after XYR RTS", pilot: "Capt. R. Hughes", aiRecommended: "est. 17 Jun 2026", deadline: "After VH-XYR returns to YBHI", flightTime: "1 hr 15 min", urgency: "plan", eventId: "EVT-002", calDate: new Date(2026, 5, 17) },
+  { id: "FRY-005", aircraft: "VH-XYJ", direction: "OUT", route: "YSDU → YSDU", fromICAO: "YSDU", toICAO: "YSDU", fromName: "Dubbo", toName: "Dubbo (maintenance)", purpose: "120 hr check + propeller overhauls", pilot: "N/A — at base", aiRecommended: "20 Jun 2026", deadline: "est. 28 Jun 2026", flightTime: "No ferry required", urgency: "plan", eventId: "EVT-001", calDate: new Date(2026, 5, 20) },
 ];
 
 const URGENCY_ORDER = { critical: 0, urgent: 1, watch: 2, plan: 3 };
+
+// ── Colour helpers ────────────────────────────────────────────────────────────
+
+function urgencyToBar(u: string) {
+  if (u === "critical") return "bg-red-500/80 border-red-400";
+  if (u === "urgent")   return "bg-orange-500/80 border-orange-400";
+  if (u === "watch")    return "bg-amber-500/80 border-amber-400";
+  return "bg-blue-500/80 border-blue-400";
+}
+function urgencyToText(u: string) {
+  if (u === "critical") return "text-red-400";
+  if (u === "urgent")   return "text-orange-400";
+  if (u === "watch")    return "text-amber-400";
+  return "text-blue-400";
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function UrgencyBadge({ urgency, label }: { urgency: string; label: string }) {
   const cls =
@@ -283,18 +217,311 @@ function ActionRow({ action }: { action: { label: string; owner: string; due: st
   );
 }
 
+// ── CALENDAR COMPONENT ────────────────────────────────────────────────────────
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DAYS   = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+interface CalEvent {
+  id: string;
+  aircraft: string;
+  label: string;
+  urgency: string;
+  start: Date;
+  end: Date;
+  type: "maintenance" | "ferry";
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+function dateInRange(d: Date, start: Date, end: Date) {
+  return d >= start && d <= end;
+}
+
+function MaintenanceCalendar({ onSelectEvent }: { onSelectEvent: (id: string) => void }) {
+  const today = new Date(2026, 6, 7); // July 7 2026
+  const [year,  setYear]  = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
+  // Build flat event list
+  const calEvents: CalEvent[] = useMemo(() => {
+    const evts: CalEvent[] = UPCOMING_EVENTS.map(e => ({
+      id: e.id,
+      aircraft: e.aircraft,
+      label: e.serviceType,
+      urgency: e.urgency,
+      start: e.calStart,
+      end: e.calEnd,
+      type: "maintenance" as const,
+    }));
+    // Ferry point events (single day)
+    const ferryEvts: CalEvent[] = FERRY_SCHEDULE
+      .filter(f => f.calDate)
+      .map(f => ({
+        id: f.id,
+        aircraft: f.aircraft,
+        label: `Ferry ${f.direction}: ${f.fromName} → ${f.toName}`,
+        urgency: f.urgency,
+        start: f.calDate!,
+        end: f.calDate!,
+        type: "ferry" as const,
+      }));
+    return [...evts, ...ferryEvts];
+  }, []);
+
+  function prevMonth() {
+    if (month === 0) { setMonth(11); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (month === 11) { setMonth(0); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  }
+
+  // Build calendar grid
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+  ];
+  // Pad to full 6-week grid
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  // Events for a given day
+  function eventsForDay(d: Date): CalEvent[] {
+    return calEvents.filter(e => dateInRange(d, e.start, e.end));
+  }
+
+  // Which events span this month at all?
+  const monthStart = new Date(year, month, 1);
+  const monthEnd   = new Date(year, month + 1, 0);
+  const monthEvents = calEvents.filter(e => e.end >= monthStart && e.start <= monthEnd);
+
+  return (
+    <div className="space-y-4">
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-4 text-[11px]">
+        <span className="font-semibold text-muted-foreground uppercase tracking-wider">Legend:</span>
+        {[
+          { color: "bg-red-500/80", label: "Critical" },
+          { color: "bg-orange-500/80", label: "Urgent" },
+          { color: "bg-amber-500/80", label: "Watch" },
+          { color: "bg-blue-500/80", label: "Plan" },
+          { color: "bg-cyan-500/60 border border-cyan-400 border-dashed", label: "Ferry" },
+        ].map(l => (
+          <span key={l.label} className="flex items-center gap-1.5">
+            <span className={`w-3 h-3 rounded-sm ${l.color}`} />
+            {l.label}
+          </span>
+        ))}
+        <span className="flex items-center gap-1.5 ml-auto">
+          <span className="w-3 h-3 rounded-sm bg-cyan-400/20 border border-cyan-400/60 ring-1 ring-cyan-400" />
+          Today
+        </span>
+      </div>
+
+      {/* Month navigator */}
+      <div className="bg-card rounded-xl border border-card-border overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-card-border">
+          <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-muted/40 transition-colors" data-testid="cal-prev">
+            <ChevronLeft size={16} className="text-muted-foreground" />
+          </button>
+          <h3 className="text-base font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+            {MONTHS[month]} {year}
+          </h3>
+          <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-muted/40 transition-colors" data-testid="cal-next">
+            <ChevronRight size={16} className="text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Day-of-week header */}
+        <div className="grid grid-cols-7 border-b border-card-border">
+          {DAYS.map(d => (
+            <div key={d} className="text-center text-[10px] font-semibold text-muted-foreground uppercase py-2">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7">
+          {cells.map((cell, idx) => {
+            const isToday = cell ? isSameDay(cell, today) : false;
+            const isOtherMonth = cell === null;
+            const dayEvents = cell ? eventsForDay(cell) : [];
+            const isWeekend = idx % 7 === 0 || idx % 7 === 6;
+
+            return (
+              <div
+                key={idx}
+                className={`min-h-[80px] border-b border-r border-card-border p-1.5 transition-colors
+                  ${isOtherMonth ? "bg-muted/10" : isWeekend ? "bg-muted/5" : ""}
+                  ${isToday ? "ring-1 ring-inset ring-cyan-400/60 bg-cyan-400/5" : ""}
+                `}
+              >
+                {cell && (
+                  <>
+                    <div className={`text-[11px] font-semibold mb-1 w-5 h-5 flex items-center justify-center rounded-full
+                      ${isToday ? "bg-cyan-400 text-black" : "text-muted-foreground"}`}>
+                      {cell.getDate()}
+                    </div>
+                    <div className="space-y-0.5">
+                      {dayEvents.slice(0, 3).map(e => {
+                        const isStart = isSameDay(cell, e.start);
+                        const isEnd   = isSameDay(cell, e.end);
+                        const isFerry = e.type === "ferry";
+                        return (
+                          <button
+                            key={e.id + cell.getTime()}
+                            data-testid={`cal-event-${e.id}`}
+                            onClick={() => {
+                              if (!isFerry) onSelectEvent(e.id);
+                              else {
+                                // find parent event
+                                const ferry = FERRY_SCHEDULE.find(f => f.id === e.id);
+                                if (ferry) onSelectEvent(ferry.eventId);
+                              }
+                            }}
+                            onMouseEnter={() => setHoverId(e.id)}
+                            onMouseLeave={() => setHoverId(null)}
+                            title={`${e.aircraft} — ${e.label}`}
+                            className={`w-full text-left text-[9px] font-semibold px-1.5 py-0.5 rounded border truncate transition-all
+                              ${isFerry
+                                ? `bg-cyan-500/20 border-cyan-400/50 text-cyan-300 border-dashed`
+                                : `${urgencyToBar(e.urgency)} text-white`}
+                              ${hoverId === e.id ? "opacity-100 scale-[1.02]" : "opacity-90"}
+                              ${isStart ? "rounded-l" : "rounded-l-none border-l-0"}
+                              ${isEnd   ? "rounded-r" : "rounded-r-none border-r-0"}
+                            `}
+                          >
+                            {isStart ? (isFerry ? "✈ " : "") + e.aircraft : ""}
+                          </button>
+                        );
+                      })}
+                      {dayEvents.length > 3 && (
+                        <div className="text-[9px] text-muted-foreground pl-1">+{dayEvents.length - 3} more</div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* This-month event summary */}
+      {monthEvents.length > 0 && (
+        <div className="bg-card rounded-xl border border-card-border p-4">
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+            {MONTHS[month]} — Scheduled Events
+          </div>
+          <div className="space-y-2">
+            {monthEvents.map(e => {
+              const isFerry = e.type === "ferry";
+              const ferry = isFerry ? FERRY_SCHEDULE.find(f => f.id === e.id) : null;
+              return (
+                <button
+                  key={e.id}
+                  data-testid={`cal-list-${e.id}`}
+                  onClick={() => {
+                    if (!isFerry) onSelectEvent(e.id);
+                    else if (ferry) onSelectEvent(ferry.eventId);
+                  }}
+                  className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-card-border hover:border-cyan-400/30 bg-background hover:bg-cyan-400/5 transition-all"
+                >
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                    isFerry ? "bg-cyan-400" : urgencyToBar(e.urgency).split(" ")[0]
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold">{e.aircraft}</span>
+                      {isFerry && <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-semibold">Ferry</span>}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground truncate">{e.label}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-[10px] text-muted-foreground">
+                      {isSameDay(e.start, e.end)
+                        ? e.start.toLocaleDateString("en-AU", { day: "numeric", month: "short" })
+                        : `${e.start.toLocaleDateString("en-AU", { day: "numeric", month: "short" })} – ${e.end.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}`
+                      }
+                    </div>
+                    {!isFerry && (
+                      <div className={`text-[9px] font-semibold ${urgencyToText(e.urgency)}`}>
+                        {e.urgency.charAt(0).toUpperCase() + e.urgency.slice(1)}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronRight size={12} className="text-muted-foreground shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 3-month lookahead strip */}
+      <div className="bg-card rounded-xl border border-card-border p-4">
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          3-Month Maintenance Horizon
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[0, 1, 2].map(offset => {
+            const m = (month + offset) % 12;
+            const y = year + Math.floor((month + offset) / 12);
+            const ms = new Date(y, m, 1);
+            const me = new Date(y, m + 1, 0);
+            const evts = calEvents.filter(e => e.end >= ms && e.start <= me);
+            return (
+              <div key={offset} className="rounded-xl border border-card-border p-3 bg-background">
+                <div className="text-xs font-bold mb-2">{MONTHS[m]} {y}</div>
+                {evts.length === 0 ? (
+                  <div className="text-[10px] text-muted-foreground">No events</div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {evts.map(e => (
+                      <div key={e.id} className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          e.type === "ferry" ? "bg-cyan-400" : urgencyToBar(e.urgency).split(" ")[0]
+                        }`} />
+                        <span className="text-[10px] truncate">{e.aircraft} — {e.type === "ferry" ? "Ferry" : e.label.split(" ")[0]}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN PAGE ─────────────────────────────────────────────────────────────────
+
 export default function MaintenancePlanner({ role }: Props) {
-  const [selectedEvent, setSelectedEvent] = useState(UPCOMING_EVENTS[1]); // default XYR (ferry required, urgent)
+  const [tab, setTab] = useState<"planner" | "calendar">("planner");
+  const [selectedEvent, setSelectedEvent] = useState(UPCOMING_EVENTS[1]);
   const [runningAI, setRunningAI] = useState(false);
-  const [aiRun, setAIRun] = useState(true); // already run on load
+  const [aiRun, setAiRun] = useState(true);
 
   const sorted = [...UPCOMING_EVENTS].sort(
     (a, b) => URGENCY_ORDER[a.urgency as keyof typeof URGENCY_ORDER] - URGENCY_ORDER[b.urgency as keyof typeof URGENCY_ORDER]
   );
 
+  function handleCalendarSelect(id: string) {
+    const evt = UPCOMING_EVENTS.find(e => e.id === id);
+    if (evt) { setSelectedEvent(evt); setTab("planner"); }
+  }
+
   function runAIAnalysis() {
     setRunningAI(true);
-    setTimeout(() => { setRunningAI(false); setAIRun(true); }, 2200);
+    setTimeout(() => { setRunningAI(false); setAiRun(true); }, 2200);
   }
 
   function downloadPlan() {
@@ -311,8 +538,7 @@ export default function MaintenancePlanner({ role }: Props) {
             { label: "Aircraft Analysed", value: "VH-XYJ, VH-XYR, VH-XYU, VH-MVW" },
             { label: "Critical Events", value: UPCOMING_EVENTS.filter(e => e.urgency === "critical").length + " — requires immediate action" },
             { label: "Urgent Events", value: UPCOMING_EVENTS.filter(e => e.urgency === "urgent").length + " — action within 7 days" },
-            { label: "Ferry Movements Required", value: FERRY_SCHEDULE.filter(f => f.direction !== "REPOSITION" && f.fromName !== f.toName).length.toString() },
-            { label: "Maintenance Bases", value: "Dubbo (YSDU) — primary | Broken Hill (YBHI) — secondary" },
+            { label: "Ferry Movements Required", value: FERRY_SCHEDULE.filter(f => f.fromName !== f.toName).length.toString() },
           ],
         },
         ...UPCOMING_EVENTS.map(e => ({
@@ -320,34 +546,13 @@ export default function MaintenancePlanner({ role }: Props) {
           rows: [
             { label: "Aircraft", value: `${e.aircraft} (${e.type})` },
             { label: "Current Base", value: e.currentBase },
-            { label: "Maintenance Base", value: e.maintenanceBase },
-            { label: "Ferry Required", value: e.ferryRequired ? "YES — see ferry schedule below" : "No — aircraft at maintenance base" },
             { label: "Service Due", value: `${e.dueDate} (${e.remainingDays} days)` },
             { label: "Urgency", value: e.urgency.toUpperCase() },
-            { label: "Ferry OUT", value: e.aiPlan.ferryOutDate || "Not required" },
-            { label: "Ferry Route OUT", value: e.aiPlan.ferryOutRoute || "N/A" },
             { label: "Ground Time", value: e.aiPlan.groundTime },
-            { label: "Ferry Return", value: e.aiPlan.ferryReturnDate || "N/A" },
             { label: "Cover Aircraft", value: e.aiPlan.coverAircraft },
             { label: "AI Summary", value: e.aiPlan.summary },
           ],
         })),
-        {
-          heading: "Ferry Movement Schedule",
-          rows: FERRY_SCHEDULE.map(f => ({
-            label: `${f.id} — ${f.aircraft} (${f.direction})`,
-            value: `${f.route} · ${f.aiRecommended} · ${f.purpose} · Pilot: ${f.pilot}`,
-          })),
-        },
-        {
-          heading: "All Action Items — Priority Order",
-          rows: UPCOMING_EVENTS.flatMap(e =>
-            e.aiPlan.actions.map(a => ({
-              label: `${e.aircraft} — ${a.label}`,
-              value: `${a.owner} · Due: ${a.due} · ${a.status.toUpperCase()}`,
-            }))
-          ),
-        },
       ],
     });
   }
@@ -374,22 +579,21 @@ export default function MaintenancePlanner({ role }: Props) {
             onClick={runAIAnalysis}
             disabled={runningAI}
             className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-400/30 rounded-lg text-xs text-purple-400 hover:bg-purple-500/20 transition-colors font-semibold disabled:opacity-50"
+            data-testid="btn-run-ai"
           >
-            {runningAI
-              ? <><RefreshCw size={12} className="animate-spin" /> Analysing...</>
-              : <><Brain size={12} /> Re-run AI</>
-            }
+            {runningAI ? <><RefreshCw size={12} className="animate-spin" /> Analysing...</> : <><Brain size={12} /> Re-run AI</>}
           </button>
           <button
             onClick={downloadPlan}
             className="flex items-center gap-2 px-3 py-2 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-xs text-cyan-400 hover:bg-cyan-500/20 transition-colors font-semibold"
+            data-testid="btn-export"
           >
             <Download size={12} /> Export Plan
           </button>
         </div>
       </div>
 
-      {/* AI status banner */}
+      {/* AI banner */}
       <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${aiRun ? "bg-purple-500/10 border-purple-400/20" : "bg-muted/30 border-card-border"}`}>
         <Brain size={15} className={aiRun ? "text-purple-400 shrink-0" : "text-muted-foreground shrink-0"} />
         <div className="flex-1 text-xs">
@@ -403,11 +607,11 @@ export default function MaintenancePlanner({ role }: Props) {
                 <span className="text-orange-400 font-semibold">1 urgent</span>,{" "}
                 <span className="text-amber-400 font-semibold">1 watch</span>,{" "}
                 <span className="text-blue-400 font-semibold">1 plan</span>{" "}
-                across 4 aircraft · {FERRY_SCHEDULE.length} ferry movements scheduled · Dubbo & Broken Hill bases optimised
+                across 4 aircraft · {FERRY_SCHEDULE.length} ferry movements scheduled
               </span>
             </>
           ) : (
-            <span className="text-muted-foreground">Click Re-run AI to analyse current fleet maintenance requirements and generate a structured ferry plan.</span>
+            <span className="text-muted-foreground">Click Re-run AI to analyse current fleet maintenance requirements.</span>
           )}
         </div>
         {aiRun && !runningAI && (
@@ -417,13 +621,13 @@ export default function MaintenancePlanner({ role }: Props) {
         )}
       </div>
 
-      {/* Summary stat row */}
+      {/* Stat row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: "Critical", value: UPCOMING_EVENTS.filter(e => e.urgency === "critical").length, sub: "Immediate action", color: "text-red-400", bg: "border-red-400/20" },
-          { label: "Urgent", value: UPCOMING_EVENTS.filter(e => e.urgency === "urgent").length, sub: "Action within 7 days", color: "text-orange-400", bg: "border-orange-400/20" },
+          { label: "Urgent",   value: UPCOMING_EVENTS.filter(e => e.urgency === "urgent").length,   sub: "Action within 7 days", color: "text-orange-400", bg: "border-orange-400/20" },
           { label: "Ferry Movements", value: FERRY_SCHEDULE.length, sub: "Scheduled by AI", color: "text-cyan-400", bg: "border-cyan-400/20" },
-          { label: "Days Coverage", value: "43+", sub: "Proactive horizon", color: "text-green-400", bg: "border-green-400/20" },
+          { label: "Days Coverage",   value: "43+", sub: "Proactive horizon", color: "text-green-400", bg: "border-green-400/20" },
         ].map((s, i) => (
           <div key={i} className={`bg-card rounded-xl border ${s.bg} p-4`}>
             <div className={`text-2xl font-bold ${s.color}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{s.value}</div>
@@ -433,233 +637,251 @@ export default function MaintenancePlanner({ role }: Props) {
         ))}
       </div>
 
-      <div className="grid xl:grid-cols-3 gap-6">
+      {/* ── TAB BAR ── */}
+      <div className="flex gap-1 bg-muted/30 p-1 rounded-xl border border-card-border w-fit">
+        {([
+          { id: "planner",  icon: <Brain size={13} />,     label: "AI Planner" },
+          { id: "calendar", icon: <Calendar size={13} />,  label: "Maintenance Calendar" },
+        ] as const).map(t => (
+          <button
+            key={t.id}
+            data-testid={`tab-${t.id}`}
+            onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all
+              ${tab === t.id
+                ? "bg-card border border-card-border text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+              }`}
+          >
+            {t.icon}{t.label}
+          </button>
+        ))}
+      </div>
 
-        {/* ── Left: Event list ── */}
-        <div className="space-y-3">
-          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Upcoming Maintenance Events
+      {/* ── CALENDAR TAB ── */}
+      {tab === "calendar" && (
+        <MaintenanceCalendar onSelectEvent={handleCalendarSelect} />
+      )}
+
+      {/* ── PLANNER TAB ── */}
+      {tab === "planner" && (
+        <div className="grid xl:grid-cols-3 gap-6">
+
+          {/* Event list */}
+          <div className="space-y-3">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Upcoming Maintenance Events
+            </div>
+            {sorted.map(e => (
+              <button
+                key={e.id}
+                data-testid={`event-${e.id}`}
+                onClick={() => setSelectedEvent(e)}
+                className={`w-full text-left p-4 rounded-xl border transition-all ${
+                  selectedEvent.id === e.id
+                    ? "bg-cyan-400/10 border-cyan-400/40"
+                    : "bg-card border-card-border hover:border-cyan-400/30"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{e.aircraft}</span>
+                  <UrgencyBadge urgency={e.urgency} label={
+                    e.urgency === "critical" ? "Critical" :
+                    e.urgency === "urgent"   ? "Urgent"   :
+                    e.urgency === "watch"    ? "Watch"    : "Plan"
+                  } />
+                </div>
+                <div className="text-xs text-muted-foreground mb-1">{e.serviceType}</div>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <Calendar size={10} className="text-muted-foreground" />
+                  <span className="text-muted-foreground">Due:</span>
+                  <span className="font-semibold">{e.dueDate}</span>
+                  <span className="text-muted-foreground ml-auto">{e.remainingDays}d</span>
+                </div>
+                {e.ferryRequired && (
+                  <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-card-border">
+                    <Plane size={10} className="text-cyan-400" />
+                    <span className="text-[10px] text-cyan-400 font-semibold">Ferry required — {e.currentBase.split(" ")[0]} → {e.maintenanceBase.split(" ")[0]}</span>
+                  </div>
+                )}
+                {e.components.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {e.components.map((c, i) => (
+                      <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded-full border ${
+                        c.status === "fail" ? "border-red-400/40 text-red-400 bg-red-500/5" :
+                        c.status === "warn" ? "border-amber-400/40 text-amber-400 bg-amber-500/5" :
+                        "border-card-border text-muted-foreground"
+                      }`}>{c.name.split(" ").slice(0, 3).join(" ")}</span>
+                    ))}
+                  </div>
+                )}
+              </button>
+            ))}
+
+            {/* Ferry schedule */}
+            <div className="mt-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Ferry Schedule</div>
+              <div className="bg-card rounded-xl border border-card-border overflow-hidden">
+                <div className="divide-y divide-border">
+                  {FERRY_SCHEDULE.map((f, i) => (
+                    <div key={i} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <Plane size={11} className={
+                            f.direction === "OUT"    ? "text-amber-400" :
+                            f.direction === "RETURN" ? "text-green-400" : "text-cyan-400"
+                          } />
+                          <span className="text-xs font-bold">{f.aircraft}</span>
+                          <span className="text-[10px] text-muted-foreground">{f.direction}</span>
+                        </div>
+                        <UrgencyBadge urgency={f.urgency} label={f.urgency === "urgent" ? "Urgent" : "Plan"} />
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                        <span className="text-cyan-400">{f.fromName}</span>
+                        <ArrowRight size={10} className="text-muted-foreground" />
+                        <span className="text-cyan-400">{f.toName}</span>
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{f.aiRecommended} · {f.flightTime}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {sorted.map(e => (
-            <button
-              key={e.id}
-              onClick={() => setSelectedEvent(e)}
-              className={`w-full text-left p-4 rounded-xl border transition-all ${
-                selectedEvent.id === e.id
-                  ? "bg-cyan-400/10 border-cyan-400/40"
-                  : "bg-card border-card-border hover:border-cyan-400/30"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{e.aircraft}</span>
-                <UrgencyBadge urgency={e.urgency} label={
-                  e.urgency === "critical" ? "Critical" :
-                  e.urgency === "urgent" ? "Urgent" :
-                  e.urgency === "watch" ? "Watch" : "Plan"
-                } />
-              </div>
-              <div className="text-xs text-muted-foreground mb-1">{e.serviceType}</div>
-              <div className="flex items-center gap-2 text-[11px]">
-                <Calendar size={10} className="text-muted-foreground" />
-                <span className="text-muted-foreground">Due:</span>
-                <span className="font-semibold">{e.dueDate}</span>
-                <span className="text-muted-foreground ml-auto">{e.remainingDays}d</span>
-              </div>
-              {e.ferryRequired && (
-                <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-card-border">
-                  <Plane size={10} className="text-cyan-400" />
-                  <span className="text-[10px] text-cyan-400 font-semibold">Ferry required — {e.currentBase.split(" ")[0]} → {e.maintenanceBase.split(" ")[0]}</span>
+          {/* Detail panel */}
+          <div className="xl:col-span-2 space-y-4">
+            <div className="bg-card rounded-xl border border-card-border p-5">
+              <div className="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{ev.aircraft}</h2>
+                    <UrgencyBadge urgency={ev.urgency} label={
+                      ev.urgency === "critical" ? "Critical — Immediate Action" :
+                      ev.urgency === "urgent"   ? "Urgent — Action This Week"  :
+                      ev.urgency === "watch"    ? "Watch — Plan in 30 Days"    : "Plan — 60+ Days"
+                    } />
+                  </div>
+                  <div className="text-sm text-muted-foreground">{ev.type} · {ev.serviceType}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    Due: <span className="text-foreground font-semibold">{ev.dueDate}</span> · {ev.remainingDays} days · {ev.remainingHours > 0 ? `${ev.remainingHours} hrs remaining` : "Maintenance hold"}
+                  </div>
                 </div>
-              )}
-              {e.components.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {e.components.map((c, i) => (
-                    <span key={i} className={`text-[9px] px-1.5 py-0.5 rounded-full border ${
-                      c.status === "fail" ? "border-red-400/40 text-red-400 bg-red-500/5" :
-                      c.status === "warn" ? "border-amber-400/40 text-amber-400 bg-amber-500/5" :
-                      "border-card-border text-muted-foreground"
-                    }`}>{c.name.split(" ").slice(0, 3).join(" ")}</span>
+                <div className="text-right shrink-0">
+                  <div className="text-xs text-muted-foreground">Current base</div>
+                  <div className="text-sm font-semibold">{ev.currentBase}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Maintenance base</div>
+                  <div className="text-sm font-semibold">{ev.maintenanceBase}</div>
+                </div>
+              </div>
+
+              {ev.components.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {ev.components.map((c, i) => (
+                    <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg border text-xs ${
+                      c.status === "fail" ? "border-red-400/30 bg-red-500/5" : "border-amber-400/30 bg-amber-500/5"
+                    }`}>
+                      <AlertTriangle size={12} className={c.status === "fail" ? "text-red-400" : "text-amber-400"} />
+                      <span className="font-semibold flex-1">{c.name}</span>
+                      <span className={`font-mono text-[11px] ${c.status === "fail" ? "text-red-400" : "text-amber-400"}`}>{c.remaining}</span>
+                      <span className="text-muted-foreground">{c.due}</span>
+                    </div>
                   ))}
                 </div>
               )}
-            </button>
-          ))}
 
-          {/* Ferry movement timeline */}
-          <div className="mt-2">
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Ferry Schedule</div>
-            <div className="bg-card rounded-xl border border-card-border overflow-hidden">
-              <div className="divide-y divide-border">
-                {FERRY_SCHEDULE.map((f, i) => (
-                  <div key={i} className="px-4 py-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-1.5">
-                        <Plane size={11} className={
-                          f.direction === "OUT" ? "text-amber-400" :
-                          f.direction === "RETURN" ? "text-green-400" : "text-cyan-400"
-                        } />
-                        <span className="text-xs font-bold">{f.aircraft}</span>
-                        <span className="text-[10px] text-muted-foreground">{f.direction}</span>
-                      </div>
-                      <UrgencyBadge urgency={f.urgency} label={f.urgency === "urgent" ? "Urgent" : "Plan"} />
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[11px] font-mono">
-                      <span className="text-cyan-400">{f.fromName}</span>
-                      <ArrowRight size={10} className="text-muted-foreground" />
-                      <span className="text-cyan-400">{f.toName}</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">{f.aiRecommended} · {f.flightTime}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Right: AI plan detail ── */}
-        <div className="xl:col-span-2 space-y-4">
-
-          {/* Aircraft card */}
-          <div className="bg-card rounded-xl border border-card-border p-5">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{ev.aircraft}</h2>
-                  <UrgencyBadge urgency={ev.urgency} label={
-                    ev.urgency === "critical" ? "Critical — Immediate Action" :
-                    ev.urgency === "urgent" ? "Urgent — Action This Week" :
-                    ev.urgency === "watch" ? "Watch — Plan in 30 Days" : "Plan — 60+ Days"
-                  } />
+              <div className="p-4 bg-purple-500/5 border border-purple-400/20 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <Brain size={13} className="text-purple-400" />
+                  <span className="text-xs font-bold text-purple-400">Jennifer AI — Maintenance Assessment</span>
                 </div>
-                <div className="text-sm text-muted-foreground">{ev.type} · {ev.serviceType}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Due: <span className="text-foreground font-semibold">{ev.dueDate}</span> · {ev.remainingDays} days · {ev.remainingHours > 0 ? `${ev.remainingHours} hrs remaining` : "Maintenance hold"}</div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-xs text-muted-foreground">Current base</div>
-                <div className="text-sm font-semibold">{ev.currentBase}</div>
-                <div className="text-xs text-muted-foreground mt-1">Maintenance base</div>
-                <div className="text-sm font-semibold">{ev.maintenanceBase}</div>
+                <p className="text-sm leading-relaxed text-foreground/90">{plan.summary}</p>
               </div>
             </div>
 
-            {/* Component warnings */}
-            {ev.components.length > 0 && (
-              <div className="space-y-2 mb-4">
-                {ev.components.map((c, i) => (
-                  <div key={i} className={`flex items-center gap-3 p-2.5 rounded-lg border text-xs ${
-                    c.status === "fail" ? "border-red-400/30 bg-red-500/5" :
-                    "border-amber-400/30 bg-amber-500/5"
-                  }`}>
-                    <AlertTriangle size={12} className={c.status === "fail" ? "text-red-400" : "text-amber-400"} />
-                    <span className="font-semibold flex-1">{c.name}</span>
-                    <span className={`font-mono text-[11px] ${c.status === "fail" ? "text-red-400" : "text-amber-400"}`}>{c.remaining}</span>
-                    <span className="text-muted-foreground">{c.due}</span>
+            {(ev.ferryRequired || plan.ferryReturnDate) && (
+              <div className="bg-card rounded-xl border border-card-border p-5">
+                <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                  <Plane size={14} className="text-cyan-400" /> Ferry Movement Plan
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {[
+                    { label: "Ferry OUT", value: plan.ferryOutDate || "Not required", sub: plan.ferryOutRoute || "Aircraft at maintenance base", icon: <Plane size={12} className="text-amber-400" />, highlight: !!plan.ferryOutDate },
+                    { label: "Ferry RETURN", value: plan.ferryReturnDate || "TBD", sub: plan.ferryReturnRoute || "Post maintenance release", icon: <Plane size={12} className="text-green-400" />, highlight: false },
+                    { label: "Ground Time", value: plan.groundTime, sub: "Estimated maintenance window", icon: <Wrench size={12} className="text-orange-400" />, highlight: false },
+                    { label: "Pilot Required", value: plan.pilotRequired, sub: "Ferry-endorsed, current currency", icon: <User size={12} className="text-blue-400" />, highlight: false },
+                  ].map((c, i) => (
+                    <div key={i} className={`p-3 rounded-xl border ${c.highlight ? "border-amber-400/30 bg-amber-500/5" : "border-card-border bg-background"}`}>
+                      <div className="flex items-center gap-1.5 mb-1.5 text-xs text-muted-foreground">{c.icon} {c.label}</div>
+                      <div className="text-sm font-semibold leading-snug">{c.value}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{c.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {relatedFerry.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scheduled Movements</div>
+                    {relatedFerry.map((f, i) => (
+                      <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${
+                        f.urgency === "urgent" ? "border-orange-400/30 bg-orange-500/5" : "border-card-border bg-background"
+                      }`}>
+                        <div className={`shrink-0 p-1.5 rounded-lg ${
+                          f.direction === "OUT" ? "bg-amber-500/10" :
+                          f.direction === "RETURN" ? "bg-green-500/10" : "bg-cyan-500/10"
+                        }`}>
+                          <Plane size={12} className={
+                            f.direction === "OUT" ? "text-amber-400" :
+                            f.direction === "RETURN" ? "text-green-400" : "text-cyan-400"
+                          } />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-xs font-bold">{f.aircraft}</span>
+                            <span className="text-[10px] text-muted-foreground">{f.direction}</span>
+                            <span className="font-mono text-xs text-cyan-400">{f.fromName}</span>
+                            <ArrowRight size={10} className="text-muted-foreground" />
+                            <span className="font-mono text-xs text-cyan-400">{f.toName}</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">{f.purpose}</div>
+                          <div className="text-[10px] text-muted-foreground">Pilot: {f.pilot} · {f.flightTime}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-xs font-semibold">{f.aiRecommended}</div>
+                          <div className="text-[10px] text-muted-foreground">{f.deadline}</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+                <div className="mt-4 p-3 bg-cyan-500/5 border border-cyan-400/20 rounded-xl">
+                  <div className="flex items-start gap-2">
+                    <Shield size={12} className="text-cyan-400 shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="text-cyan-400 font-semibold">Operational cover: </span>
+                      <span className="text-muted-foreground">{plan.coverAircraft}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* AI summary */}
-            <div className="p-4 bg-purple-500/5 border border-purple-400/20 rounded-xl">
-              <div className="flex items-center gap-2 mb-2">
-                <Brain size={13} className="text-purple-400" />
-                <span className="text-xs font-bold text-purple-400">Jennifer AI — Maintenance Assessment</span>
-              </div>
-              <p className="text-sm leading-relaxed text-foreground/90">{plan.summary}</p>
-            </div>
-          </div>
-
-          {/* Ferry plan */}
-          {ev.ferryRequired || plan.ferryReturnDate ? (
             <div className="bg-card rounded-xl border border-card-border p-5">
-              <h3 className="text-sm font-bold mb-4 flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-                <Plane size={14} className="text-cyan-400" /> Ferry Movement Plan
+              <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                <Calendar size={14} className="text-cyan-400" /> AI Recommended Window
               </h3>
-              <div className="grid sm:grid-cols-2 gap-3">
-                {[
-                  { label: "Ferry OUT", value: plan.ferryOutDate || "Not required", sub: plan.ferryOutRoute || "Aircraft at maintenance base", icon: <Plane size={12} className="text-amber-400" />, highlight: !!plan.ferryOutDate },
-                  { label: "Ferry RETURN", value: plan.ferryReturnDate || "TBD", sub: plan.ferryReturnRoute || "Post maintenance release", icon: <Plane size={12} className="text-green-400" />, highlight: false },
-                  { label: "Ground Time", value: plan.groundTime, sub: "Estimated maintenance window", icon: <Wrench size={12} className="text-orange-400" />, highlight: false },
-                  { label: "Pilot Required", value: plan.pilotRequired, sub: "Ferry-endorsed, current currency", icon: <User size={12} className="text-blue-400" />, highlight: false },
-                ].map((c, i) => (
-                  <div key={i} className={`p-3 rounded-xl border ${c.highlight ? "border-amber-400/30 bg-amber-500/5" : "border-card-border bg-background"}`}>
-                    <div className="flex items-center gap-1.5 mb-1.5 text-xs text-muted-foreground">{c.icon} {c.label}</div>
-                    <div className="text-sm font-semibold leading-snug">{c.value}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">{c.sub}</div>
-                  </div>
-                ))}
+              <div className="p-3 bg-cyan-500/5 border border-cyan-400/20 rounded-xl text-sm leading-relaxed mb-4">
+                {plan.windowRecommendation}
               </div>
-
-              {relatedFerry.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Scheduled Movements</div>
-                  {relatedFerry.map((f, i) => (
-                    <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${
-                      f.urgency === "urgent" ? "border-orange-400/30 bg-orange-500/5" : "border-card-border bg-background"
-                    }`}>
-                      <div className={`shrink-0 p-1.5 rounded-lg ${
-                        f.direction === "OUT" ? "bg-amber-500/10" :
-                        f.direction === "RETURN" ? "bg-green-500/10" : "bg-cyan-500/10"
-                      }`}>
-                        <Plane size={12} className={
-                          f.direction === "OUT" ? "text-amber-400" :
-                          f.direction === "RETURN" ? "text-green-400" : "text-cyan-400"
-                        } />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-bold">{f.aircraft}</span>
-                          <span className="text-[10px] text-muted-foreground">{f.direction}</span>
-                          <span className="font-mono text-xs text-cyan-400">{f.fromName}</span>
-                          <ArrowRight size={10} className="text-muted-foreground" />
-                          <span className="font-mono text-xs text-cyan-400">{f.toName}</span>
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">{f.purpose}</div>
-                        <div className="text-[10px] text-muted-foreground">Pilot: {f.pilot} · {f.flightTime}</div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="text-xs font-semibold">{f.aiRecommended}</div>
-                        <div className="text-[10px] text-muted-foreground">{f.deadline}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-4 p-3 bg-cyan-500/5 border border-cyan-400/20 rounded-xl">
-                <div className="flex items-start gap-2">
-                  <Shield size={12} className="text-cyan-400 shrink-0 mt-0.5" />
-                  <div className="text-xs">
-                    <span className="text-cyan-400 font-semibold">Operational cover: </span>
-                    <span className="text-muted-foreground">{plan.coverAircraft}</span>
-                  </div>
-                </div>
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                Structured Action Plan — {ev.aiPlan.actions.length} items
               </div>
-            </div>
-          ) : null}
-
-          {/* Recommended window */}
-          <div className="bg-card rounded-xl border border-card-border p-5">
-            <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-              <Calendar size={14} className="text-cyan-400" /> AI Recommended Window
-            </h3>
-            <div className="p-3 bg-cyan-500/5 border border-cyan-400/20 rounded-xl text-sm leading-relaxed mb-4">
-              {plan.windowRecommendation}
-            </div>
-
-            {/* Action list */}
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Structured Action Plan — {ev.aiPlan.actions.length} items
-            </div>
-            <div className="space-y-2">
-              {plan.actions.map((a, i) => (
-                <ActionRow key={i} action={a} />
-              ))}
+              <div className="space-y-2">
+                {plan.actions.map((a, i) => <ActionRow key={i} action={a} />)}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
