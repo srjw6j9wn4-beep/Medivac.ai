@@ -44,6 +44,7 @@ import MissionOptimiser from "@/pages/MissionOptimiser";
 import ManifestSign from "@/pages/ManifestSign";
 import TechLogEmbed from "@/pages/TechLogEmbed";
 import NEPTTasking from "@/pages/NEPTTasking";
+import Invoicing from "@/pages/Invoicing";
 import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
 import { FEATURES } from "@/lib/config";
 import type { UserRole } from "@/lib/data";
@@ -71,6 +72,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/map" component={() => <FlightMap role={role} />} />
       <Route path="/dispatch" component={() => <Dispatch role={role} />} />
       <Route path="/nept-tasking" component={() => <NEPTTasking role={role} />} />
+      <Route path="/invoicing" component={() => <Invoicing role={role} />} />
       <Route path="/ora" component={() => <OperationalRiskAssessment role={role} />} />
       <Route path="/morning-brief" component={() => <MorningBrief role={role} />} />
       <Route path="/passenger-manifest" component={() => <PassengerManifest role={role} />} />

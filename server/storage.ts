@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions, invoices } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession, Invoice } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -166,6 +166,36 @@ sqlite.exec(`
   )
 `);
 
+// ── Invoices ─────────────────────────────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS invoices (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_number       TEXT NOT NULL UNIQUE,
+    invoice_date         TEXT NOT NULL,
+    due_date             TEXT NOT NULL,
+    service_date         TEXT NOT NULL,
+    status               TEXT NOT NULL DEFAULT 'Draft',
+    payer_type           TEXT NOT NULL,
+    payer_name           TEXT NOT NULL,
+    task_ref             TEXT,
+    patient_id           TEXT,
+    pickup_location      TEXT,
+    destination          TEXT,
+    aircraft_reg         TEXT,
+    mission_type         TEXT NOT NULL DEFAULT 'Standard NEPT',
+    base_amount          INTEGER NOT NULL,
+    after_hours_surcharge INTEGER NOT NULL DEFAULT 0,
+    additional_charges   INTEGER NOT NULL DEFAULT 0,
+    gst_amount           INTEGER NOT NULL DEFAULT 0,
+    total_amount         INTEGER NOT NULL,
+    notes                TEXT,
+    submitted_at         TEXT,
+    paid_at              TEXT,
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL
+  );
+`);
+
 // ── Special Mission QC Sessions ──────────────────────────────────────────────
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS special_mission_sessions (
@@ -240,6 +270,13 @@ export interface IStorage {
   createNeptTask(data: Omit<NeptTask, 'id'>): Promise<NeptTask>;
   updateNeptTask(id: number, updates: Partial<NeptTask>): Promise<NeptTask>;
   deleteNeptTask(id: number): Promise<void>;
+  // Invoices
+  listInvoices(): Invoice[];
+  getInvoice(id: number): Invoice | undefined;
+  createInvoice(data: Omit<Invoice, 'id'>): Invoice;
+  updateInvoice(id: number, updates: Partial<Invoice>): Invoice;
+  deleteInvoice(id: number): boolean;
+  getNextInvoiceNumber(): string;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -516,6 +553,40 @@ export class DatabaseStorage implements IStorage {
       'SELECT * FROM active_missions WHERE completed = 0 ORDER BY created_at DESC'
     ).all() as any[];
     return rows.map(r => ({ ...r, airports: JSON.parse(r.airports) }));
+  }
+
+  // ── Invoices ─────────────────────────────────────────────────────────────────
+  listInvoices(): Invoice[] {
+    return db.select().from(invoices).all()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  getInvoice(id: number): Invoice | undefined {
+    return db.select().from(invoices).where(eq(invoices.id, id)).get();
+  }
+
+  createInvoice(data: Omit<Invoice, 'id'>): Invoice {
+    return db.insert(invoices).values(data).returning().get()!;
+  }
+
+  updateInvoice(id: number, updates: Partial<Invoice>): Invoice {
+    return db.update(invoices)
+      .set({ ...updates, updatedAt: new Date().toISOString() })
+      .where(eq(invoices.id, id))
+      .returning().get()!;
+  }
+
+  deleteInvoice(id: number): boolean {
+    const result = db.delete(invoices).where(eq(invoices.id, id)).run();
+    return (result as any).changes > 0;
+  }
+
+  getNextInvoiceNumber(): string {
+    const year = new Date().getFullYear();
+    const all = db.select().from(invoices).all()
+      .filter(inv => inv.invoiceNumber.includes(`NEPT-${year}`));
+    const seq = all.length + 1;
+    return `INV-NEPT-${year}-${String(seq).padStart(4, '0')}`;
   }
 
   // ── Special Mission QC Sessions ──────────────────────────────────────────────

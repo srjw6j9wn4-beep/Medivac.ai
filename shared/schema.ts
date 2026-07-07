@@ -154,3 +154,35 @@ export const specialMissionSessions = sqliteTable("special_mission_sessions", {
 export const insertSpecialMissionSessionSchema = createInsertSchema(specialMissionSessions).omit({ id: true });
 export type InsertSpecialMissionSession = z.infer<typeof insertSpecialMissionSessionSchema>;
 export type SpecialMissionSession = typeof specialMissionSessions.$inferSelect;
+
+// ── Invoices ──────────────────────────────────────────────────────────────────
+export const invoices = sqliteTable("invoices", {
+  id:             integer("id").primaryKey({ autoIncrement: true }),
+  invoiceNumber:  text("invoice_number").notNull().unique(),
+  invoiceDate:    text("invoice_date").notNull(),
+  dueDate:        text("due_date").notNull(),
+  serviceDate:    text("service_date").notNull(),
+  status:         text("status").notNull().default("Draft"),   // Draft | Submitted | Paid | Overdue
+  payerType:      text("payer_type").notNull(),                // "nsw_health" | "private"
+  payerName:      text("payer_name").notNull(),
+  taskRef:        text("task_ref"),
+  patientId:      text("patient_id"),
+  pickupLocation: text("pickup_location"),
+  destination:    text("destination"),
+  aircraftReg:    text("aircraft_reg"),
+  missionType:    text("mission_type").notNull().default("Standard NEPT"),
+  baseAmount:     integer("base_amount").notNull(),            // cents
+  afterHoursSurcharge: integer("after_hours_surcharge").notNull().default(0), // cents
+  additionalCharges:   integer("additional_charges").notNull().default(0),    // cents
+  gstAmount:      integer("gst_amount").notNull().default(0),  // cents (health = 0)
+  totalAmount:    integer("total_amount").notNull(),           // cents
+  notes:          text("notes"),
+  submittedAt:    text("submitted_at"),
+  paidAt:         text("paid_at"),
+  createdAt:      text("created_at").notNull(),
+  updatedAt:      text("updated_at").notNull(),
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true });
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type Invoice = typeof invoices.$inferSelect;

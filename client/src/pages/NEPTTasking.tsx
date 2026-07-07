@@ -8,7 +8,7 @@ import {
   Clock, Plane, User, MapPin, ChevronDown, Filter, Search,
   RefreshCw, ClipboardList, ArrowRight, Ambulance, GripVertical, ChevronsRight,
   FileText, CheckSquare, ChevronRight, Calendar, BarChart3,
-  Shield, Printer, Send, RotateCcw, AlertCircle, Check, ExternalLink,
+  Shield, Printer, Send, RotateCcw, AlertCircle, Check, ExternalLink, Receipt,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -1772,6 +1772,23 @@ export default function NEPTTasking({ role }: Props) {
                                 <span className="text-green-400 font-semibold">{fmtDT(t.completedAt)}</span>
                               </div>
                             )}
+                            {t.status === "Complete" && (
+                              <button
+                                onClick={() => {
+                                  const params = new URLSearchParams({
+                                    taskRef: t.taskRef,
+                                    from: t.pickupLocation || "",
+                                    to: t.destLocation || "",
+                                    aircraft: t.aircraftReg || "",
+                                    date: t.completedAt?.slice(0, 10) || "",
+                                  });
+                                  window.location.hash = `/invoicing?${params.toString()}`;
+                                }}
+                                className="mt-1.5 flex items-center gap-1 px-2 py-1 text-[10px] font-semibold rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 transition-colors"
+                              >
+                                <Receipt size={10} /> Generate Invoice
+                              </button>
+                            )}
                             {t.dispatchedBy && <div><span className="text-muted-foreground">Dispatched by: </span>{t.dispatchedBy}</div>}
                           </div>
                           {/* Notes */}
@@ -1857,6 +1874,23 @@ export default function NEPTTasking({ role }: Props) {
                   <span className="text-muted-foreground">Completed:</span>
                   <span className="text-green-400 font-semibold">{fmtDT(t.completedAt)}</span>
                 </div>
+              )}
+              {t.status === "Complete" && (
+                <button
+                  onClick={() => {
+                    const params = new URLSearchParams({
+                      taskRef: t.taskRef,
+                      from: t.pickupLocation || "",
+                      to: t.destLocation || "",
+                      aircraft: t.aircraftReg || "",
+                      date: t.completedAt?.slice(0, 10) || "",
+                    });
+                    window.location.hash = `/invoicing?${params.toString()}`;
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/25 transition-colors w-full justify-center"
+                >
+                  <Receipt size={11} /> Generate Invoice
+                </button>
               )}
               {/* ETA */}
               {t.estimatedEta && (

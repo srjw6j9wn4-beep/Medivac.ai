@@ -241,6 +241,7 @@ const BASE_NAV: NavItem[] = [
     icon: <Shield size={16} />,
     iconLg: <Shield size={28} />,
     children: [
+      { label: "Invoicing", path: "/invoicing" },
       { label: "ISO Compliance", path: "/iso", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
       { label: "Contract Compliance", path: "/contracts", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
       { label: "Fuel & Finance", path: "/finance", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },

@@ -1039,5 +1039,77 @@ export async function registerRoutes(
     }
   });
 
+  // ── Invoices ─────────────────────────────────────────────────────────────────
+  app.get("/api/invoices", (_req: Request, res: Response) => {
+    try {
+      res.json(storage.listInvoices());
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.get("/api/invoices/next-number", (_req: Request, res: Response) => {
+    try {
+      res.json({ invoiceNumber: storage.getNextInvoiceNumber() });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.get("/api/invoices/:id", (req: Request, res: Response) => {
+    try {
+      const inv = storage.getInvoice(parseInt(req.params.id));
+      if (!inv) return res.status(404).json({ error: "Not found" });
+      res.json(inv);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/invoices", (req: Request, res: Response) => {
+    try {
+      const now = new Date().toISOString();
+      const body = req.body;
+      const inv = storage.createInvoice({
+        invoiceNumber:       body.invoiceNumber,
+        invoiceDate:         body.invoiceDate,
+        dueDate:             body.dueDate,
+        serviceDate:         body.serviceDate,
+        status:              body.status ?? "Draft",
+        payerType:           body.payerType,
+        payerName:           body.payerName,
+        taskRef:             body.taskRef ?? null,
+        patientId:           body.patientId ?? null,
+        pickupLocation:      body.pickupLocation ?? null,
+        destination:         body.destination ?? null,
+        aircraftReg:         body.aircraftReg ?? null,
+        missionType:         body.missionType ?? "Standard NEPT",
+        baseAmount:          body.baseAmount ?? 0,
+        afterHoursSurcharge: body.afterHoursSurcharge ?? 0,
+        additionalCharges:   body.additionalCharges ?? 0,
+        gstAmount:           body.gstAmount ?? 0,
+        totalAmount:         body.totalAmount ?? 0,
+        notes:               body.notes ?? null,
+        submittedAt:         null,
+        paidAt:              null,
+        createdAt:           now,
+        updatedAt:           now,
+      });
+      res.status(201).json(inv);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.patch("/api/invoices/:id", (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updates: any = { ...req.body };
+      if (updates.status === "Submitted" && !updates.submittedAt) updates.submittedAt = new Date().toISOString();
+      if (updates.status === "Paid" && !updates.paidAt) updates.paidAt = new Date().toISOString();
+      res.json(storage.updateInvoice(id, updates));
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.delete("/api/invoices/:id", (req: Request, res: Response) => {
+    try {
+      const ok = storage.deleteInvoice(parseInt(req.params.id));
+      if (!ok) return res.status(404).json({ error: "Not found" });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
   return httpServer;
 }
