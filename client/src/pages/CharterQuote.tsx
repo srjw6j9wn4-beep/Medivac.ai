@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
-  calculateQuote, fmtCents, AIRCRAFT,
+  calculateQuote, fmtCents, AIRCRAFT, loadLiveRates, getRatesLastChecked,
   type AircraftKey, type LegInput, type CrewConfig, type QuoteInput, type QuoteCostBreakdown,
-  type GroundTransportType,
+  type GroundTransportType, type LiveQuoteRate,
 } from "@/lib/quoteEngine";
 import { generateCharterQuotePDF } from "@/lib/generateCharterQuotePDF";
 import { AirportLegPicker } from "@/components/AirportSearch";
@@ -12,6 +12,7 @@ import { type Airport } from "@/lib/airportData";
 import {
   Plane, Plus, Trash2, Calculator, Save, FileDown, RotateCcw,
   AlertTriangle, ChevronDown, ChevronUp, Users, MapPin, Hotel, Percent, Eye, Edit3,
+  DollarSign, RefreshCw, Pencil, Check, X, ArrowUp, ArrowDown, Loader2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -110,6 +111,14 @@ export default function CharterQuote() {
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
   const [viewingQuote, setViewingQuote] = useState<CharterQuoteRecord | null>(null);
 
+  // ─── Live rate loading ───────────────────────────────────────────────
+  const [ratesLoading, setRatesLoading] = useState(true);
+  const [rateCardTick, setRateCardTick] = useState(0); // bump to force RateCard re-render after refresh
+
+  useEffect(() => {
+    loadLiveRates().catch(console.error).finally(() => setRatesLoading(false));
+  }, []);
+
   const crewCount = useMemo(() => {
     let n = 1; // captain always
     if (crew.firstOfficer) n++;
@@ -120,6 +129,42 @@ export default function CharterQuote() {
   }, [crew]);
 
   // ─── Queries ──────────────────────────────────────────────────────────────
+  const { data: quoteRates = [], isLoading: rateCardQueryLoading } = useQuery<LiveQuoteRate[]>({
+    queryKey: ["/api/quote-rates"],
+  });
+
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+
+  const refreshRatesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/quote-rates/refresh", {});
+      return res.json() as Promise<{ checked: number; updated: number; changes: Array<{ key: string; old: string; new: string }> }>;
+    },
+    onSuccess: async (result) => {
+      await qc.invalidateQueries({ queryKey: ["/api/quote-rates"] });
+      await loadLiveRates();
+      setRateCardTick(t => t + 1);
+      setRefreshMessage(result.updated > 0 ? `${result.updated} rate${result.updated === 1 ? "" : "s"} updated` : "All rates current");
+      setTimeout(() => setRefreshMessage(null), 6000);
+    },
+    onError: () => {
+      setRefreshMessage("Refresh failed — check connection");
+      setTimeout(() => setRefreshMessage(null), 6000);
+    },
+  });
+
+  const updateRateMutation = useMutation({
+    mutationFn: async ({ key, value, notes }: { key: string; value: string; notes?: string }) => {
+      const res = await apiRequest("PUT", `/api/quote-rates/${key}`, { value, notes });
+      return res.json();
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["/api/quote-rates"] });
+      await loadLiveRates();
+      setRateCardTick(t => t + 1);
+    },
+  });
+
   const { data: nextNumberData } = useQuery<{ quoteNumber: string }>({
     queryKey: ["/api/charter-quotes/next-number"],
   });
@@ -365,6 +410,17 @@ export default function CharterQuote() {
               </div>
             </div>
           </div>
+
+          {/* Rate Card — live monitored rates */}
+          <RateCard
+            rates={quoteRates}
+            loading={ratesLoading || rateCardQueryLoading}
+            lastChecked={getRatesLastChecked()}
+            refreshMutation={refreshRatesMutation}
+            updateMutation={updateRateMutation}
+            refreshMessage={refreshMessage}
+            tick={rateCardTick}
+          />
 
           {/* 2. Flight Legs */}
           <div className="bg-card border border-card-border rounded-2xl p-4">
@@ -759,5 +815,210 @@ function CostLine({
       </span>
       <span className="font-medium">{fmtCents(value)}</span>
     </button>
+  );
+}
+
+// ─── Rate Card (Live Rate Monitor) ──────────────────────────────────────────
+const RATE_CATEGORY_ORDER = ["AIRSERVICES", "FUEL", "CREW", "LANDING", "ACCOMMODATION", "GROUND"];
+const RATE_CATEGORY_LABELS: Record<string, string> = {
+  AIRSERVICES: "Airservices Australia",
+  FUEL: "Fuel",
+  CREW: "Crew ($/hr)",
+  LANDING: "Landing Fees ($/tonne)",
+  ACCOMMODATION: "Accommodation",
+  GROUND: "Ground Transport",
+};
+
+function fmtRateDate(d: string | null | undefined): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function fmtRateValue(rate: LiveQuoteRate): string {
+  const v = parseFloat(rate.rateValue);
+  if (isNaN(v)) return rate.rateValue;
+  return `$${v.toFixed(2)}${rate.unit ? ` ${rate.unit}` : ""}`;
+}
+
+interface RateCardProps {
+  rates: LiveQuoteRate[];
+  loading: boolean;
+  lastChecked: string | null;
+  refreshMutation: { mutate: () => void; isPending: boolean };
+  updateMutation: { mutate: (v: { key: string; value: string; notes?: string }) => void; isPending: boolean };
+  refreshMessage: string | null;
+  tick: number;
+}
+
+function RateCard({ rates, loading, lastChecked, refreshMutation, updateMutation, refreshMessage }: RateCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [landingExpanded, setLandingExpanded] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  const grouped = useMemo(() => {
+    const map: Record<string, LiveQuoteRate[]> = {};
+    for (const r of rates) {
+      if (!map[r.category]) map[r.category] = [];
+      map[r.category].push(r);
+    }
+    return map;
+  }, [rates]);
+
+  const startEdit = (rate: LiveQuoteRate) => {
+    setEditingKey(rate.rateKey);
+    setEditValue(rate.rateValue);
+  };
+  const cancelEdit = () => { setEditingKey(null); setEditValue(""); };
+  const saveEdit = (rate: LiveQuoteRate) => {
+    if (!editValue || isNaN(parseFloat(editValue))) return;
+    updateMutation.mutate({ key: rate.rateKey, value: editValue, notes: "Manually overridden" });
+    setEditingKey(null);
+    setEditValue("");
+  };
+
+  const renderRow = (rate: LiveQuoteRate) => {
+    const prev = rate.previousValue ? parseFloat(rate.previousValue) : null;
+    const curr = parseFloat(rate.rateValue);
+    const changed = prev !== null && !isNaN(prev) && !isNaN(curr) && prev !== curr;
+    const increased = changed && prev !== null && curr > prev;
+    const isEditing = editingKey === rate.rateKey;
+
+    return (
+      <tr key={rate.rateKey} className="border-t border-card-border/60">
+        <td className="py-1.5 pr-2 text-foreground/80">{rate.label}</td>
+        <td className="py-1.5 pr-2 font-medium whitespace-nowrap">
+          {isEditing ? (
+            <input autoFocus value={editValue} onChange={e => setEditValue(e.target.value)}
+              className="w-20 text-xs bg-background border border-card-border rounded px-1.5 py-0.5 focus:outline-none" />
+          ) : (
+            fmtRateValue(rate)
+          )}
+        </td>
+        <td className="py-1.5 pr-2 text-[10px] text-muted-foreground whitespace-nowrap">{fmtRateDate(rate.effectiveDate)}</td>
+        <td className="py-1.5 pr-2 whitespace-nowrap">
+          {changed && (
+            <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${increased ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+              {increased ? <ArrowUp size={9} /> : <ArrowDown size={9} />}
+              was ${prev?.toFixed(2)}
+            </span>
+          )}
+        </td>
+        <td className="py-1.5 pl-1 text-right whitespace-nowrap">
+          {isEditing ? (
+            <span className="inline-flex items-center gap-1">
+              <button onClick={() => saveEdit(rate)} className="text-green-400 hover:text-green-300" title="Save">
+                <Check size={12} />
+              </button>
+              <button onClick={cancelEdit} className="text-red-400 hover:text-red-300" title="Cancel">
+                <X size={12} />
+              </button>
+            </span>
+          ) : (
+            <button onClick={() => startEdit(rate)} className="text-muted-foreground hover:text-foreground" title="Edit rate">
+              <Pencil size={11} />
+            </button>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
+  const renderGroupTable = (category: string, rows: LiveQuoteRate[]) => (
+    <div key={category} className="mb-3">
+      <div className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: TEAL }}>
+        {RATE_CATEGORY_LABELS[category] ?? category}
+      </div>
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="text-[9px] uppercase tracking-wider text-muted-foreground">
+            <th className="text-left font-medium pb-1">Rate</th>
+            <th className="text-left font-medium pb-1">Value</th>
+            <th className="text-left font-medium pb-1">Effective</th>
+            <th className="text-left font-medium pb-1">Change</th>
+            <th className="text-right font-medium pb-1"></th>
+          </tr>
+        </thead>
+        <tbody>{rows.map(renderRow)}</tbody>
+      </table>
+    </div>
+  );
+
+  return (
+    <div className="bg-card border border-card-border rounded-2xl p-4">
+      <button className="w-full flex items-center justify-between" onClick={() => setExpanded(v => !v)}>
+        <div className="flex items-center gap-2">
+          <DollarSign size={14} style={{ color: TEAL }} />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rate Card</h2>
+          {lastChecked && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/5 text-muted-foreground whitespace-nowrap">
+              Verified {fmtRateDate(lastChecked)}
+            </span>
+          )}
+        </div>
+        {expanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />}
+      </button>
+
+      {expanded && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] text-muted-foreground">
+              {rates.length} live rate{rates.length === 1 ? "" : "s"} tracked
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); refreshMutation.mutate(); }}
+              disabled={refreshMutation.isPending}
+              className="inline-flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-md border border-card-border hover:bg-white/5 disabled:opacity-50"
+            >
+              {refreshMutation.isPending ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+              Refresh Rates
+            </button>
+          </div>
+
+          {refreshMessage && (
+            <div className="mb-3 text-[10px] px-2.5 py-1.5 rounded-md" style={{ backgroundColor: `${TEAL}22`, color: TEAL }}>
+              {refreshMessage}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground py-4 justify-center">
+              <Loader2 size={13} className="animate-spin" /> Loading rates...
+            </div>
+          ) : (
+            <>
+              {RATE_CATEGORY_ORDER.filter(cat => cat !== "LANDING" && grouped[cat]?.length).map(cat => renderGroupTable(cat, grouped[cat]))}
+
+              {grouped.LANDING?.length > 0 && (
+                <div className="mb-1">
+                  <button className="w-full flex items-center justify-between mb-1" onClick={() => setLandingExpanded(v => !v)}>
+                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEAL }}>
+                      Landing Fees ($/tonne)
+                    </span>
+                    {landingExpanded ? <ChevronUp size={12} className="text-muted-foreground" /> : <ChevronDown size={12} className="text-muted-foreground" />}
+                  </button>
+                  {landingExpanded && (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-[9px] uppercase tracking-wider text-muted-foreground">
+                          <th className="text-left font-medium pb-1">Rate</th>
+                          <th className="text-left font-medium pb-1">Value</th>
+                          <th className="text-left font-medium pb-1">Effective</th>
+                          <th className="text-left font-medium pb-1">Change</th>
+                          <th className="text-right font-medium pb-1"></th>
+                        </tr>
+                      </thead>
+                      <tbody>{grouped.LANDING.slice(0, 10).map(renderRow)}</tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

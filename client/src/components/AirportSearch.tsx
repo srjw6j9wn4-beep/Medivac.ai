@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MapPin, X } from "lucide-react";
+import { MapPin, X, CheckCircle2 } from "lucide-react";
 import { searchAirports, distanceNm, type Airport } from "@/lib/airportData";
 
 interface AirportSearchProps {
@@ -15,29 +15,112 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
   const [results, setResults] = useState<Airport[]>([]);
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
+  const [autoFilled, setAutoFilled] = useState(false); // shows brief confirmation flash
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const autoSelectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // When a value is selected externally, clear the query
+  // Clear query when value selected externally
   useEffect(() => {
-    if (value) setQuery("");
+    if (value) { setQuery(""); setAutoFilled(false); }
   }, [value]);
+
+  // Clear autofill flash after 2s
+  useEffect(() => {
+    if (autoFilled) {
+      const t = setTimeout(() => setAutoFilled(false), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [autoFilled]);
+
+  /**
+   * Attempt an exact / high-confidence auto-select.
+   * Triggers when:
+   *   - Exact ICAO match (4 uppercase letters)
+   *   - Exact city name match (case-insensitive, unique)
+   *   - Single result returned AND it's a strong name/city match
+   * Returns true if auto-selected, false otherwise.
+   */
+  function tryAutoSelect(q: string, hits: Airport[]): boolean {
+    if (!hits.length) return false;
+    const ql = q.trim().toLowerCase();
+    const qu = q.trim().toUpperCase();
+
+    // 1. Exact 4-letter ICAO match
+    if (qu.length === 4 && /^[A-Z]{4}$/.test(qu)) {
+      const exact = hits.find(a => a.icao === qu);
+      if (exact) { autoSelect(exact); return true; }
+    }
+
+    // 2. Exact city match (case-insensitive, unique across hits)
+    const cityMatches = hits.filter(a => a.city?.toLowerCase() === ql);
+    if (cityMatches.length === 1) {
+      autoSelect(cityMatches[0]); return true;
+    }
+    // If multiple city matches (e.g. "Sydney"), pick the largest
+    if (cityMatches.length > 1) {
+      const typeOrder: Record<string, number> = { large: 0, medium: 1, small: 2, heliport: 3, seaplane: 4 };
+      const best = cityMatches.sort((a, b) => (typeOrder[a.type] ?? 9) - (typeOrder[b.type] ?? 9))[0];
+      autoSelect(best); return true;
+    }
+
+    // 3. Exact airport name match
+    const nameMatches = hits.filter(a => a.name.toLowerCase() === ql);
+    if (nameMatches.length === 1) { autoSelect(nameMatches[0]); return true; }
+
+    // 4. Single result and query strongly matches city or name start
+    if (hits.length === 1) {
+      const a = hits[0];
+      const cityMatch = a.city?.toLowerCase().startsWith(ql);
+      const nameMatch = a.name.toLowerCase().startsWith(ql);
+      // Only auto-select if query is >= 5 chars (avoid premature auto-select on short input)
+      if (ql.length >= 5 && (cityMatch || nameMatch)) {
+        autoSelect(hits[0]); return true;
+      }
+    }
+
+    return false;
+  }
+
+  function autoSelect(ap: Airport) {
+    onChange(ap);
+    setQuery("");
+    setResults([]);
+    setOpen(false);
+    setAutoFilled(true);
+  }
 
   const search = useCallback((q: string) => {
     setQuery(q);
+
+    // Clear any pending auto-select timer
+    if (autoSelectTimerRef.current) clearTimeout(autoSelectTimerRef.current);
+
     if (q.length === 0) {
       setResults([]);
       setOpen(false);
       return;
     }
+
     const hits = searchAirports(q, 12);
     setResults(hits);
     setOpen(hits.length > 0);
     setHighlighted(0);
+
+    // Delay auto-select slightly so user sees what's happening (300ms)
+    autoSelectTimerRef.current = setTimeout(() => {
+      tryAutoSelect(q, hits);
+    }, 300);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => { if (autoSelectTimerRef.current) clearTimeout(autoSelectTimerRef.current); };
   }, []);
 
   function select(ap: Airport) {
+    if (autoSelectTimerRef.current) clearTimeout(autoSelectTimerRef.current);
     onChange(ap);
     setQuery("");
     setResults([]);
@@ -45,14 +128,22 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
   }
 
   function clear() {
+    if (autoSelectTimerRef.current) clearTimeout(autoSelectTimerRef.current);
     onChange(null);
     setQuery("");
     setResults([]);
     setOpen(false);
+    setAutoFilled(false);
     inputRef.current?.focus();
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Tab" && open && results.length > 0) {
+      // Tab accepts the top result
+      e.preventDefault();
+      select(results[highlighted]);
+      return;
+    }
     if (!open) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -88,19 +179,11 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
   }, [highlighted]);
 
   const typeLabel: Record<string, string> = {
-    large: "Intl",
-    medium: "Regional",
-    small: "General",
-    heliport: "Heli",
-    seaplane: "Seaplane",
+    large: "Intl", medium: "Regional", small: "General", heliport: "Heli", seaplane: "Seaplane",
   };
-
   const typeColor: Record<string, string> = {
-    large: "text-teal-400",
-    medium: "text-blue-400",
-    small: "text-slate-400",
-    heliport: "text-purple-400",
-    seaplane: "text-cyan-400",
+    large: "text-teal-400", medium: "text-blue-400", small: "text-slate-400",
+    heliport: "text-purple-400", seaplane: "text-cyan-400",
   };
 
   return (
@@ -109,15 +192,23 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
 
       {/* Selected value pill */}
       {value ? (
-        <div className="flex items-center gap-1.5 w-full text-xs bg-background border border-[#01696F]/60 rounded px-2 py-1.5 min-h-[30px]">
-          <MapPin size={11} className="text-[#01696F] shrink-0" />
-          <span className="font-mono font-semibold text-[#4F98A3]">{value.icao}</span>
-          <span className="text-foreground truncate flex-1">{value.city || value.name}</span>
-          <button
-            type="button"
-            onClick={clear}
-            className="text-muted-foreground hover:text-foreground shrink-0 ml-auto"
-          >
+        <div className={`flex items-center gap-1.5 w-full text-xs rounded px-2 py-1.5 min-h-[30px] border transition-colors ${
+          autoFilled
+            ? "bg-[#01696F]/10 border-[#01696F]/80"
+            : "bg-background border-[#01696F]/60"
+        }`}>
+          {autoFilled
+            ? <CheckCircle2 size={11} className="text-[#01696F] shrink-0" />
+            : <MapPin size={11} className="text-[#01696F] shrink-0" />
+          }
+          <span className="font-mono font-bold text-[11px] text-[#4F98A3] shrink-0">{value.icao}</span>
+          <span className="text-foreground font-medium truncate flex-1">
+            {value.city && value.city !== value.name ? value.city : value.name}
+          </span>
+          {value.state && (
+            <span className="text-muted-foreground text-[10px] shrink-0">{value.state}</span>
+          )}
+          <button type="button" onClick={clear} className="text-muted-foreground hover:text-foreground shrink-0 ml-1">
             <X size={11} />
           </button>
         </div>
@@ -180,6 +271,13 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
               </button>
             </li>
           ))}
+
+          {/* Hint footer */}
+          <li className="px-2.5 py-1 border-t border-[#393836]/60">
+            <span className="text-[9px] text-muted-foreground/50">
+              ↑↓ navigate · Enter or Tab to select · Esc to close
+            </span>
+          </li>
         </ul>
       )}
     </div>
@@ -199,7 +297,7 @@ export function AirportLegPicker({
   fromAirport, toAirport, onFromChange, onToChange, onDistanceCalculated
 }: AirportLegPickerProps) {
 
-  // Auto-calculate distance when both endpoints are set
+  // Auto-calculate distance when both endpoints are set with coordinates
   useEffect(() => {
     if (
       fromAirport?.lat != null && fromAirport?.lon != null &&
@@ -216,13 +314,13 @@ export function AirportLegPicker({
         label="From"
         value={fromAirport}
         onChange={onFromChange}
-        placeholder="ICAO, city or name…"
+        placeholder="City, ICAO or name…"
       />
       <AirportSearch
         label="To"
         value={toAirport}
         onChange={onToChange}
-        placeholder="ICAO, city or name…"
+        placeholder="City, ICAO or name…"
       />
     </div>
   );

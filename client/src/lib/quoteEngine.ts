@@ -22,8 +22,8 @@ export const AIRCRAFT = {
 export type AircraftKey = keyof typeof AIRCRAFT;
 
 // ─── Airservices Australia charges (IFR, MTOW < 20t) ───────────────────────
-const ENROUTE_RATE_PER_100KM_PER_TONNE = 0.90; // $ incl GST
-const MET_SURCHARGE_RATE_PER_100KM_PER_TONNE = 0.077; // $ incl GST
+export let ENROUTE_RATE_PER_100KM_PER_TONNE = 0.90; // $ incl GST
+export let MET_SURCHARGE_RATE_PER_100KM_PER_TONNE = 0.077; // $ incl GST
 const NM_TO_KM = 1.852;
 
 // ─── Terminal Navigation Charge (TNC) rates ($/tonne, incl GST) ────────────
@@ -48,12 +48,14 @@ export const TNC_RATES: Record<string, number> = {
   YNTN: 6.96,  // Normanton
   DEFAULT: 6.96,
 };
-const TNC_MINIMUM_MAJOR = 21_00; // cents — minimum at capital airports
+export let TNC_MAJOR_RATE = 12.11; // $/tonne — major airports (live-overridable)
+export let TNC_REGIONAL_RATE = 6.96; // $/tonne — regional (live-overridable)
+export let TNC_MINIMUM_MAJOR = 21_00; // cents — minimum at capital airports
 const TNC_MAJOR_AIRPORTS = new Set(["YSSY", "YMML", "YBBN", "YPAD", "YPPH", "YSCB", "YMHB"]);
-const OUT_OF_HOURS_TNC_SURCHARGE = 261_00; // cents per movement, outside 0600-2200 local
+export let OUT_OF_HOURS_TNC_SURCHARGE = 261_00; // cents per movement, outside 0600-2200 local
 
 // ─── Airport landing charges (Avdata schedule, $/tonne) ────────────────────
-export const LANDING_RATES: Record<string, number> = {
+export let LANDING_RATES: Record<string, number> = {
   YSDU: 15.45,  // Dubbo
   YBHI: 15.45,  // Broken Hill
   YBTL: 16.00,  // Townsville
@@ -73,11 +75,11 @@ export const LANDING_RATES: Record<string, number> = {
 const LANDING_MINIMUM = 15_00; // cents
 
 // ─── Fuel ────────────────────────────────────────────────────────────────
-const FUEL_PRICE_PER_LITRE = 1.92; // AUD incl GST, Jet-A1 avg July 2026
+export let FUEL_PRICE_PER_LITRE = 1.92; // AUD incl GST, Jet-A1 avg July 2026
 const KG_PER_LITRE = 0.8;
 
 // ─── Crew hourly rates (cents/hr) ───────────────────────────────────────────
-export const CREW_HOURLY = {
+export let CREW_HOURLY = {
   captain: 185_00,
   firstOfficer: 145_00,
   flightNurse: 95_00,
@@ -87,7 +89,7 @@ export const CREW_HOURLY = {
 const CREW_MIN_HOURS = 3;
 
 // ─── Ground transport (cents/leg) ──────────────────────────────────────────
-export const GROUND_VEHICLE_RATES = {
+export let GROUND_VEHICLE_RATES = {
   ambulance: 2_50_00,
   bus: 1_50_00,
   taxi: 8_00_00,
@@ -96,7 +98,7 @@ export const GROUND_VEHICLE_RATES = {
 };
 
 // ─── Accommodation ──────────────────────────────────────────────────────────
-export const ACCOMMODATION_PER_PERSON_NIGHT = 180_00; // cents
+export let ACCOMMODATION_PER_PERSON_NIGHT = 180_00; // cents
 const FDP_ACCOMMODATION_TRIGGER_HOURS = 12;
 const FDP_MAX_HOURS = 14; // CASA CAO 48.1 multi-crew max
 
@@ -179,7 +181,10 @@ export interface QuoteCostBreakdown {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function tncRateFor(icao: string): number {
-  return TNC_RATES[icao] ?? TNC_RATES.DEFAULT;
+  if (icao === "YBNS") return TNC_RATES.YBNS; // Ballina special interim rate, not live-tracked
+  if (TNC_MAJOR_AIRPORTS.has(icao)) return TNC_MAJOR_RATE;
+  if (icao in TNC_RATES) return TNC_REGIONAL_RATE;
+  return TNC_REGIONAL_RATE;
 }
 
 function landingRateFor(icao: string): number {
@@ -400,4 +405,149 @@ export function calculateQuote(input: QuoteInput): QuoteCostBreakdown {
 
 export function fmtCents(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// ─── Live rate loading ───────────────────────────────────────────────
+// Fetches current rates from the server-side quote_rates table and overrides
+// the module-level rate variables above. If the fetch fails for any reason,
+// the hardcoded fallback defaults declared above remain in effect.
+
+export interface LiveQuoteRate {
+  id: number;
+  rateKey: string;
+  rateValue: string;
+  category: string;
+  label: string;
+  unit: string;
+  source: string | null;
+  effectiveDate: string | null;
+  previousValue: string | null;
+  previousDate: string | null;
+  lastChecked: string | null;
+  autoUpdateEnabled: number;
+  notes: string | null;
+  updatedAt: string;
+}
+
+let lastLoadedRates: LiveQuoteRate[] = [];
+
+/** Resolve the correct API base — mirrors the logic in lib/queryClient.ts. */
+function resolveApiBase(): string {
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".pplx.app")) {
+    return "/port/5000";
+  }
+  return "";
+}
+
+/**
+ * Loads live rates from GET /api/quote-rates and overrides the module-level
+ * rate variables used by calculateQuote(). Falls back silently to the
+ * hardcoded defaults declared above if the fetch fails or a key is missing.
+ */
+export async function loadLiveRates(): Promise<void> {
+  try {
+    const apiBase = resolveApiBase();
+    const appKey = (import.meta as any).env?.VITE_APP_KEY as string | undefined;
+    const headers: Record<string, string> = {};
+    if (appKey) headers["X-App-Key"] = appKey;
+
+    const res = await fetch(`${apiBase}/api/quote-rates`, { headers });
+    if (!res.ok) return;
+    const rates: LiveQuoteRate[] = await res.json();
+    if (!Array.isArray(rates) || rates.length === 0) return;
+    lastLoadedRates = rates;
+
+    const byKey: Record<string, LiveQuoteRate> = {};
+    for (const r of rates) byKey[r.rateKey] = r;
+    const num = (key: string): number | undefined => {
+      const r = byKey[key];
+      if (!r) return undefined;
+      const n = parseFloat(r.rateValue);
+      return Number.isNaN(n) ? undefined : n;
+    };
+
+    // Airservices
+    const enroute = num("enroute_rate");
+    if (enroute !== undefined) ENROUTE_RATE_PER_100KM_PER_TONNE = enroute;
+    const met = num("met_surcharge_rate");
+    if (met !== undefined) MET_SURCHARGE_RATE_PER_100KM_PER_TONNE = met;
+    const tncMajor = num("tnc_major_rate");
+    if (tncMajor !== undefined) TNC_MAJOR_RATE = tncMajor;
+    const tncRegional = num("tnc_regional_rate");
+    if (tncRegional !== undefined) TNC_REGIONAL_RATE = tncRegional;
+    const outOfHours = num("tnc_out_of_hours");
+    if (outOfHours !== undefined) OUT_OF_HOURS_TNC_SURCHARGE = Math.round(outOfHours * 100);
+    const tncMin = num("tnc_minimum_major");
+    if (tncMin !== undefined) TNC_MINIMUM_MAJOR = Math.round(tncMin * 100);
+
+    // Fuel
+    const fuel = num("fuel_jet_a1_per_litre");
+    if (fuel !== undefined) FUEL_PRICE_PER_LITRE = fuel;
+
+    // Crew ($/hr -> cents/hr)
+    const captain = num("crew_captain");
+    const firstOfficer = num("crew_first_officer");
+    const flightNurse = num("crew_flight_nurse");
+    const icuDoctor = num("crew_icu_doctor");
+    CREW_HOURLY = {
+      captain: captain !== undefined ? Math.round(captain * 100) : CREW_HOURLY.captain,
+      firstOfficer: firstOfficer !== undefined ? Math.round(firstOfficer * 100) : CREW_HOURLY.firstOfficer,
+      flightNurse: flightNurse !== undefined ? Math.round(flightNurse * 100) : CREW_HOURLY.flightNurse,
+      flightParamedic: flightNurse !== undefined ? Math.round(flightNurse * 100) : CREW_HOURLY.flightParamedic,
+      icuDoctor: icuDoctor !== undefined ? Math.round(icuDoctor * 100) : CREW_HOURLY.icuDoctor,
+    };
+
+    // Landing fees per-airport ($/tonne) — DB keys use landing_XXXX, with landing_YNBR
+    // mapping to the engine's YNAR (Narrabri) key.
+    const landingKeyMap: Record<string, string> = { YNBR: "YNAR" };
+    const newLandingRates: Record<string, number> = { ...LANDING_RATES };
+    for (const r of rates) {
+      if (!r.rateKey.startsWith("landing_")) continue;
+      const suffix = r.rateKey.replace("landing_", "");
+      const n = parseFloat(r.rateValue);
+      if (Number.isNaN(n)) continue;
+      if (suffix === "default") {
+        newLandingRates.DEFAULT = n;
+      } else {
+        const icao = landingKeyMap[suffix] ?? suffix;
+        newLandingRates[icao] = n;
+      }
+    }
+    LANDING_RATES = newLandingRates;
+
+    // Ground transport ($/leg -> cents/leg)
+    const ambulance = num("ground_ambulance");
+    const bus = num("ground_bus");
+    const taxi = num("ground_taxi");
+    const van = num("ground_van");
+    GROUND_VEHICLE_RATES = {
+      ambulance: ambulance !== undefined ? Math.round(ambulance * 100) : GROUND_VEHICLE_RATES.ambulance,
+      bus: bus !== undefined ? Math.round(bus * 100) : GROUND_VEHICLE_RATES.bus,
+      taxi: taxi !== undefined ? Math.round(taxi * 100) : GROUND_VEHICLE_RATES.taxi,
+      van: van !== undefined ? Math.round(van * 100) : GROUND_VEHICLE_RATES.van,
+      none: 0,
+    };
+
+    // Accommodation ($/person/night -> cents)
+    const accom = num("accommodation_per_person_night");
+    if (accom !== undefined) ACCOMMODATION_PER_PERSON_NIGHT = Math.round(accom * 100);
+  } catch (err) {
+    // Best-effort — keep hardcoded defaults on any failure
+    console.error("[quoteEngine] loadLiveRates failed, using hardcoded defaults:", err);
+  }
+}
+
+/** Returns the most recent lastChecked timestamp among all loaded rates, or null if none loaded. */
+export function getRatesLastChecked(): string | null {
+  if (lastLoadedRates.length === 0) return null;
+  let latest: string | null = null;
+  for (const r of lastLoadedRates) {
+    if (r.lastChecked && (!latest || r.lastChecked > latest)) latest = r.lastChecked;
+  }
+  return latest;
+}
+
+/** Returns the currently loaded live rates (empty array if loadLiveRates() has not run yet). */
+export function getLoadedRates(): LiveQuoteRate[] {
+  return lastLoadedRates;
 }

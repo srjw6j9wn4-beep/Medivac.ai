@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions, invoices, charterQuotes } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession, Invoice, CharterQuote, InsertCharterQuote } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions, invoices, charterQuotes, quoteRates } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession, Invoice, CharterQuote, InsertCharterQuote, QuoteRate } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -219,6 +219,26 @@ sqlite.exec(`
   );
 `);
 
+// ── Quote Rates ──────────────────────────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS quote_rates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rate_key TEXT NOT NULL UNIQUE,
+    rate_value TEXT NOT NULL,
+    category TEXT NOT NULL,
+    label TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    source TEXT,
+    effective_date TEXT,
+    previous_value TEXT,
+    previous_date TEXT,
+    last_checked TEXT,
+    auto_update_enabled INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // ── Special Mission QC Sessions ──────────────────────────────────────────────
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS special_mission_sessions (
@@ -307,6 +327,100 @@ export interface IStorage {
   updateCharterQuote(id: number, data: Partial<InsertCharterQuote>): CharterQuote | undefined;
   deleteCharterQuote(id: number): boolean;
   getNextQuoteNumber(): string;
+  // Quote Rates
+  getAllRates(): QuoteRate[];
+  getRateByKey(key: string): QuoteRate | undefined;
+  upsertRate(key: string, value: string, previousValue?: string, previousDate?: string, lastChecked?: string): QuoteRate;
+  updateRateManual(key: string, value: string, notes?: string): QuoteRate | undefined;
+}
+
+// ── Default rate seed data ───────────────────────────────────────────────────
+const AIRSERVICES_SOURCE = 'https://www.airservicesaustralia.com/industry-info/aviation-charging/';
+const AVDATA_SOURCE = 'https://avdata.com.au/airport-charge-rates';
+
+interface DefaultRateSeed {
+  rateKey: string;
+  rateValue: string;
+  category: string;
+  label: string;
+  unit: string;
+  source?: string | null;
+  effectiveDate?: string | null;
+}
+
+const DEFAULT_RATES: DefaultRateSeed[] = [
+  // Airservices
+  { rateKey: 'enroute_rate', rateValue: '0.90', category: 'airservices', label: 'Enroute Nav (IFR <20t)', unit: '$/100km/tonne', source: AIRSERVICES_SOURCE, effectiveDate: '2025-08-01' },
+  { rateKey: 'met_surcharge_rate', rateValue: '0.077', category: 'airservices', label: 'Met Service Surcharge', unit: '$/100km/tonne', source: AIRSERVICES_SOURCE, effectiveDate: '2025-08-01' },
+  { rateKey: 'tnc_major_rate', rateValue: '12.11', category: 'airservices', label: 'Terminal Nav Charge — Major Airports', unit: '$/tonne', source: AIRSERVICES_SOURCE, effectiveDate: '2025-08-01' },
+  { rateKey: 'tnc_regional_rate', rateValue: '6.96', category: 'airservices', label: 'Terminal Nav Charge — Regional', unit: '$/tonne', source: AIRSERVICES_SOURCE, effectiveDate: '2025-08-01' },
+  { rateKey: 'tnc_out_of_hours', rateValue: '261.00', category: 'airservices', label: 'TNC Out-of-Hours Surcharge (>15min)', unit: '$/movement', source: AIRSERVICES_SOURCE, effectiveDate: '2025-08-01' },
+  { rateKey: 'tnc_minimum_major', rateValue: '21.00', category: 'airservices', label: 'TNC Minimum Charge (major airports)', unit: '$', source: AIRSERVICES_SOURCE, effectiveDate: '2025-08-01' },
+
+  // Fuel
+  { rateKey: 'fuel_jet_a1_per_litre', rateValue: '1.92', category: 'fuel', label: 'Jet-A1 Fuel Price (incl GST)', unit: '$/litre', source: 'https://avdata.com.au', effectiveDate: '2026-07-01' },
+
+  // Crew
+  { rateKey: 'crew_captain', rateValue: '185.00', category: 'crew', label: 'Captain Hourly Rate', unit: '$/hr' },
+  { rateKey: 'crew_first_officer', rateValue: '145.00', category: 'crew', label: 'First Officer Hourly Rate', unit: '$/hr' },
+  { rateKey: 'crew_flight_nurse', rateValue: '95.00', category: 'crew', label: 'Flight Nurse/Paramedic Hourly Rate', unit: '$/hr' },
+  { rateKey: 'crew_icu_doctor', rateValue: '180.00', category: 'crew', label: 'ICU Doctor Hourly Rate', unit: '$/hr' },
+
+  // Landing fees
+  { rateKey: 'landing_default', rateValue: '14.00', category: 'landing', label: 'Landing Fee — Default', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YSDU', rateValue: '15.45', category: 'landing', label: 'Landing Fee — Dubbo', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YBHI', rateValue: '15.45', category: 'landing', label: 'Landing Fee — Broken Hill', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YBTL', rateValue: '16.00', category: 'landing', label: 'Landing Fee — Townsville', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YARM', rateValue: '15.45', category: 'landing', label: 'Landing Fee — Armidale', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YBUD', rateValue: '15.03', category: 'landing', label: 'Landing Fee — Bundaberg', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YLHI', rateValue: '22.00', category: 'landing', label: 'Landing Fee — Lord Howe Island', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YSTW', rateValue: '15.45', category: 'landing', label: 'Landing Fee — Tamworth', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YNRM', rateValue: '15.45', category: 'landing', label: 'Landing Fee — Narromine', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YORG', rateValue: '14.00', category: 'landing', label: 'Landing Fee — Orange', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YBKE', rateValue: '14.00', category: 'landing', label: 'Landing Fee — Bourke', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YNBR', rateValue: '14.00', category: 'landing', label: 'Landing Fee — Narrabri', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YSSY', rateValue: '5.54', category: 'landing', label: 'Landing Fee — Sydney', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YMML', rateValue: '27.68', category: 'landing', label: 'Landing Fee — Melbourne GA', unit: '$/tonne', source: AVDATA_SOURCE },
+  { rateKey: 'landing_YBBN', rateValue: '6.18', category: 'landing', label: 'Landing Fee — Brisbane', unit: '$/tonne', source: AVDATA_SOURCE },
+
+  // Accommodation
+  { rateKey: 'accommodation_per_person_night', rateValue: '180.00', category: 'accommodation', label: 'Crew Accommodation', unit: '$/person/night' },
+
+  // Ground
+  { rateKey: 'ground_ambulance', rateValue: '250.00', category: 'ground', label: 'Ambulance Transfer', unit: '$/leg' },
+  { rateKey: 'ground_bus', rateValue: '150.00', category: 'ground', label: 'Bus', unit: '$/leg' },
+  { rateKey: 'ground_taxi', rateValue: '800.00', category: 'ground', label: 'Taxi Charter', unit: '$/leg' },
+  { rateKey: 'ground_van', rateValue: '120.00', category: 'ground', label: 'Van', unit: '$/leg' },
+];
+
+export function seedDefaultRates(): void {
+  const row = sqlite.prepare('SELECT COUNT(*) as cnt FROM quote_rates').get() as { cnt: number };
+  if (row.cnt > 0) return;
+  const now = new Date().toISOString();
+  const insert = sqlite.prepare(`
+    INSERT INTO quote_rates
+      (rate_key, rate_value, category, label, unit, source, effective_date,
+       previous_value, previous_date, last_checked, auto_update_enabled, notes, updated_at)
+    VALUES
+      (@rateKey, @rateValue, @category, @label, @unit, @source, @effectiveDate,
+       NULL, NULL, @lastChecked, 1, NULL, CURRENT_TIMESTAMP)
+  `);
+  const insertMany = sqlite.transaction((rates: DefaultRateSeed[]) => {
+    for (const r of rates) {
+      insert.run({
+        rateKey: r.rateKey,
+        rateValue: r.rateValue,
+        category: r.category,
+        label: r.label,
+        unit: r.unit,
+        source: r.source ?? null,
+        effectiveDate: r.effectiveDate ?? null,
+        lastChecked: now,
+      });
+    }
+  });
+  insertMany(DEFAULT_RATES);
+  console.log(`[quote-rates] Seeded ${DEFAULT_RATES.length} default rates`);
 }
 
 export class DatabaseStorage implements IStorage {
@@ -679,6 +793,86 @@ export class DatabaseStorage implements IStorage {
     const seq = all.length + 1;
     return `CQ-${year}-${String(seq).padStart(4, '0')}`;
   }
+
+  // ── Quote Rates ────────────────────────────────────────────────────────────
+  getAllRates(): QuoteRate[] {
+    return db.select().from(quoteRates).all()
+      .sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label));
+  }
+
+  getRateByKey(key: string): QuoteRate | undefined {
+    return db.select().from(quoteRates).where(eq(quoteRates.rateKey, key)).get();
+  }
+
+  upsertRate(key: string, value: string, previousValue?: string, previousDate?: string, lastChecked?: string): QuoteRate {
+    const existing = this.getRateByKey(key);
+    const now = lastChecked ?? new Date().toISOString();
+    if (existing) {
+      sqlite.prepare(`
+        INSERT OR REPLACE INTO quote_rates
+          (id, rate_key, rate_value, category, label, unit, source, effective_date,
+           previous_value, previous_date, last_checked, auto_update_enabled, notes, updated_at)
+        VALUES
+          (@id, @rateKey, @rateValue, @category, @label, @unit, @source, @effectiveDate,
+           @previousValue, @previousDate, @lastChecked, @autoUpdateEnabled, @notes, CURRENT_TIMESTAMP)
+      `).run({
+        id: existing.id,
+        rateKey: existing.rateKey,
+        rateValue: value,
+        category: existing.category,
+        label: existing.label,
+        unit: existing.unit,
+        source: existing.source,
+        effectiveDate: existing.effectiveDate,
+        previousValue: previousValue ?? existing.previousValue,
+        previousDate: previousDate ?? existing.previousDate,
+        lastChecked: now,
+        autoUpdateEnabled: existing.autoUpdateEnabled,
+        notes: existing.notes,
+      });
+      return this.getRateByKey(key)!;
+    }
+    // No existing row — insert a minimal new rate (should be rare, seed covers all known keys)
+    sqlite.prepare(`
+      INSERT INTO quote_rates
+        (rate_key, rate_value, category, label, unit, source, effective_date,
+         previous_value, previous_date, last_checked, auto_update_enabled, notes, updated_at)
+      VALUES
+        (@rateKey, @rateValue, 'unknown', @rateKey, '', NULL, NULL,
+         @previousValue, @previousDate, @lastChecked, 1, NULL, CURRENT_TIMESTAMP)
+    `).run({
+      rateKey: key,
+      rateValue: value,
+      previousValue: previousValue ?? null,
+      previousDate: previousDate ?? null,
+      lastChecked: now,
+    });
+    return this.getRateByKey(key)!;
+  }
+
+  updateRateManual(key: string, value: string, notes?: string): QuoteRate | undefined {
+    const existing = this.getRateByKey(key);
+    if (!existing) return undefined;
+    sqlite.prepare(`
+      UPDATE quote_rates
+      SET rate_value = @rateValue,
+          previous_value = @previousValue,
+          previous_date = @previousDate,
+          notes = COALESCE(@notes, notes),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE rate_key = @rateKey
+    `).run({
+      rateKey: key,
+      rateValue: value,
+      previousValue: existing.rateValue !== value ? existing.rateValue : existing.previousValue,
+      previousDate: existing.rateValue !== value ? new Date().toISOString().slice(0, 10) : existing.previousDate,
+      notes: notes ?? null,
+    });
+    return this.getRateByKey(key);
+  }
 }
 
 export const storage = new DatabaseStorage();
+
+// Seed default rates once on startup if the table is empty
+seedDefaultRates();

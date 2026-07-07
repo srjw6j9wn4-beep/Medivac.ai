@@ -211,3 +211,24 @@ export const charterQuotes = sqliteTable('charter_quotes', {
 
 export type CharterQuote = typeof charterQuotes.$inferSelect;
 export type InsertCharterQuote = typeof charterQuotes.$inferInsert;
+
+// ── Quote Rates — live rate monitor for Charter Quote engine ────────────────
+export const quoteRates = sqliteTable('quote_rates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  rateKey: text('rate_key').notNull().unique(),   // e.g. 'enroute_per_100km_per_tonne'
+  rateValue: text('rate_value').notNull(),          // stored as string (numeric)
+  category: text('category').notNull(),             // 'airservices' | 'landing' | 'tnc' | 'fuel' | 'crew' | 'accommodation' | 'ground'
+  label: text('label').notNull(),                   // human-readable
+  unit: text('unit').notNull(),                     // '$/100km/tonne' | '$/tonne' | '$/litre' | '$/hr' | '$/night' | '$/leg'
+  source: text('source'),                           // URL of authoritative source
+  effectiveDate: text('effective_date'),             // 'YYYY-MM-DD'
+  previousValue: text('previous_value'),             // last value before latest update
+  previousDate: text('previous_date'),               // when previous value was effective
+  lastChecked: text('last_checked'),                 // ISO timestamp of last automated check
+  autoUpdateEnabled: integer('auto_update_enabled').notNull().default(1), // 0|1
+  notes: text('notes'),
+  updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export type QuoteRate = typeof quoteRates.$inferSelect;
+export type InsertQuoteRate = typeof quoteRates.$inferInsert;

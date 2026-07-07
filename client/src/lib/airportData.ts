@@ -23,41 +23,81 @@ export function distanceNm(lat1: number, lon1: number, lat2: number, lon2: numbe
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
 }
 
-// Search airports by ICAO, IATA, name, or city — returns top N matches
-export function searchAirports(query: string, limit = 10): Airport[] {
-  if (!query || query.length < 1) return [];
-  const q = query.toUpperCase().trim();
-  const ql = query.toLowerCase().trim();
-  
+// Search airports by ICAO, IATA, name, city, or common place name variants.
+// Supports:
+//   - Exact ICAO (4-letter Y-code): highest priority
+//   - Exact IATA (3-letter): high priority
+//   - Exact city name match: very high priority
+//   - City/name starts-with: high priority
+//   - City/name contains: medium priority
+//   - Fuzzy: strips common suffixes ("airport", "aerodrome", "regional") before matching
+// Returns top N matches sorted by relevance score descending.
+export function searchAirports(query: string, limit = 12): Airport[] {
+  if (!query || query.trim().length === 0) return [];
+
+  const raw = query.trim();
+  const qu = raw.toUpperCase();
+  const ql = raw.toLowerCase();
+
+  // Strip common suffixes for fuzzy matching
+  const stripSuffixes = (s: string) =>
+    s.replace(/\s+(international|regional|airport|aerodrome|airstrip|airfield|aero)\s*/gi, '').trim();
+  const qlStripped = stripSuffixes(ql);
+
   const scored: Array<{ airport: Airport; score: number }> = [];
-  
+
   for (const ap of AU_AIRPORTS) {
     let score = 0;
-    // Exact ICAO match
-    if (ap.icao === q) score = 100;
-    // ICAO starts with query
-    else if (ap.icao.startsWith(q)) score = 80;
-    // IATA exact match
-    else if (ap.iata && ap.iata === q) score = 90;
-    // Name starts with
-    else if (ap.name.toLowerCase().startsWith(ql)) score = 60;
-    // City starts with
-    else if (ap.city && ap.city.toLowerCase().startsWith(ql)) score = 55;
-    // Name contains
-    else if (ap.name.toLowerCase().includes(ql)) score = 40;
-    // City contains
-    else if (ap.city && ap.city.toLowerCase().includes(ql)) score = 35;
-    // ICAO contains
-    else if (ap.icao.includes(q)) score = 30;
-    
-    if (score > 0) {
-      // Boost larger airports
-      if (ap.type === 'large') score += 10;
-      else if (ap.type === 'medium') score += 5;
-      scored.push({ airport: ap, score });
-    }
+
+    const apCity   = (ap.city  ?? '').toLowerCase();
+    const apName   = ap.name.toLowerCase();
+    const apNameS  = stripSuffixes(apName);
+    const apIcao   = ap.icao.toUpperCase();
+    const apIata   = (ap.iata ?? '').toUpperCase();
+
+    // ── Exact matches (highest priority) ─────────────────────────────
+    if (apIcao === qu)                               score = 1000; // exact ICAO
+    else if (apIata === qu && qu.length === 3)        score = 950;  // exact IATA
+    else if (apCity === ql && ql.length >= 2)         score = 900;  // exact city
+    else if (apNameS === qlStripped && qlStripped.length >= 3) score = 850; // exact stripped name
+
+    // ── Starts-with ──────────────────────────────────────────────────
+    else if (apIcao.startsWith(qu) && qu.length >= 2) score = 700;
+    else if (apCity.startsWith(ql) && ql.length >= 2) score = 650;
+    else if (apNameS.startsWith(qlStripped) && qlStripped.length >= 2) score = 600;
+    else if (apName.startsWith(ql) && ql.length >= 2) score = 580;
+
+    // ── Contains ─────────────────────────────────────────────────────
+    else if (apCity.includes(ql) && ql.length >= 3)   score = 400;
+    else if (apNameS.includes(qlStripped) && qlStripped.length >= 3) score = 380;
+    else if (apName.includes(ql) && ql.length >= 3)   score = 360;
+    else if (apIcao.includes(qu) && qu.length >= 2)   score = 300;
+
+    // ── IATA starts-with ─────────────────────────────────────────────
+    else if (apIata && apIata.startsWith(qu) && qu.length >= 2) score = 500;
+
+    if (score === 0) continue;
+
+    // Size boost: larger airports rank higher within same score tier
+    if (ap.type === 'large')    score += 12;
+    else if (ap.type === 'medium') score += 6;
+
+    // Penalise heliports slightly unless exact ICAO match
+    if (ap.type === 'heliport' && score < 900) score -= 20;
+
+    scored.push({ airport: ap, score });
   }
-  
+
   scored.sort((a, b) => b.score - a.score || a.airport.name.localeCompare(b.airport.name));
   return scored.slice(0, limit).map(s => s.airport);
+}
+
+// Exact lookup by ICAO code — returns undefined if not found
+export function getAirportByICAO(icao: string): Airport | undefined {
+  return AU_AIRPORTS.find(a => a.icao === icao.toUpperCase());
+}
+
+// Exact lookup by IATA code — returns undefined if not found
+export function getAirportByIATA(iata: string): Airport | undefined {
+  return AU_AIRPORTS.find(a => a.iata === iata.toUpperCase());
 }

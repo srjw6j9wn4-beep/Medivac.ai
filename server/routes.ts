@@ -1175,5 +1175,101 @@ export async function registerRoutes(
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
+  // ── Quote Rates — live rate monitor for Charter Quote engine ────────────────
+
+  // GET /api/quote-rates — all rates, ordered by category then label
+  app.get("/api/quote-rates", (_req: Request, res: Response) => {
+    try {
+      res.json(storage.getAllRates());
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  // PUT /api/quote-rates/:key — ops manual override
+  app.put("/api/quote-rates/:key", (req: Request, res: Response) => {
+    try {
+      const { key } = req.params;
+      const { value, notes } = req.body as { value?: string | number; notes?: string };
+      if (value === undefined || value === null || value === "") {
+        return res.status(400).json({ error: "value is required" });
+      }
+      const rate = storage.updateRateManual(key, String(value), notes);
+      if (!rate) return res.status(404).json({ error: "Rate not found" });
+      res.json(rate);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  // POST /api/quote-rates/refresh — best-effort live rate check against public sources
+  app.post("/api/quote-rates/refresh", async (_req: Request, res: Response) => {
+    const changes: Array<{ key: string; old: string; new: string }> = [];
+    let checked = 0;
+    const nowIso = new Date().toISOString();
+    const today = nowIso.slice(0, 10);
+
+    // ── Avdata landing fees ──────────────────────────────────────────────────
+    try {
+      const avdataRes = await fetch("https://avdata.com.au/airport-charge-rates");
+      if (avdataRes.ok) {
+        const html = await avdataRes.text();
+        const re = /([A-Z]{4}).*?\$([0-9]+\.[0-9]+)\s+per tonne/g;
+        let match: RegExpExecArray | null;
+        while ((match = re.exec(html)) !== null) {
+          const icao = match[1];
+          const newValue = match[2];
+          const key = `landing_${icao}`;
+          const existing = storage.getRateByKey(key);
+          if (!existing) continue; // only track airports we already seed
+          checked++;
+          const oldValue = parseFloat(existing.rateValue);
+          const newNum = parseFloat(newValue);
+          if (Math.abs(oldValue - newNum) > 0.10) {
+            storage.upsertRate(key, newValue, existing.rateValue, today, nowIso);
+            changes.push({ key, old: existing.rateValue, new: newValue });
+          } else {
+            storage.upsertRate(key, existing.rateValue, undefined, undefined, nowIso);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[quote-rates/refresh] Avdata fetch failed:", err);
+    }
+
+    // ── Airservices Australia enroute/TNC rates ─────────────────────────────
+    try {
+      const airservicesRes = await fetch("https://www.airservicesaustralia.com/industry-info/aviation-charging/");
+      if (airservicesRes.ok) {
+        const html = await airservicesRes.text();
+        const enrouteMatch = /Up to 20 tonnes.*?\$([0-9]+\.[0-9]+)/i.exec(html);
+        if (enrouteMatch) {
+          const key = "enroute_rate";
+          const existing = storage.getRateByKey(key);
+          if (existing) {
+            checked++;
+            const newValue = enrouteMatch[1];
+            const oldValue = parseFloat(existing.rateValue);
+            const newNum = parseFloat(newValue);
+            if (Math.abs(oldValue - newNum) > 0.10) {
+              storage.upsertRate(key, newValue, existing.rateValue, today, nowIso);
+              changes.push({ key, old: existing.rateValue, new: newValue });
+            } else {
+              storage.upsertRate(key, existing.rateValue, undefined, undefined, nowIso);
+            }
+          }
+        }
+        // Update last_checked for other airservices rates regardless of a specific match
+        for (const k of ["met_surcharge_rate", "tnc_major_rate", "tnc_regional_rate", "tnc_out_of_hours", "tnc_minimum_major"]) {
+          const existing = storage.getRateByKey(k);
+          if (existing) {
+            checked++;
+            storage.upsertRate(k, existing.rateValue, undefined, undefined, nowIso);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[quote-rates/refresh] Airservices fetch failed:", err);
+    }
+
+    res.json({ checked, updated: changes.length, changes });
+  });
+
   return httpServer;
 }
