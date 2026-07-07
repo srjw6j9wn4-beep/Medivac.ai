@@ -199,6 +199,7 @@ const BASE_NAV: NavItem[] = [
       { label: "Mission Board", path: "/missions" },
       { label: "NSW Flight Map", path: "/map" },
       { label: "Dispatch & Intake", path: "/dispatch" },
+      { label: "Charter Quote", path: "/charter-quote" },
       { label: "Operational Risk Assessment", path: "/ora" },
       { label: "Flight Planning", path: "/flight-planning" },
       { label: "Mission Optimiser", path: "/mission-optimiser" },

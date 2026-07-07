@@ -1,5 +1,5 @@
-import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions, invoices } from '@shared/schema';
-import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession, Invoice } from '@shared/schema';
+import { users, morningBriefData, passengerManifests, drugEditsTable, chestItemEditsTable, neptTasks, notifications, specialMissionSessions, invoices, charterQuotes } from '@shared/schema';
+import type { User, InsertUser, MorningBrief, PassengerManifest, DrugEdit, ChestItemEdit, NeptTask, InsertNeptTask, Notification, SpecialMissionSession, InsertSpecialMissionSession, Invoice, CharterQuote, InsertCharterQuote } from '@shared/schema';
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, and } from "drizzle-orm";
@@ -196,6 +196,29 @@ sqlite.exec(`
   );
 `);
 
+// ── Charter Quotes ───────────────────────────────────────────────────────────
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS charter_quotes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    quote_number TEXT NOT NULL,
+    client_name TEXT NOT NULL,
+    client_contact TEXT,
+    purpose TEXT NOT NULL,
+    aircraft_type TEXT NOT NULL,
+    departure_date TEXT NOT NULL,
+    legs TEXT NOT NULL,
+    crew TEXT NOT NULL,
+    costs TEXT NOT NULL,
+    total_cost INTEGER NOT NULL,
+    margin_percent INTEGER NOT NULL DEFAULT 15,
+    final_quote INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
 // ── Special Mission QC Sessions ──────────────────────────────────────────────
 sqlite.exec(`
   CREATE TABLE IF NOT EXISTS special_mission_sessions (
@@ -277,6 +300,13 @@ export interface IStorage {
   updateInvoice(id: number, updates: Partial<Invoice>): Invoice;
   deleteInvoice(id: number): boolean;
   getNextInvoiceNumber(): string;
+  // Charter Quotes
+  getCharterQuotes(): CharterQuote[];
+  getCharterQuote(id: number): CharterQuote | undefined;
+  createCharterQuote(data: InsertCharterQuote): CharterQuote;
+  updateCharterQuote(id: number, data: Partial<InsertCharterQuote>): CharterQuote | undefined;
+  deleteCharterQuote(id: number): boolean;
+  getNextQuoteNumber(): string;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -609,6 +639,45 @@ export class DatabaseStorage implements IStorage {
       .set({ ...updates, updatedAt: new Date().toISOString() })
       .where(eq(specialMissionSessions.id, id))
       .returning().get()!;
+  }
+
+  // ── Charter Quotes ──────────────────────────────────────────────────────────
+  getCharterQuotes(): CharterQuote[] {
+    return db.select().from(charterQuotes).all()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  getCharterQuote(id: number): CharterQuote | undefined {
+    return db.select().from(charterQuotes).where(eq(charterQuotes.id, id)).get();
+  }
+
+  createCharterQuote(data: InsertCharterQuote): CharterQuote {
+    const now = new Date().toISOString();
+    return db.insert(charterQuotes).values({
+      ...data,
+      createdAt: (data as any).createdAt ?? now,
+      updatedAt: (data as any).updatedAt ?? now,
+    }).returning().get()!;
+  }
+
+  updateCharterQuote(id: number, data: Partial<InsertCharterQuote>): CharterQuote | undefined {
+    return db.update(charterQuotes)
+      .set({ ...data, updatedAt: new Date().toISOString() })
+      .where(eq(charterQuotes.id, id))
+      .returning().get();
+  }
+
+  deleteCharterQuote(id: number): boolean {
+    const result = db.delete(charterQuotes).where(eq(charterQuotes.id, id)).run();
+    return (result as any).changes > 0;
+  }
+
+  getNextQuoteNumber(): string {
+    const year = new Date().getFullYear();
+    const all = db.select().from(charterQuotes).all()
+      .filter(q => q.quoteNumber.includes(`CQ-${year}`));
+    const seq = all.length + 1;
+    return `CQ-${year}-${String(seq).padStart(4, '0')}`;
   }
 }
 

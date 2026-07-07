@@ -1,6 +1,7 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -186,3 +187,27 @@ export const invoices = sqliteTable("invoices", {
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true });
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
+
+// ── Charter Quotes ────────────────────────────────────────────────────────────
+export const charterQuotes = sqliteTable('charter_quotes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  quoteNumber: text('quote_number').notNull(),
+  clientName: text('client_name').notNull(),
+  clientContact: text('client_contact'),
+  purpose: text('purpose').notNull(),           // 'medevac_charter' | 'scenic' | 'freight' | 'other'
+  aircraftType: text('aircraft_type').notNull(), // 'B200' | 'B350'
+  departureDate: text('departure_date').notNull(),
+  legs: text('legs').notNull(),                  // JSON: array of leg objects
+  crew: text('crew').notNull(),                  // JSON: crew config
+  costs: text('costs').notNull(),                // JSON: full breakdown
+  totalCost: integer('total_cost').notNull(),    // cents
+  marginPercent: integer('margin_percent').notNull().default(15),
+  finalQuote: integer('final_quote').notNull(),  // cents (total + margin)
+  status: text('status').notNull().default('draft'), // 'draft'|'sent'|'accepted'|'declined'
+  notes: text('notes'),
+  createdAt: text('created_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export type CharterQuote = typeof charterQuotes.$inferSelect;
+export type InsertCharterQuote = typeof charterQuotes.$inferInsert;

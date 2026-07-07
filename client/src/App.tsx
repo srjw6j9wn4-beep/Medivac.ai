@@ -46,6 +46,7 @@ import TechLogEmbed from "@/pages/TechLogEmbed";
 import NEPTTasking from "@/pages/NEPTTasking";
 import Invoicing from "@/pages/Invoicing";
 import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
+import CharterQuote from "@/pages/CharterQuote";
 import { FEATURES } from "@/lib/config";
 import type { UserRole } from "@/lib/data";
 
@@ -71,6 +72,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/missions" component={() => <MissionBoard role={role} />} />
       <Route path="/map" component={() => <FlightMap role={role} />} />
       <Route path="/dispatch" component={() => <Dispatch role={role} />} />
+      <Route path="/charter-quote" component={() => <CharterQuote />} />
       <Route path="/nept-tasking" component={() => <NEPTTasking role={role} />} />
       <Route path="/invoicing" component={() => <Invoicing role={role} />} />
       <Route path="/ora" component={() => <OperationalRiskAssessment role={role} />} />

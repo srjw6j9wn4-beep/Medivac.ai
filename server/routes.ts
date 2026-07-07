@@ -1111,5 +1111,69 @@ export async function registerRoutes(
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
+  // ── Charter Quotes ────────────────────────────────────────────────────────────
+  app.get("/api/charter-quotes", (_req: Request, res: Response) => {
+    try {
+      res.json(storage.getCharterQuotes());
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.get("/api/charter-quotes/next-number", (_req: Request, res: Response) => {
+    try {
+      res.json({ quoteNumber: storage.getNextQuoteNumber() });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.get("/api/charter-quotes/:id", (req: Request, res: Response) => {
+    try {
+      const q = storage.getCharterQuote(parseInt(req.params.id));
+      if (!q) return res.status(404).json({ error: "Not found" });
+      res.json(q);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/charter-quotes", (req: Request, res: Response) => {
+    try {
+      const now = new Date().toISOString();
+      const body = req.body;
+      const quote = storage.createCharterQuote({
+        quoteNumber:    body.quoteNumber,
+        clientName:     body.clientName,
+        clientContact:  body.clientContact ?? null,
+        purpose:        body.purpose,
+        aircraftType:   body.aircraftType,
+        departureDate:  body.departureDate,
+        legs:           body.legs,
+        crew:           body.crew,
+        costs:          body.costs,
+        totalCost:      body.totalCost,
+        marginPercent:  body.marginPercent ?? 15,
+        finalQuote:     body.finalQuote,
+        status:         body.status ?? "draft",
+        notes:          body.notes ?? null,
+        createdAt:      now,
+        updatedAt:      now,
+      } as any);
+      res.status(201).json(quote);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.patch("/api/charter-quotes/:id", (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = storage.updateCharterQuote(id, req.body);
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json(updated);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.delete("/api/charter-quotes/:id", (req: Request, res: Response) => {
+    try {
+      const ok = storage.deleteCharterQuote(parseInt(req.params.id));
+      if (!ok) return res.status(404).json({ error: "Not found" });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
   return httpServer;
 }
