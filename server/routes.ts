@@ -1187,7 +1187,7 @@ export async function registerRoutes(
   // PUT /api/quote-rates/:key — ops manual override
   app.put("/api/quote-rates/:key", (req: Request, res: Response) => {
     try {
-      const { key } = req.params;
+      const key = String(req.params.key);
       const { value, notes } = req.body as { value?: string | number; notes?: string };
       if (value === undefined || value === null || value === "") {
         return res.status(400).json({ error: "value is required" });
