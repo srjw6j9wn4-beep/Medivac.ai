@@ -875,7 +875,7 @@ export default function MorningBrief({ role }: Props) {
     setPresentMode(false);
     setControlsVisible(true);
     if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
+      try { document.exitFullscreen(); } catch {}
     }
   }, []);
 

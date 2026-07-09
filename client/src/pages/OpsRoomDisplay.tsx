@@ -349,12 +349,12 @@ export default function OpsRoomDisplay() {
   }, [tasks, showCompleted]);
 
   // Fullscreen toggle
-  function toggleFullscreen() {
+  async function toggleFullscreen() {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+      try { await document.documentElement.requestFullscreen?.(); } catch {}
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen?.().catch(() => {});
+      try { await document.exitFullscreen?.(); } catch {}
       setIsFullscreen(false);
     }
   }
