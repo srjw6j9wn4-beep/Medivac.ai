@@ -117,6 +117,15 @@ type CostMode = "contract"|"full";
 // GEO + FORMAT HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 const LHDs = [
+  // VIC Health Regions
+  { id:"vic-metropolitan",      name:"VIC — Metropolitan",    lat:-37.81, lon:144.96 },
+  { id:"vic-grampians",         name:"VIC — Grampians",       lat:-37.14, lon:142.52 },
+  { id:"vic-loddon-mallee",     name:"VIC — Loddon Mallee",   lat:-35.55, lon:143.85 },
+  { id:"vic-hume",              name:"VIC — Hume",            lat:-36.37, lon:146.32 },
+  { id:"vic-gippsland",         name:"VIC — Gippsland",       lat:-37.90, lon:146.80 },
+  { id:"vic-barwon-sw",         name:"VIC — Barwon South West",lat:-38.15, lon:143.60 },
+  { id:"vic-corangamite",       name:"VIC — Corangamite",     lat:-38.10, lon:143.00 },
+  // NSW LHDs
   { id:"western-nsw",           name:"Western NSW",           lat:-32.24, lon:148.60 },
   { id:"far-west",              name:"Far West",              lat:-31.95, lon:141.45 },
   { id:"murrumbidgee",          name:"Murrumbidgee",          lat:-35.11, lon:147.37 },
@@ -137,6 +146,8 @@ const RFDS_BASES = [
   { id:"bankstown",   name:"Bankstown",   icao:"YSBK", lat:-33.924, lon:150.988 },
   { id:"dubbo",       name:"Dubbo",       icao:"YSDU", lat:-32.217, lon:148.575 },
   { id:"broken-hill", name:"Broken Hill", icao:"YBHI", lat:-31.988, lon:141.472 },
+  { id:"essendon",   name:"Essendon",    icao:"YMEN", lat:-37.728, lon:144.902 },
+  { id:"albury",     name:"Albury",      icao:"YMAY", lat:-36.068, lon:146.958 },
 ];
 // gndKm = actual road distance (airport → hospital front door)
 // gndSpeedKph = realistic average incl. traffic lights, hospital zone, intersections
@@ -159,6 +170,26 @@ const HOSPITALS = [
   { id:"broken-hill-h",name:"Broken Hill Health",      lhd:"far-west",              lat:-31.953, lon:141.469, level:3, capabilities:["trauma"],                                              runway:"YBHI", gndKm:10, gndSpeedKph:40 },
   { id:"griffith",    name:"Griffith Base Hospital",    lhd:"murrumbidgee",          lat:-34.293, lon:146.047, level:3, capabilities:["trauma","cardiac"],                                   runway:"YGTH", gndKm:8,  gndSpeedKph:40 },
   { id:"port-mac",    name:"Port Macquarie Hospital",   lhd:"mid-north-coast",       lat:-31.434, lon:152.909, level:3, capabilities:["trauma","cardiac"],                                   runway:"YPMQ", gndKm:12, gndSpeedKph:40 },
+  // ── VIC — Metro Melbourne (Level 1) ──
+  { id:"alfred",       name:"The Alfred Hospital",         lhd:"vic-metropolitan",     lat:-37.844, lon:144.983, level:1, capabilities:["trauma","cardiac","stroke","burns","neuro","paeds"], runway:"YMEN", gndKm:14, gndSpeedKph:30 },
+  { id:"royal-melb",   name:"Royal Melbourne Hospital",    lhd:"vic-metropolitan",     lat:-37.797, lon:144.956, level:1, capabilities:["trauma","cardiac","stroke","neuro","paeds"],         runway:"YMEN", gndKm:14, gndSpeedKph:30 },
+  { id:"monash-melb",  name:"Monash Medical Centre",       lhd:"vic-metropolitan",     lat:-37.916, lon:145.121, level:1, capabilities:["trauma","cardiac","stroke","neuro","paeds"],         runway:"YMEN", gndKm:22, gndSpeedKph:30 },
+  { id:"austin",       name:"Austin Hospital",             lhd:"vic-metropolitan",     lat:-37.754, lon:145.059, level:1, capabilities:["trauma","cardiac","stroke","neuro"],                runway:"YMEN", gndKm:18, gndSpeedKph:30 },
+  { id:"st-vincent-v", name:"St Vincent's Melbourne",      lhd:"vic-metropolitan",     lat:-37.808, lon:144.979, level:1, capabilities:["cardiac","stroke","neuro"],                        runway:"YMEN", gndKm:15, gndSpeedKph:30 },
+  { id:"footscray",    name:"Footscray Hospital",          lhd:"vic-metropolitan",     lat:-37.800, lon:144.899, level:2, capabilities:["trauma","cardiac","stroke"],                        runway:"YMEN", gndKm:12, gndSpeedKph:30 },
+  // ── VIC — Regional ──
+  { id:"bendigo",      name:"Bendigo Health",              lhd:"vic-loddon-mallee",    lat:-36.757, lon:144.283, level:2, capabilities:["trauma","cardiac","stroke"],                        runway:"YBDG", gndKm:8,  gndSpeedKph:40 },
+  { id:"ballarat",     name:"Ballarat Base Hospital",      lhd:"vic-grampians",        lat:-37.560, lon:143.843, level:2, capabilities:["trauma","cardiac","stroke"],                        runway:"YBLT", gndKm:8,  gndSpeedKph:40 },
+  { id:"geelong",      name:"University Hospital Geelong", lhd:"vic-barwon-sw",        lat:-38.151, lon:144.354, level:2, capabilities:["trauma","cardiac","stroke"],                        runway:"YGLG", gndKm:10, gndSpeedKph:40 },
+  { id:"shepparton",   name:"Goulburn Valley Health",      lhd:"vic-hume",             lat:-36.378, lon:145.397, level:2, capabilities:["trauma","cardiac"],                                runway:"YSHT", gndKm:8,  gndSpeedKph:40 },
+  { id:"albury-wodonga",name:"Albury Wodonga Health",      lhd:"vic-hume",             lat:-36.077, lon:146.920, level:2, capabilities:["trauma","cardiac","stroke"],                        runway:"YMAY", gndKm:8,  gndSpeedKph:40 },
+  { id:"mildura-v",    name:"Mildura Base Hospital",       lhd:"vic-loddon-mallee",    lat:-34.196, lon:142.149, level:2, capabilities:["trauma","cardiac"],                                runway:"YMIA", gndKm:8,  gndSpeedKph:40 },
+  { id:"wangaratta",   name:"Northeast Health Wangaratta", lhd:"vic-hume",             lat:-36.352, lon:146.325, level:2, capabilities:["trauma","cardiac"],                                runway:"YWGT", gndKm:5,  gndSpeedKph:40 },
+  { id:"horsham",      name:"Wimmera Health Care Group",   lhd:"vic-grampians",        lat:-36.713, lon:142.200, level:3, capabilities:["trauma","cardiac"],                                runway:"YHSM", gndKm:6,  gndSpeedKph:40 },
+  { id:"swan-hill-v",  name:"Swan Hill District Health",   lhd:"vic-loddon-mallee",    lat:-35.338, lon:143.553, level:3, capabilities:["trauma","cardiac"],                                runway:"YSWH", gndKm:7,  gndSpeedKph:40 },
+  { id:"warrnambool",  name:"South West Healthcare",       lhd:"vic-barwon-sw",        lat:-38.382, lon:142.490, level:2, capabilities:["trauma","cardiac"],                                runway:"YWBL", gndKm:8,  gndSpeedKph:40 },
+  { id:"latrobe",      name:"Latrobe Regional Health",     lhd:"vic-gippsland",        lat:-38.192, lon:146.542, level:2, capabilities:["trauma","cardiac"],                                runway:"YTRE", gndKm:6,  gndSpeedKph:40 },
+  { id:"echuca-v",     name:"Echuca Regional Health",      lhd:"vic-loddon-mallee",    lat:-36.134, lon:144.752, level:3, capabilities:["trauma","cardiac"],                                runway:"YECH", gndKm:5,  gndSpeedKph:40 },
 ];
 
 function haversineKm(la1:number,lo1:number,la2:number,lo2:number){
