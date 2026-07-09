@@ -768,6 +768,7 @@ function FleetComparison({
 interface RouteOption {
   hospital:typeof HOSPITALS[0]; aircraftKey:AircraftKey;
   flightTimeMin:number; flightKm:number; handlingMin:number; gndTimeMin:number; totalTimeMin:number;
+  leg1Km:number; leg2Km:number; leg3Km:number; // base→patient, patient→hosp, hosp→base
   aircraftCost:number; gndCost:number; totalCost:number;
   capabilityMatch:boolean; divertedFrom?:string; isRecommended:boolean; score:number;
 }
@@ -812,7 +813,9 @@ function optimise(inputs:MissionInputs):RouteOption[]{
       const score=levelBonus+capBonus-timePenalty-costPenalty;
       all.push({
         hospital:hosp,aircraftKey:acKey,flightTimeMin:fMin,flightKm:Math.round(legKm),
-        handlingMin,gndTimeMin:gMin,totalTimeMin:tMin,aircraftCost:Math.round(acCost),
+        handlingMin,gndTimeMin:gMin,totalTimeMin:tMin,
+        leg1Km:Math.round(leg1Km),leg2Km:Math.round(leg2Km),leg3Km:Math.round(leg3Km),
+        aircraftCost:Math.round(acCost),
         gndCost:amb.total,totalCost:Math.round(acCost)+amb.total,
         capabilityMatch:capMatch,
         divertedFrom:inputs.lhd!==hosp.lhd?LHDs.find(l=>l.id===inputs.lhd)?.name:undefined,
@@ -1262,6 +1265,27 @@ export default function MissionOptimiser(){
                 </CardContent>
               </Card>
             )}
+            {/* Mission summary — shows the fixed inputs so user always sees what was calculated */}
+            <div className="rounded-lg border border-card-border bg-card/60 p-3 text-xs space-y-1.5">
+              <div className="flex items-center gap-1.5 text-muted-foreground font-semibold uppercase tracking-widest mb-2"><MapPin size={11} className="text-cyan-400"/>Mission Parameters</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                <div><span className="text-muted-foreground">Base: </span><span className="font-semibold text-white">{base.name} ({base.icao})</span></div>
+                <div><span className="text-muted-foreground">Priority: </span><Badge className={`${PRIORITY_STYLE[inputs.priority]} text-xs py-0`}>{inputs.priority}</Badge></div>
+                <div className="col-span-2"><span className="text-muted-foreground">Patient pickup: </span><span className="font-semibold text-white">{inputs.patientLocation||`${inputs.patientLat}, ${inputs.patientLon}`}</span></div>
+                <div><span className="text-muted-foreground">Case type: </span><span className="font-semibold capitalize text-white">{inputs.caseType}</span></div>
+                <div><span className="text-muted-foreground">Aircraft: </span><span className="font-semibold text-white">{inputs.availableAircraft.join(', ')}</span></div>
+              </div>
+              {/* Leg distances for recommended route */}
+              {recommended&&(
+                <div className="mt-2 pt-2 border-t border-card-border flex flex-wrap gap-3 text-muted-foreground">
+                  <span>Base→Pickup: <span className="text-white font-semibold">{fmtNm(recommended.leg1Km)}</span></span>
+                  <span className="text-card-border">|</span>
+                  <span>Pickup→Hospital: <span className="text-white font-semibold">{fmtNm(recommended.leg2Km)}</span></span>
+                  <span className="text-card-border">|</span>
+                  <span>Return: <span className="text-white font-semibold">{fmtNm(recommended.leg3Km)}</span></span>
+                </div>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wide px-1">Ranked options</div>
             {results.map((r,idx)=>(
               <Card key={idx} className={`border transition-all ${r.isRecommended?"border-cyan-500/50":"border-card-border"}`}>
@@ -1286,16 +1310,37 @@ export default function MissionOptimiser(){
                 </button>
                 {expandedIdx===idx&&(
                   <div className="px-4 pb-4 border-t border-card-border pt-4 space-y-3">
+                    {/* Leg breakdown */}
+                    <div className="text-xs text-muted-foreground font-semibold uppercase tracking-widest mb-1">Route legs</div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="p-2.5 rounded-lg border border-card-border bg-background">
+                        <div className="text-muted-foreground mb-1">Base → Pickup</div>
+                        <div className="font-bold text-white">{fmtNm(r.leg1Km)}</div>
+                        <div className="text-muted-foreground">{base.name}</div>
+                      </div>
+                      <div className="p-2.5 rounded-lg border border-cyan-500/30 bg-cyan-500/5">
+                        <div className="text-muted-foreground mb-1">Pickup → Hospital</div>
+                        <div className="font-bold text-cyan-400">{fmtNm(r.leg2Km)}</div>
+                        <div className="text-muted-foreground">{r.hospital.name.split(' ').slice(0,2).join(' ')}</div>
+                      </div>
+                      <div className="p-2.5 rounded-lg border border-card-border bg-background">
+                        <div className="text-muted-foreground mb-1">Return</div>
+                        <div className="font-bold text-white">{fmtNm(r.leg3Km)}</div>
+                        <div className="text-muted-foreground">{r.hospital.runway} → {base.icao}</div>
+                      </div>
+                    </div>
+                    {/* Time breakdown */}
+                    <div className="text-xs text-muted-foreground font-semibold uppercase tracking-widest mb-1 mt-1">Time &amp; cost</div>
                     <div className="grid grid-cols-4 gap-2">
                       {[
-                        {label:"Aircraft Leg",val:fmtTime(r.flightTimeMin),sub:AIRCRAFT[r.aircraftKey].name,sub2:"",col:"text-cyan-400",icon:<Plane size={11} className="text-cyan-400"/>, border:"border-card-border bg-background"},
-                        {label:"Patient Handling",val:fmtTime(r.handlingMin),sub:"30m load + 30m unload",sub2:"pickup & hospital",col:"text-purple-400",icon:<Clock size={11} className="text-purple-400"/>, border:"border-purple-500/20 bg-background"},
-                        {label:"Ground Leg",val:fmtTime(r.gndTimeMin),sub:`${r.hospital.runway} → hospital`,sub2:"NSW Ambulance",col:"text-amber-400",icon:<Navigation size={11} className="text-amber-400"/>, border:"border-card-border bg-background"},
-                        {label:"Total",val:fmtTime(r.totalTimeMin),sub:fmtCost(r.totalCost),sub2:"door to hospital",col:"text-cyan-400",icon:<Clock size={11} className="text-cyan-400"/>, border:"border-cyan-500/30 bg-cyan-500/5"},
+                        {label:"Flight",val:fmtTime(r.flightTimeMin),sub:AIRCRAFT[r.aircraftKey].name,sub2:"",col:"text-cyan-400",icon:<Plane size={11} className="text-cyan-400"/>, border:"border-card-border bg-background"},
+                        {label:"Handling",val:fmtTime(r.handlingMin),sub:"30m load + unload",sub2:"",col:"text-purple-400",icon:<Clock size={11} className="text-purple-400"/>, border:"border-purple-500/20 bg-background"},
+                        {label:"Ground",val:fmtTime(r.gndTimeMin),sub:`${r.hospital.runway} → hosp`,sub2:"NSW Ambulance",col:"text-amber-400",icon:<Navigation size={11} className="text-amber-400"/>, border:"border-card-border bg-background"},
+                        {label:"Total Cost",val:fmtCost(r.totalCost),sub:fmtTime(r.totalTimeMin)+" total",sub2:"aircraft + ground",col:"text-cyan-400",icon:<Clock size={11} className="text-cyan-400"/>, border:"border-cyan-500/30 bg-cyan-500/5"},
                       ].map((c,i)=>(
                         <div key={i} className={`p-3 rounded-lg border ${c.border}`}>
                           <div className="flex items-center gap-1.5 mb-2">{c.icon}<span className={`text-xs font-semibold ${c.col}`}>{c.label}</span></div>
-                          <div className={`text-lg font-bold ${i===3?c.col:""}`}>{c.val}</div>
+                          <div className={`text-base font-bold ${c.col}`}>{c.val}</div>
                           <div className="text-xs text-muted-foreground">{c.sub}</div>
                           <div className="text-xs text-muted-foreground">{c.sub2}</div>
                         </div>
