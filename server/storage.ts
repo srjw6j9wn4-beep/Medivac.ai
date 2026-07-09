@@ -134,6 +134,7 @@ sqlite.exec(`
     actual_arrive TEXT,
     completed_at TEXT,
     notes TEXT,
+    ground_transport_cost INTEGER DEFAULT 200,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
@@ -150,6 +151,9 @@ if (!neptColNames.includes("completed_at")) {
 }
 if (!neptColNames.includes("sectors")) {
   sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN sectors TEXT");
+}
+if (!neptColNames.includes("ground_transport_cost")) {
+  sqlite.exec("ALTER TABLE nept_tasks ADD COLUMN ground_transport_cost INTEGER DEFAULT 200");
 }
 
 // ── Notifications table ─────────────────────────────────────────────────────

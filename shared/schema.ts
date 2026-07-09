@@ -114,6 +114,7 @@ export const neptTasks = sqliteTable("nept_tasks", {
   actualArrive:  text("actual_arrive"),               // ISO datetime
   completedAt:   text("completed_at"),                 // ISO datetime — auto-set when status → Complete
   notes:         text("notes"),
+  groundTransportCost: integer("ground_transport_cost").default(200),  // van pick/drop $200 each
   createdAt:     text("created_at").notNull(),
   updatedAt:     text("updated_at").notNull(),
 });
@@ -147,6 +148,7 @@ export const specialMissionSessions = sqliteTable("special_mission_sessions", {
   checklistData: text("checklist_data").notNull(),  // JSON: Record<checklistItemId, { checked: boolean; signedBy: string; signedAt: string }>
   signoffs:      text("signoffs").notNull(),         // JSON: Array<{ stage, role, timestamp, notes }>
   notes:         text("notes"),
+  groundTransportCost: integer("ground_transport_cost").default(200),  // van pick/drop $200 each
   createdAt:     text("created_at").notNull(),
   updatedAt:     text("updated_at").notNull(),
   completedAt:   text("completed_at"),

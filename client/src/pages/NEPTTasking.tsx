@@ -1,8 +1,11 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { generateNopPDF } from "@/lib/generateNopPDF";
 import { type UserRole } from "@/lib/data";
+import { AirportSearch } from "@/components/AirportSearch";
+import { type Airport } from "@/lib/airportData";
+import { searchFacilities, FACILITY_TYPE_LABELS, FACILITY_TYPE_ICONS, type PatientFacility } from "@/lib/patientFacilities";
 import {
   Plus, X, Save, Pencil, Trash2, AlertTriangle, CheckCircle2,
   Clock, Plane, User, MapPin, ChevronDown, Filter, Search,
@@ -19,11 +22,13 @@ type TaskPriority = "Routine" | "Urgent" | "Emergency";
 
 /** A single flight leg within a multi-sector task */
 interface Sector {
-  from:     string;       // location / hospital
-  fromIcao: string;       // ICAO code
-  to:       string;
-  toIcao:   string;
-  eta:      string | null; // sector-level ETA (ISO or null)
+  from:        string;           // location / hospital name
+  fromIcao:    string;           // ICAO code
+  to:          string;
+  toIcao:      string;
+  eta:         string | null;    // sector-level ETA (ISO or null)
+  fromAirport: Airport | null;   // full airport object for picker
+  toAirport:   Airport | null;
 }
 
 interface NeptTask {
@@ -51,6 +56,7 @@ interface NeptTask {
   actualArrive: string | null;
   completedAt: string | null;
   notes: string | null;
+  groundTransportCost: number | null;  // van pick/drop — default $200
   sectors: Sector[] | null;
   createdAt: string;
   updatedAt: string;
@@ -73,7 +79,7 @@ const NURSE_OPTIONS = ["S. Mitchell RN", "Dr. K. Patel", "J. O'Brien RN"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 function emptySector(): Sector {
-  return { from: "", fromIcao: "", to: "", toIcao: "", eta: null };
+  return { from: "", fromIcao: "", to: "", toIcao: "", eta: null, fromAirport: null, toAirport: null };
 }
 
 function nextRef(tasks: NeptTask[]): string {
@@ -201,6 +207,7 @@ function emptyDraft(ref: string): TaskDraft {
     actualArrive: null,
     completedAt: null,
     notes: null,
+    groundTransportCost: 200,
     sectors: [emptySector()],
   };
 }
@@ -226,6 +233,108 @@ function PriorityBadge({ priority }: { priority: TaskPriority }) {
 }
 
 // ─── SectorEditor ─────────────────────────────────────────────────────────
+// ─── FacilitySearchInput ──────────────────────────────────────────────────────
+function FacilitySearchInput({
+  value, onChange, placeholder = "Search hospital, aged care, facility…",
+}: {
+  value: string;
+  onChange: (name: string) => void;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen]   = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef     = useRef<HTMLInputElement>(null);
+
+  const results = useMemo(() => searchFacilities(query, 10), [query]);
+
+  // Close on outside click (functional updater — prevents re-renders that dismiss pickers)
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(prev => prev ? false : prev);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  function select(f: PatientFacility) {
+    onChange(f.name);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function clear() {
+    onChange("");
+    setQuery("");
+    setOpen(false);
+    inputRef.current?.focus();
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    if (!open) return;
+    if (e.key === "ArrowDown")  { e.preventDefault(); setHighlighted(h => Math.min(h + 1, results.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)); }
+    else if (e.key === "Enter")  { e.preventDefault(); if (results[highlighted]) select(results[highlighted]); }
+    else if (e.key === "Escape") setOpen(false);
+    else if (e.key === "Tab" && results.length > 0) { e.preventDefault(); select(results[highlighted]); }
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      {value ? (
+        <div className="flex items-center gap-1.5 w-full text-xs rounded px-2 py-1.5 min-h-[30px] border border-[#01696F]/60 bg-background">
+          <span className="text-base shrink-0">🏥</span>
+          <span className="text-foreground font-medium truncate flex-1">{value}</span>
+          <button type="button" onClick={clear} className="text-muted-foreground hover:text-foreground shrink-0 ml-1"><X size={11} /></button>
+        </div>
+      ) : (
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setHighlighted(0); setOpen(true); }}
+          onKeyDown={onKeyDown}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className="w-full text-xs bg-background border border-card-border rounded px-2 py-1.5 focus:outline-none focus:border-[#01696F]/60 transition-colors placeholder:text-muted-foreground/50"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      )}
+
+      {open && results.length > 0 && (
+        <ul className="absolute z-50 top-full left-0 right-0 mt-0.5 bg-[#1C1B19] border border-[#393836] rounded-md shadow-xl max-h-52 overflow-y-auto py-0.5">
+          {results.map((f, i) => (
+            <li key={f.id}>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); select(f); }}
+                onMouseEnter={() => setHighlighted(i)}
+                className={`w-full text-left px-2.5 py-1.5 flex items-center gap-2 text-xs transition-colors ${
+                  i === highlighted ? "bg-[#393836]" : "hover:bg-[#393836]/50"
+                }`}
+              >
+                <span className="text-base shrink-0">{FACILITY_TYPE_ICONS[f.type]}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="text-foreground font-medium truncate block">{f.name}</span>
+                  <span className="text-muted-foreground text-[10px] truncate block">{f.suburb}, {f.state}{f.icao ? ` · ${f.icao}` : ""}</span>
+                </span>
+                <span className="text-[10px] text-muted-foreground shrink-0">{FACILITY_TYPE_LABELS[f.type]}</span>
+              </button>
+            </li>
+          ))}
+          <li className="px-2.5 py-1 border-t border-[#393836]/60">
+            <span className="text-[9px] text-muted-foreground/50">↑↓ navigate · Enter or Tab to select · Esc to close</span>
+          </li>
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function SectorEditor({
   sectors, onChange,
 }: {
@@ -240,15 +349,29 @@ function SectorEditor({
     onChange(next);
   }
 
+  function updateSectorAirport(idx: number, side: "from" | "to", airport: Airport | null) {
+    const next = sectors.map((s, i) => {
+      if (i !== idx) return s;
+      if (side === "from") {
+        return { ...s, fromAirport: airport, from: airport?.name ?? "", fromIcao: airport?.icao ?? "" };
+      } else {
+        return { ...s, toAirport: airport, to: airport?.name ?? "", toIcao: airport?.icao ?? "" };
+      }
+    });
+    onChange(next);
+  }
+
   function addSector() {
     // Pre-fill new sector's "from" with previous sector's "to"
     const prev = sectors[sectors.length - 1];
     const newSec: Sector = {
-      from:     prev ? prev.to : "",
-      fromIcao: prev ? prev.toIcao : "",
-      to:       "",
-      toIcao:   "",
-      eta:      null,
+      from:        prev ? prev.to : "",
+      fromIcao:    prev ? prev.toIcao : "",
+      to:          "",
+      toIcao:      "",
+      eta:         null,
+      fromAirport: prev ? prev.toAirport : null,
+      toAirport:   null,
     };
     onChange([...sectors, newSec]);
   }
@@ -338,46 +461,22 @@ function SectorEditor({
               </div>
             </div>
 
-            {/* From / To rows */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className={labelCls}>Departure / From</label>
-                <input
-                  className={fieldCls}
-                  placeholder="e.g. Dubbo Base Hospital"
-                  value={s.from}
-                  onChange={e => updateSector(i, "from", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>ICAO</label>
-                <input
-                  className={fieldCls}
-                  placeholder="YSDU"
-                  value={s.fromIcao}
-                  onChange={e => updateSector(i, "fromIcao", e.target.value)}
-                />
-              </div>
+            {/* From / To rows — ERSA airport pickers */}
+            <div>
+              <label className={labelCls}>Departure Airport</label>
+              <AirportSearch
+                value={s.fromAirport}
+                onChange={ap => updateSectorAirport(i, "from", ap)}
+                placeholder="Search ICAO, city or airport name…"
+              />
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className={labelCls}>Arrival / To</label>
-                <input
-                  className={fieldCls}
-                  placeholder="e.g. Royal Prince Alfred Hospital"
-                  value={s.to}
-                  onChange={e => updateSector(i, "to", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>ICAO</label>
-                <input
-                  className={fieldCls}
-                  placeholder="YSSY"
-                  value={s.toIcao}
-                  onChange={e => updateSector(i, "toIcao", e.target.value)}
-                />
-              </div>
+            <div>
+              <label className={labelCls}>Arrival Airport</label>
+              <AirportSearch
+                value={s.toAirport}
+                onChange={ap => updateSectorAirport(i, "to", ap)}
+                placeholder="Search ICAO, city or airport name…"
+              />
             </div>
             {/* Per-sector ETA */}
             <div>
@@ -410,12 +509,21 @@ function TaskModal({
     // Ensure sectors is always at least one empty sector
     if (!base.sectors || base.sectors.length === 0) {
       base.sectors = [{
-        from:     base.pickupLocation ?? "",
-        fromIcao: base.pickupIcao ?? "",
-        to:       base.destLocation ?? "",
-        toIcao:   base.destIcao ?? "",
-        eta:      null,
+        from:        base.pickupLocation ?? "",
+        fromIcao:    base.pickupIcao ?? "",
+        to:          base.destLocation ?? "",
+        toIcao:      base.destIcao ?? "",
+        eta:         null,
+        fromAirport: null,
+        toAirport:   null,
       }];
+    } else {
+      // Ensure airport objects exist on sectors loaded from DB (they only store strings)
+      base.sectors = base.sectors.map(s => ({
+        ...s,
+        fromAirport: (s as any).fromAirport ?? null,
+        toAirport:   (s as any).toAirport   ?? null,
+      }));
     }
     return base;
   });
@@ -507,16 +615,68 @@ function TaskModal({
           {/* Sector Editor — replaces the old Pickup / Destination rows */}
           <SectorEditor sectors={d.sectors ?? [emptySector()]} onChange={setSectors} />
 
-          {/* Referring / Receiving hospitals */}
+          {/* Referring / Receiving hospitals — facility search */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={labelCls}>Referring Hospital</label>
-              <input className={fieldCls} placeholder="Referring facility" value={d.referringHospital ?? ""} onChange={e => set("referringHospital", e.target.value)} />
+              <label className={labelCls}>Referring Hospital / Facility</label>
+              <FacilitySearchInput
+                value={d.referringHospital ?? ""}
+                onChange={name => set("referringHospital", name || null)}
+                placeholder="Search referring facility…"
+              />
             </div>
             <div>
-              <label className={labelCls}>Receiving Hospital</label>
-              <input className={fieldCls} placeholder="Receiving facility" value={d.receivingHospital ?? ""} onChange={e => set("receivingHospital", e.target.value)} />
+              <label className={labelCls}>Receiving Hospital / Facility</label>
+              <FacilitySearchInput
+                value={d.receivingHospital ?? ""}
+                onChange={name => set("receivingHospital", name || null)}
+                placeholder="Search receiving facility…"
+              />
             </div>
+          </div>
+
+          {/* Ground Transport cost */}
+          <div className="bg-muted/10 border border-card-border rounded-xl px-4 py-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold text-cyan-400/80 flex items-center gap-1.5" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                🚐 Ground Transport
+              </div>
+              <span className="text-[10px] text-muted-foreground">Van — per pick-up / drop-off</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className={labelCls}>Rate per Transfer ($)</label>
+                <div className="flex items-center">
+                  <span className="text-xs text-muted-foreground px-2 py-1.5 border border-r-0 border-card-border rounded-l-lg bg-muted/20">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="10"
+                    className="flex-1 bg-background/50 border border-card-border rounded-r-lg px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-400/50"
+                    value={d.groundTransportCost ?? 200}
+                    onChange={e => setD(p => ({ ...p, groundTransportCost: parseFloat(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+              <div className="flex-1">
+                <label className={labelCls}>Total (pick-up + drop-off)</label>
+                <div className="px-3 py-1.5 bg-cyan-500/10 border border-cyan-400/30 rounded-lg text-xs font-bold text-cyan-300">
+                  ${((d.groundTransportCost ?? 200) * 2).toLocaleString()}
+                </div>
+              </div>
+              <div className="flex-none pt-4">
+                <button
+                  type="button"
+                  onClick={() => setD(p => ({ ...p, groundTransportCost: 200 }))}
+                  className="text-[10px] px-2 py-1.5 rounded-lg border border-card-border text-muted-foreground hover:text-foreground hover:border-cyan-400/40 transition-colors"
+                >
+                  Reset $200
+                </button>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Default $200/transfer · 2 transfers (pick-up + drop-off) = total shown. Override for actual van cost.
+            </p>
           </div>
 
           {/* Row 5 — patient */}
