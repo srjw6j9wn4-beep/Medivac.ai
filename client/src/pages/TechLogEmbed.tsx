@@ -1,4 +1,4 @@
-import { ExternalLink, BookOpen, AlertTriangle, CheckCircle, Clock, Wrench, ArrowUpRight, RefreshCw, Wifi, WifiOff, Plane } from "lucide-react";
+import { ExternalLink, BookOpen, AlertTriangle, CheckCircle, Clock, Wrench, ArrowUpRight, RefreshCw, Wifi, WifiOff, Plane, Clipboard } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -403,27 +403,53 @@ export default function TechLogEmbed() {
         );
       })()}
 
-      {/* Journey Log App link card */}
-      <div className="bg-card border border-card-border rounded-2xl p-5 flex items-center gap-5">
-        <div className="w-12 h-12 rounded-xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center shrink-0">
-          <BookOpen size={22} className="text-cyan-400" />
+      {/* App link cards */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* Flight Tech Log */}
+        <div className="bg-card border border-card-border rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center shrink-0">
+            <Clipboard size={22} className="text-cyan-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              Flight Tech Log
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Defects, maintenance releases, DG checks &amp; fuel logs
+            </p>
+          </div>
+          <a
+            href={TECH_LOG_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-4 py-2 bg-cyan-400/10 border border-cyan-400/30 hover:bg-cyan-400/20 text-cyan-400 text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
+          >
+            <ExternalLink size={12} /> Open App
+          </a>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-            Medivac Ai Journey Log App
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Install on iPhone / iPad from Safari · Face ID auth · Full offline · Auto-syncs on landing
-          </p>
+
+        {/* Journey Log PWA */}
+        <div className="bg-card border border-card-border rounded-2xl p-5 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-cyan-400/10 border border-cyan-400/30 flex items-center justify-center shrink-0">
+            <BookOpen size={22} className="text-cyan-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              Medivac Ai Journey Log App
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              iPhone / iPad PWA · Face ID · Full offline · Auto-syncs on landing
+            </p>
+          </div>
+          <a
+            href={JOURNEY_LOG_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-4 py-2 bg-cyan-400/10 border border-cyan-400/30 hover:bg-cyan-400/20 text-cyan-400 text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
+          >
+            <ExternalLink size={12} /> Open App
+          </a>
         </div>
-        <a
-          href={JOURNEY_LOG_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-4 py-2 bg-cyan-400/10 border border-cyan-400/30 hover:bg-cyan-400/20 text-cyan-400 text-xs font-bold rounded-xl transition-colors whitespace-nowrap"
-        >
-          <ExternalLink size={12} /> Open App
-        </a>
       </div>
 
     </div>
