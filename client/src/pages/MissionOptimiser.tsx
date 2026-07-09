@@ -801,8 +801,15 @@ function optimise(inputs:MissionInputs):RouteOption[]{
       const isEmer=inputs.priority==="P1"||inputs.priority==="P2";
       const amb=calcAmbulanceCost(hosp.gndKm,isEmer,true);
       const capMatch=hosp.capabilities.includes(inputs.caseType)||inputs.caseType==="general";
-      const pF=inputs.priority==="P1"?3:inputs.priority==="P2"?1.5:1;
-      const score=(4-hosp.level)*10+(capMatch?40:0)-tMin*pF*0.5-acCost*0.01;
+      // Scoring: level is the dominant factor for aeromedical — L1 hospitals should always
+      // beat L3 unless travel time difference is extreme (>4 hrs). Time and cost are secondary.
+      // L1=100pts, L2=50pts, L3=0pts (non-linear — getting to the right hospital is the mission)
+      const levelBonus=(3-hosp.level)*50;
+      const capBonus=capMatch?60:0;
+      // Time penalty: 0.25 pts/min so a 60-min difference = 15 pts (won't override a level gap)
+      const timePenalty=tMin*0.25;
+      const costPenalty=acCost*0.002;
+      const score=levelBonus+capBonus-timePenalty-costPenalty;
       all.push({
         hospital:hosp,aircraftKey:acKey,flightTimeMin:fMin,flightKm:Math.round(legKm),
         handlingMin,gndTimeMin:gMin,totalTimeMin:tMin,aircraftCost:Math.round(acCost),
