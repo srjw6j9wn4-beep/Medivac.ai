@@ -264,3 +264,95 @@ export const actionPlanItems = sqliteTable('action_plan_items', {
 export const insertActionPlanItemSchema = createInsertSchema(actionPlanItems).omit({ id: true });
 export type InsertActionPlanItem = z.infer<typeof insertActionPlanItemSchema>;
 export type ActionPlanItem = typeof actionPlanItems.$inferSelect;
+
+// ── Client Rate Sheet ─────────────────────────────────────────────────────────
+// Per-organisation, per-mission-type billing rates
+export const clientRates = sqliteTable('client_rates', {
+  id:            integer('id').primaryKey({ autoIncrement: true }),
+  orgName:       text('org_name').notNull(),        // e.g. "NSW Health", "RAHS Dental"
+  orgCode:       text('org_code').notNull(),        // e.g. "nsw_health", "rahs_dental"
+  missionType:   text('mission_type').notNull(),    // "NEPT" | "Dental" | "ACC" | "Charter" | "Special"
+  rateType:      text('rate_type').notNull(),       // "per_flight" | "per_hour" | "per_leg"
+  rateAmountCents: integer('rate_amount_cents').notNull(), // rate in cents
+  afterHoursSurchargeCents: integer('after_hours_surcharge_cents').notNull().default(0),
+  gstApplicable: integer('gst_applicable').notNull().default(0), // 0=no GST, 1=GST
+  notes:         text('notes'),
+  effectiveFrom: text('effective_from'),            // ISO date
+  active:        integer('active').notNull().default(1),
+  createdAt:     text('created_at').notNull(),
+  updatedAt:     text('updated_at').notNull(),
+});
+
+export const insertClientRateSchema = createInsertSchema(clientRates).omit({ id: true });
+export type InsertClientRate = z.infer<typeof insertClientRateSchema>;
+export type ClientRate = typeof clientRates.$inferSelect;
+
+// ── Invoice Lines ─────────────────────────────────────────────────────────────
+// One line per flight/mission on an invoice
+export const invoiceLines = sqliteTable('invoice_lines', {
+  id:            integer('id').primaryKey({ autoIncrement: true }),
+  invoiceBatchId: text('invoice_batch_id').notNull(), // groups lines into a batch/reconciliation
+  orgCode:       text('org_code').notNull(),
+  orgName:       text('org_name').notNull(),
+  missionType:   text('mission_type').notNull(),    // "NEPT" | "Dental" | "ACC" | "Charter" | "Special"
+  serviceDate:   text('service_date').notNull(),    // ISO date
+  taskRef:       text('task_ref'),                  // e.g. NEPT-2026-0047
+  aircraftReg:   text('aircraft_reg'),
+  fromIcao:      text('from_icao'),
+  toIcao:        text('to_icao'),
+  flightTimeMins: integer('flight_time_mins'),      // block time
+  paxCount:      integer('pax_count').notNull().default(1),
+  rateAmountCents: integer('rate_amount_cents').notNull(),
+  afterHoursSurchargeCents: integer('after_hours_surcharge_cents').notNull().default(0),
+  additionalCents: integer('additional_cents').notNull().default(0),
+  gstCents:      integer('gst_cents').notNull().default(0),
+  lineTotalCents: integer('line_total_cents').notNull(),
+  status:        text('status').notNull().default('pending'), // pending | approved | invoiced | disputed
+  invoiceNumber: text('invoice_number'),            // set once invoiced
+  notes:         text('notes'),
+  flagged:       integer('flagged').notNull().default(0), // AI flagged for review
+  flagReason:    text('flag_reason'),
+  autoPopulated: integer('auto_populated').notNull().default(1), // 1=auto from dispatch, 0=manual
+  createdAt:     text('created_at').notNull(),
+  updatedAt:     text('updated_at').notNull(),
+});
+
+export const insertInvoiceLineSchema = createInsertSchema(invoiceLines).omit({ id: true });
+export type InsertInvoiceLine = z.infer<typeof insertInvoiceLineSchema>;
+export type InvoiceLine = typeof invoiceLines.$inferSelect;
+
+// ── Invoice Audit ─────────────────────────────────────────────────────────────
+// Full audit trail — every action on every invoice
+export const invoiceAudit = sqliteTable('invoice_audit', {
+  id:            integer('id').primaryKey({ autoIncrement: true }),
+  entityType:    text('entity_type').notNull(), // "invoice_line" | "invoice_batch" | "client_rate"
+  entityId:      text('entity_id').notNull(),   // the id of the changed entity
+  action:        text('action').notNull(),       // "created" | "edited" | "approved" | "disputed" | "invoiced" | "emailed" | "rate_changed"
+  performedBy:   text('performed_by').notNull(), // user/role
+  detail:        text('detail'),                 // JSON: before/after diff or summary
+  createdAt:     text('created_at').notNull(),
+});
+
+export type InvoiceAuditEntry = typeof invoiceAudit.$inferSelect;
+
+// ── Invoice Batches ───────────────────────────────────────────────────────────
+// A reconciliation run — groups lines, period, status
+export const invoiceBatches = sqliteTable('invoice_batches', {
+  id:            integer('id').primaryKey({ autoIncrement: true }),
+  batchId:       text('batch_id').notNull().unique(), // e.g. "BATCH-2026-07-10"
+  periodType:    text('period_type').notNull(),  // "daily" | "weekly" | "monthly" | "on_demand"
+  periodStart:   text('period_start').notNull(), // ISO date
+  periodEnd:     text('period_end').notNull(),   // ISO date
+  status:        text('status').notNull().default('reconciling'), // reconciling | review | approved | sent
+  totalLines:    integer('total_lines').notNull().default(0),
+  totalAmountCents: integer('total_amount_cents').notNull().default(0),
+  flaggedCount:  integer('flagged_count').notNull().default(0),
+  approvedBy:    text('approved_by'),
+  approvedAt:    text('approved_at'),
+  sentAt:        text('sent_at'),
+  notes:         text('notes'),
+  createdAt:     text('created_at').notNull(),
+  updatedAt:     text('updated_at').notNull(),
+});
+
+export type InvoiceBatch = typeof invoiceBatches.$inferSelect;

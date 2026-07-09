@@ -125,8 +125,25 @@ export async function seedDefaultRates(): Promise<void> {
   console.log(`[quote-rates] Seeded ${DEFAULT_RATES.length} default rates`);
 }
 
-// ── DatabaseStorage ──────────────────────────────────────────────────────────
-export class DatabaseStorage {
+// ── Types for new tables ──────────────────────────────────────────────────────
+export type ClientRate = { id: number; orgName: string; orgCode: string; missionType: string; rateType: string; rateAmountCents: number; afterHoursSurchargeCents: number; gstApplicable: number; notes: string | null; effectiveFrom: string | null; active: number; createdAt: string; updatedAt: string; };
+export type InvoiceLine = { id: number; invoiceBatchId: string; orgCode: string; orgName: string; missionType: string; serviceDate: string; taskRef: string | null; aircraftReg: string | null; fromIcao: string | null; toIcao: string | null; flightTimeMins: number | null; paxCount: number; rateAmountCents: number; afterHoursSurchargeCents: number; additionalCents: number; gstCents: number; lineTotalCents: number; status: string; invoiceNumber: string | null; notes: string | null; flagged: number; flagReason: string | null; autoPopulated: number; createdAt: string; updatedAt: string; };
+export type InvoiceAuditEntry = { id: number; entityType: string; entityId: string; action: string; performedBy: string; detail: string | null; createdAt: string; };
+export type InvoiceBatch = { id: number; batchId: string; periodType: string; periodStart: string; periodEnd: string; status: string; totalLines: number; totalAmountCents: number; flaggedCount: number; approvedBy: string | null; approvedAt: string | null; sentAt: string | null; notes: string | null; createdAt: string; updatedAt: string; };
+
+function mapClientRate(r: any): ClientRate {
+  return { id: r.id, orgName: r.org_name, orgCode: r.org_code, missionType: r.mission_type, rateType: r.rate_type, rateAmountCents: r.rate_amount_cents, afterHoursSurchargeCents: r.after_hours_surcharge_cents ?? 0, gstApplicable: r.gst_applicable ?? 0, notes: r.notes, effectiveFrom: r.effective_from, active: r.active ?? 1, createdAt: r.created_at, updatedAt: r.updated_at };
+}
+function mapInvoiceLine(r: any): InvoiceLine {
+  return { id: r.id, invoiceBatchId: r.invoice_batch_id, orgCode: r.org_code, orgName: r.org_name, missionType: r.mission_type, serviceDate: r.service_date, taskRef: r.task_ref, aircraftReg: r.aircraft_reg, fromIcao: r.from_icao, toIcao: r.to_icao, flightTimeMins: r.flight_time_mins, paxCount: r.pax_count ?? 1, rateAmountCents: r.rate_amount_cents, afterHoursSurchargeCents: r.after_hours_surcharge_cents ?? 0, additionalCents: r.additional_cents ?? 0, gstCents: r.gst_cents ?? 0, lineTotalCents: r.line_total_cents, status: r.status, invoiceNumber: r.invoice_number, notes: r.notes, flagged: r.flagged ?? 0, flagReason: r.flag_reason, autoPopulated: r.auto_populated ?? 1, createdAt: r.created_at, updatedAt: r.updated_at };
+}
+function mapAuditEntry(r: any): InvoiceAuditEntry {
+  return { id: r.id, entityType: r.entity_type, entityId: r.entity_id, action: r.action, performedBy: r.performed_by, detail: r.detail, createdAt: r.created_at };
+}
+function mapInvoiceBatch(r: any): InvoiceBatch {
+  return { id: r.id, batchId: r.batch_id, periodType: r.period_type, periodStart: r.period_start, periodEnd: r.period_end, status: r.status, totalLines: r.total_lines ?? 0, totalAmountCents: r.total_amount_cents ?? 0, flaggedCount: r.flagged_count ?? 0, approvedBy: r.approved_by, approvedAt: r.approved_at, sentAt: r.sent_at, notes: r.notes, createdAt: r.created_at, updatedAt: r.updated_at };
+}
+class DatabaseStorage {
 
   // ── Users ─────────────────────────────────────────────────────────────────
   async getUser(id: number): Promise<User | undefined> {
@@ -464,6 +481,98 @@ export class DatabaseStorage {
   async deleteActionItem(id: number): Promise<boolean> {
     const { error } = await supabase.from('action_plan_items').delete().eq('id', id);
     return !error;
+  }
+
+  // ── Client Rates ──────────────────────────────────────────────────────────
+  async listClientRates(): Promise<ClientRate[]> {
+    const { data } = await supabase.from('client_rates').select('*').order('org_name').order('mission_type');
+    return (data ?? []).map(mapClientRate);
+  }
+  async getClientRate(id: number): Promise<ClientRate | undefined> {
+    const { data } = await supabase.from('client_rates').select('*').eq('id', id).single();
+    return data ? mapClientRate(data) : undefined;
+  }
+  async getRateForOrg(orgCode: string, missionType: string): Promise<ClientRate | undefined> {
+    const { data } = await supabase.from('client_rates').select('*').eq('org_code', orgCode).eq('mission_type', missionType).eq('active', 1).order('effective_from', { ascending: false }).limit(1).single();
+    return data ? mapClientRate(data) : undefined;
+  }
+  async createClientRate(d: Omit<ClientRate, 'id'>): Promise<ClientRate> {
+    const now = new Date().toISOString();
+    const { data } = await supabase.from('client_rates').insert({ org_name: d.orgName, org_code: d.orgCode, mission_type: d.missionType, rate_type: d.rateType, rate_amount_cents: d.rateAmountCents, after_hours_surcharge_cents: d.afterHoursSurchargeCents, gst_applicable: d.gstApplicable, notes: d.notes, effective_from: d.effectiveFrom, active: d.active, created_at: now, updated_at: now }).select().single();
+    return mapClientRate(data);
+  }
+  async updateClientRate(id: number, u: Partial<ClientRate>): Promise<ClientRate | undefined> {
+    const row: any = { updated_at: new Date().toISOString() };
+    const map: Record<string, string> = { orgName: 'org_name', orgCode: 'org_code', missionType: 'mission_type', rateType: 'rate_type', rateAmountCents: 'rate_amount_cents', afterHoursSurchargeCents: 'after_hours_surcharge_cents', gstApplicable: 'gst_applicable', notes: 'notes', effectiveFrom: 'effective_from', active: 'active' };
+    for (const [k, v] of Object.entries(map)) if ((u as any)[k] !== undefined) row[v] = (u as any)[k];
+    const { data } = await supabase.from('client_rates').update(row).eq('id', id).select().single();
+    return data ? mapClientRate(data) : undefined;
+  }
+  async deleteClientRate(id: number): Promise<boolean> {
+    const { error } = await supabase.from('client_rates').delete().eq('id', id);
+    return !error;
+  }
+
+  // ── Invoice Lines ─────────────────────────────────────────────────────────
+  async listInvoiceLines(filters?: { batchId?: string; orgCode?: string; status?: string; dateFrom?: string; dateTo?: string }): Promise<InvoiceLine[]> {
+    let q = supabase.from('invoice_lines').select('*').order('service_date', { ascending: false });
+    if (filters?.batchId) q = q.eq('invoice_batch_id', filters.batchId);
+    if (filters?.orgCode) q = q.eq('org_code', filters.orgCode);
+    if (filters?.status) q = q.eq('status', filters.status);
+    if (filters?.dateFrom) q = q.gte('service_date', filters.dateFrom);
+    if (filters?.dateTo) q = q.lte('service_date', filters.dateTo);
+    const { data } = await q;
+    return (data ?? []).map(mapInvoiceLine);
+  }
+  async createInvoiceLine(d: Omit<InvoiceLine, 'id'>): Promise<InvoiceLine> {
+    const now = new Date().toISOString();
+    const { data } = await supabase.from('invoice_lines').insert({ invoice_batch_id: d.invoiceBatchId, org_code: d.orgCode, org_name: d.orgName, mission_type: d.missionType, service_date: d.serviceDate, task_ref: d.taskRef, aircraft_reg: d.aircraftReg, from_icao: d.fromIcao, to_icao: d.toIcao, flight_time_mins: d.flightTimeMins, pax_count: d.paxCount, rate_amount_cents: d.rateAmountCents, after_hours_surcharge_cents: d.afterHoursSurchargeCents, additional_cents: d.additionalCents, gst_cents: d.gstCents, line_total_cents: d.lineTotalCents, status: d.status, invoice_number: d.invoiceNumber, notes: d.notes, flagged: d.flagged, flag_reason: d.flagReason, auto_populated: d.autoPopulated, created_at: now, updated_at: now }).select().single();
+    return mapInvoiceLine(data);
+  }
+  async updateInvoiceLine(id: number, u: Partial<InvoiceLine>): Promise<InvoiceLine | undefined> {
+    const row: any = { updated_at: new Date().toISOString() };
+    const map: Record<string, string> = { status: 'status', notes: 'notes', flagged: 'flagged', flagReason: 'flag_reason', invoiceNumber: 'invoice_number', additionalCents: 'additional_cents', lineTotalCents: 'line_total_cents', rateAmountCents: 'rate_amount_cents', afterHoursSurchargeCents: 'after_hours_surcharge_cents', gstCents: 'gst_cents', flightTimeMins: 'flight_time_mins', paxCount: 'pax_count' };
+    for (const [k, v] of Object.entries(map)) if ((u as any)[k] !== undefined) row[v] = (u as any)[k];
+    const { data } = await supabase.from('invoice_lines').update(row).eq('id', id).select().single();
+    return data ? mapInvoiceLine(data) : undefined;
+  }
+  async deleteInvoiceLine(id: number): Promise<boolean> {
+    const { error } = await supabase.from('invoice_lines').delete().eq('id', id);
+    return !error;
+  }
+
+  // ── Invoice Audit ─────────────────────────────────────────────────────────
+  async logAudit(entityType: string, entityId: string, action: string, performedBy: string, detail?: string): Promise<void> {
+    await supabase.from('invoice_audit').insert({ entity_type: entityType, entity_id: entityId, action, performed_by: performedBy, detail: detail ?? null, created_at: new Date().toISOString() });
+  }
+  async listAudit(entityType?: string, entityId?: string, limit = 200): Promise<InvoiceAuditEntry[]> {
+    let q = supabase.from('invoice_audit').select('*').order('created_at', { ascending: false }).limit(limit);
+    if (entityType) q = q.eq('entity_type', entityType);
+    if (entityId) q = q.eq('entity_id', entityId);
+    const { data } = await q;
+    return (data ?? []).map(mapAuditEntry);
+  }
+
+  // ── Invoice Batches ───────────────────────────────────────────────────────
+  async listInvoiceBatches(): Promise<InvoiceBatch[]> {
+    const { data } = await supabase.from('invoice_batches').select('*').order('created_at', { ascending: false });
+    return (data ?? []).map(mapInvoiceBatch);
+  }
+  async getInvoiceBatch(batchId: string): Promise<InvoiceBatch | undefined> {
+    const { data } = await supabase.from('invoice_batches').select('*').eq('batch_id', batchId).single();
+    return data ? mapInvoiceBatch(data) : undefined;
+  }
+  async createInvoiceBatch(d: Omit<InvoiceBatch, 'id'>): Promise<InvoiceBatch> {
+    const now = new Date().toISOString();
+    const { data } = await supabase.from('invoice_batches').insert({ batch_id: d.batchId, period_type: d.periodType, period_start: d.periodStart, period_end: d.periodEnd, status: d.status, total_lines: d.totalLines, total_amount_cents: d.totalAmountCents, flagged_count: d.flaggedCount, approved_by: d.approvedBy, approved_at: d.approvedAt, sent_at: d.sentAt, notes: d.notes, created_at: now, updated_at: now }).select().single();
+    return mapInvoiceBatch(data);
+  }
+  async updateInvoiceBatch(batchId: string, u: Partial<InvoiceBatch>): Promise<InvoiceBatch | undefined> {
+    const row: any = { updated_at: new Date().toISOString() };
+    const map: Record<string, string> = { status: 'status', totalLines: 'total_lines', totalAmountCents: 'total_amount_cents', flaggedCount: 'flagged_count', approvedBy: 'approved_by', approvedAt: 'approved_at', sentAt: 'sent_at', notes: 'notes' };
+    for (const [k, v] of Object.entries(map)) if ((u as any)[k] !== undefined) row[v] = (u as any)[k];
+    const { data } = await supabase.from('invoice_batches').update(row).eq('batch_id', batchId).select().single();
+    return data ? mapInvoiceBatch(data) : undefined;
   }
 }
 

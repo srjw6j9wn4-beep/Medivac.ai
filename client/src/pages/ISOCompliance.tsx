@@ -292,6 +292,8 @@ export default function ISOCompliance() {
 
         {/* Video player */}
         <div className="relative w-full bg-[#0a1628]" style={{ aspectRatio: '16/9', backgroundImage: 'url(/aeromedical_bg.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+          {/* Isolated layer — screen blend composites against backdrop only, not UI overlays */}
+          <div className="absolute inset-0" style={{ isolation: 'isolate' }}>
           <video
             ref={isoVideoRef}
             className="w-full h-full object-cover"
@@ -313,6 +315,7 @@ export default function ISOCompliance() {
             onPause={() => setIsoPlaying(false)}
             onEnded={() => { setIsoPlaying(false); setIsoProgress(100); }}
           />
+          </div>{/* end isolation layer */}
 
           {/* Pre-play overlay */}
           <div className={`absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-black/40 to-black/70 transition-opacity duration-500 ${

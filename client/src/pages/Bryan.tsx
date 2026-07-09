@@ -12,11 +12,11 @@ const VIDEOS = [
     duration: "0:32",
     section: "Introduction",
     desc: "Jennifer introduces Medivac.ai — the end-to-end aeromedical operations platform built for King Air B200/B300 RFDS-style operators.",
-    thumbnail: "🛩",
+    thumbnail: "/thumb_01_welcome.png",
     color: "from-cyan-900/60 to-slate-900",
     accent: "border-cyan-400/40",
     videoSrc: `${API_BASE}/api/video/01_welcome.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_01_welcome.png",
   },
   {
     id: 2,
@@ -24,11 +24,11 @@ const VIDEOS = [
     duration: "0:36",
     section: "Mission Operations",
     desc: "Jennifer walks through how Medivac.ai handles a mission from initial NEPT call through to dispatch release and airborne confirmation.",
-    thumbnail: "📡",
+    thumbnail: "/thumb_02_dispatch.png",
     color: "from-blue-900/60 to-slate-900",
     accent: "border-blue-400/40",
     videoSrc: `${API_BASE}/api/video/02_dispatch.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_02_dispatch.png",
   },
   {
     id: 3,
@@ -36,11 +36,11 @@ const VIDEOS = [
     duration: "0:35",
     section: "Compliance",
     desc: "A full walkthrough of each dispatch release gate — flight plan, W&B, APG release, maintenance release, and crew sign-off.",
-    thumbnail: "✅",
+    thumbnail: "/thumb_03_compliance.png",
     color: "from-green-900/60 to-slate-900",
     accent: "border-green-400/40",
     videoSrc: `${API_BASE}/api/video/03_compliance.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_03_compliance.png",
   },
   {
     id: 4,
@@ -48,11 +48,11 @@ const VIDEOS = [
     duration: "0:30",
     section: "Ferry Flights",
     desc: "How Medivac.ai tracks equipment removed and reinstalled during aircraft repositioning, with photo evidence and return-to-service controls.",
-    thumbnail: "🔧",
+    thumbnail: "/thumb_04_ferry.png",
     color: "from-orange-900/60 to-slate-900",
     accent: "border-orange-400/40",
     videoSrc: `${API_BASE}/api/video/04_ferry.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_04_ferry.png",
   },
   {
     id: 5,
@@ -60,7 +60,7 @@ const VIDEOS = [
     duration: "0:34",
     section: "Special Missions",
     desc: "Detailed walkthrough of YLHI over-water dispatch — life raft, survival equipment, EPIRBs, SARTIME lodgement and dispatch block logic.",
-    thumbnail: "🌊",
+    thumbnail: "/thumb_05_lordhowe.png",
     color: "from-teal-900/60 to-slate-900",
     accent: "border-teal-400/40",
     videoSrc: `${API_BASE}/api/video/05_lordhowe.mp4`,
@@ -72,11 +72,11 @@ const VIDEOS = [
     duration: "0:27",
     section: "Special Missions",
     desc: "Jennifer explains neonatal and ECMO transport configurations — required equipment, specialist crew, and receiving facility confirmation gates.",
-    thumbnail: "🏥",
+    thumbnail: "/thumb_06_nets.png",
     color: "from-purple-900/60 to-slate-900",
     accent: "border-purple-400/40",
     videoSrc: `${API_BASE}/api/video/06_nets.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_06_nets.png",
   },
   {
     id: 7,
@@ -84,11 +84,11 @@ const VIDEOS = [
     duration: "1:16",
     section: "Compliance",
     desc: "Jennifer walks through the ISO 9001:2015 and ISO 13485:2016 certification readiness dashboard — clause scoring, CAPA register, evidence packs, and the four-phase critical path to dual certification by November 2026.",
-    thumbnail: "🏅",
+    thumbnail: "/thumb_07_iso.png",
     color: "from-amber-900/60 to-slate-900",
     accent: "border-amber-400/40",
     videoSrc: `${API_BASE}/api/video/07_iso.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_07_iso.png",
   },
   {
     id: 8,
@@ -96,11 +96,11 @@ const VIDEOS = [
     duration: "0:29",
     section: "Clinical",
     desc: "How the Telehealth Portal and AI Mission Analyst work together to support in-flight clinical decision making.",
-    thumbnail: "📱",
+    thumbnail: "/thumb_08_telehealth.png",
     color: "from-green-900/60 to-slate-900",
     accent: "border-green-400/40",
     videoSrc: `${API_BASE}/api/video/08_telehealth.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_08_telehealth.png",
   },
   {
     id: 9,
@@ -108,11 +108,11 @@ const VIDEOS = [
     duration: "0:37",
     section: "Clinical",
     desc: "Isolation flight procedures — patient containment, cabin airflow management, and crew PPE protocols for infectious disease transport.",
-    thumbnail: "🧪",
+    thumbnail: "/thumb_09_isolation.png",
     color: "from-rose-900/60 to-slate-900",
     accent: "border-rose-400/40",
     videoSrc: `${API_BASE}/api/video/09_isolation.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_09_isolation.png",
   },
 ];
 
@@ -473,7 +473,11 @@ export default function Bryan({ role }: Props) {
               <div className={`absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/50 transition-opacity duration-500 ${
                 playing ? "opacity-0 pointer-events-none" : "opacity-100"
               }`}>
-                  <div className="text-4xl mb-1">{activeVideo.thumbnail}</div>
+                  {activeVideo.thumbnail.startsWith('/') ? (
+                    <img src={activeVideo.thumbnail} alt={activeVideo.title} className="w-20 h-14 object-cover rounded-lg shadow-lg mb-1 opacity-90" />
+                  ) : (
+                    <div className="text-4xl mb-1">{activeVideo.thumbnail}</div>
+                  )}
                   <div className="text-lg font-bold text-white text-center px-6" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
                     {activeVideo.title}
                   </div>

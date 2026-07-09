@@ -1331,5 +1331,135 @@ export async function registerRoutes(
     res.json({ checked, updated: changes.length, changes });
   });
 
+
+// ── Client Rates ────────────────────────────────────────────────────────────
+  app.get("/api/client-rates", async (_req: Request, res: Response) => {
+    res.json(await storage.listClientRates());
+  });
+  app.post("/api/client-rates", async (req: Request, res: Response) => {
+    const now = new Date().toISOString();
+    const rate = await storage.createClientRate({ ...req.body, createdAt: now, updatedAt: now });
+    await storage.logAudit("client_rate", String(rate.id), "created", req.body.createdBy ?? "ops", JSON.stringify(req.body));
+    res.status(201).json(rate);
+  });
+  app.patch("/api/client-rates/:id", async (req: Request, res: Response) => {
+    const rate = await storage.updateClientRate(parseInt(req.params.id), req.body);
+    if (!rate) return res.status(404).json({ error: "Not found" });
+    await storage.logAudit("client_rate", req.params.id, "edited", req.body.updatedBy ?? "ops", JSON.stringify(req.body));
+    res.json(rate);
+  });
+  app.delete("/api/client-rates/:id", async (req: Request, res: Response) => {
+    await storage.deleteClientRate(parseInt(req.params.id));
+    await storage.logAudit("client_rate", req.params.id, "deleted", "ops");
+    res.json({ ok: true });
+  });
+
+  // ── Invoice Lines ────────────────────────────────────────────────────────────
+  app.get("/api/invoice-lines", async (req: Request, res: Response) => {
+    const { batchId, orgCode, status, dateFrom, dateTo } = req.query as Record<string, string>;
+    res.json(await storage.listInvoiceLines({ batchId, orgCode, status, dateFrom, dateTo }));
+  });
+  app.post("/api/invoice-lines", async (req: Request, res: Response) => {
+    const now = new Date().toISOString();
+    const line = await storage.createInvoiceLine({ ...req.body, createdAt: now, updatedAt: now });
+    await storage.logAudit("invoice_line", String(line.id), "created", req.body.createdBy ?? "system", JSON.stringify(req.body));
+    res.status(201).json(line);
+  });
+  app.patch("/api/invoice-lines/:id", async (req: Request, res: Response) => {
+    const before = await storage.listInvoiceLines();
+    const prev = before.find(l => l.id === parseInt(req.params.id));
+    const line = await storage.updateInvoiceLine(parseInt(req.params.id), req.body);
+    if (!line) return res.status(404).json({ error: "Not found" });
+    await storage.logAudit("invoice_line", req.params.id, req.body.status === "approved" ? "approved" : req.body.status === "disputed" ? "disputed" : "edited", req.body.updatedBy ?? "ops", JSON.stringify({ before: prev, after: req.body }));
+    res.json(line);
+  });
+  app.delete("/api/invoice-lines/:id", async (req: Request, res: Response) => {
+    await storage.deleteInvoiceLine(parseInt(req.params.id));
+    await storage.logAudit("invoice_line", req.params.id, "deleted", "ops");
+    res.json({ ok: true });
+  });
+
+  // ── Auto-populate invoice line from dispatch ─────────────────────────────────
+  app.post("/api/invoice-lines/auto-populate", async (req: Request, res: Response) => {
+    // Called when a mission is dispatched — auto-creates a pending invoice line
+    const { missionType, taskRef, aircraftReg, fromIcao, toIcao, serviceDate, paxCount, orgCode, orgName, flightTimeMins, afterHours } = req.body;
+    const now = new Date().toISOString();
+    const today = (serviceDate ?? now).slice(0, 10);
+    // Look up rate for this org + mission type
+    let rateAmount = 0;
+    let afterHoursAmount = 0;
+    let gstApplicable = 0;
+    const rate = await storage.getRateForOrg(orgCode ?? "default", missionType ?? "NEPT");
+    if (rate) {
+      rateAmount = rate.rateAmountCents;
+      afterHoursAmount = afterHours ? rate.afterHoursSurchargeCents : 0;
+      gstApplicable = rate.gstApplicable;
+    }
+    const subtotal = rateAmount + afterHoursAmount;
+    const gstCents = gstApplicable ? Math.round(subtotal * 0.1) : 0;
+    const total = subtotal + gstCents;
+    // Find or create today's batch
+    const batchId = `BATCH-${today}`;
+    let batch = await storage.getInvoiceBatch(batchId);
+    if (!batch) {
+      batch = await storage.createInvoiceBatch({ batchId, periodType: "daily", periodStart: today, periodEnd: today, status: "reconciling", totalLines: 0, totalAmountCents: 0, flaggedCount: 0, approvedBy: null, approvedAt: null, sentAt: null, notes: null, createdAt: now, updatedAt: now });
+    }
+    // Flag if no rate found
+    const flagged = !rate ? 1 : 0;
+    const flagReason = !rate ? "No client rate configured for this org/mission type" : null;
+    const line = await storage.createInvoiceLine({ invoiceBatchId: batchId, orgCode: orgCode ?? "unknown", orgName: orgName ?? orgCode ?? "Unknown", missionType: missionType ?? "NEPT", serviceDate: today, taskRef: taskRef ?? null, aircraftReg: aircraftReg ?? null, fromIcao: fromIcao ?? null, toIcao: toIcao ?? null, flightTimeMins: flightTimeMins ?? null, paxCount: paxCount ?? 1, rateAmountCents: rateAmount, afterHoursSurchargeCents: afterHoursAmount, additionalCents: 0, gstCents, lineTotalCents: total, status: "pending", invoiceNumber: null, notes: null, flagged, flagReason, autoPopulated: 1, createdAt: now, updatedAt: now });
+    // Update batch totals
+    const allLines = await storage.listInvoiceLines({ batchId });
+    const batchTotal = allLines.reduce((s, l) => s + l.lineTotalCents, 0);
+    const flagCount = allLines.filter(l => l.flagged).length;
+    await storage.updateInvoiceBatch(batchId, { totalLines: allLines.length, totalAmountCents: batchTotal, flaggedCount: flagCount });
+    await storage.logAudit("invoice_line", String(line.id), "auto_populated", "system", JSON.stringify({ taskRef, missionType, orgCode, rateAmount, total }));
+    res.status(201).json(line);
+  });
+
+  // ── Invoice Batches ──────────────────────────────────────────────────────────
+  app.get("/api/invoice-batches", async (_req: Request, res: Response) => {
+    res.json(await storage.listInvoiceBatches());
+  });
+  app.get("/api/invoice-batches/:batchId", async (req: Request, res: Response) => {
+    const batch = await storage.getInvoiceBatch(req.params.batchId);
+    if (!batch) return res.status(404).json({ error: "Not found" });
+    res.json(batch);
+  });
+  app.post("/api/invoice-batches", async (req: Request, res: Response) => {
+    const now = new Date().toISOString();
+    const batch = await storage.createInvoiceBatch({ ...req.body, createdAt: now, updatedAt: now });
+    await storage.logAudit("invoice_batch", batch.batchId, "created", req.body.createdBy ?? "ops");
+    res.status(201).json(batch);
+  });
+  app.patch("/api/invoice-batches/:batchId/approve", async (req: Request, res: Response) => {
+    const now = new Date().toISOString();
+    const batch = await storage.updateInvoiceBatch(req.params.batchId, { status: "approved", approvedBy: req.body.approvedBy ?? "ops", approvedAt: now });
+    // Mark all pending lines as approved
+    const lines = await storage.listInvoiceLines({ batchId: req.params.batchId, status: "pending" });
+    for (const line of lines) await storage.updateInvoiceLine(line.id, { status: "approved" });
+    await storage.logAudit("invoice_batch", req.params.batchId, "approved", req.body.approvedBy ?? "ops", `${lines.length} lines approved`);
+    res.json(batch);
+  });
+  app.patch("/api/invoice-batches/:batchId/send", async (req: Request, res: Response) => {
+    const now = new Date().toISOString();
+    const batch = await storage.updateInvoiceBatch(req.params.batchId, { status: "sent", sentAt: now });
+    // Mark approved lines as invoiced
+    const lines = await storage.listInvoiceLines({ batchId: req.params.batchId, status: "approved" });
+    for (const line of lines) await storage.updateInvoiceLine(line.id, { status: "invoiced" });
+    await storage.logAudit("invoice_batch", req.params.batchId, "sent", req.body.sentBy ?? "ops", `Sent to clients — placeholder (email not yet wired)`);
+    res.json(batch);
+  });
+  app.patch("/api/invoice-batches/:batchId", async (req: Request, res: Response) => {
+    const batch = await storage.updateInvoiceBatch(req.params.batchId, req.body);
+    res.json(batch);
+  });
+
+  // ── Invoice Audit Trail ──────────────────────────────────────────────────────
+  app.get("/api/invoice-audit", async (req: Request, res: Response) => {
+    const { entityType, entityId } = req.query as Record<string, string>;
+    res.json(await storage.listAudit(entityType, entityId));
+  });
+
   return httpServer;
 }
