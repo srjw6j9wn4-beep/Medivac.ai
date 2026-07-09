@@ -137,11 +137,37 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
     inputRef.current?.focus();
   }
 
+  function acceptFreeText() {
+    const q = query.trim();
+    if (!q) return;
+    // Create a minimal airport-like object from free text so the field shows as filled
+    const synthetic: Airport = {
+      icao: q.length <= 6 ? q.toUpperCase() : q.slice(0, 4).toUpperCase(),
+      iata: null,
+      name: q,
+      city: q,
+      state: null,
+      type: "small",
+      lat: null,
+      lon: null,
+    };
+    onChange(synthetic);
+    setQuery("");
+    setResults([]);
+    setOpen(false);
+  }
+
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Tab" && open && results.length > 0) {
       // Tab accepts the top result
       e.preventDefault();
       select(results[highlighted]);
+      return;
+    }
+    if (e.key === "Tab" && query.trim()) {
+      // Tab with no dropdown — accept free text
+      e.preventDefault();
+      acceptFreeText();
       return;
     }
     if (!open) return;
@@ -154,6 +180,7 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (results[highlighted]) select(results[highlighted]);
+      else if (query.trim()) acceptFreeText();
     } else if (e.key === "Escape") {
       setOpen(false);
     }

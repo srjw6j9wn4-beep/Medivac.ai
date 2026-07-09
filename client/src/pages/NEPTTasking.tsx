@@ -486,6 +486,7 @@ function SectorEditor({
                 className={`${fieldCls} border-cyan-400/20 focus:border-cyan-400/50`}
                 value={s.eta?.slice(0, 16) ?? ""}
                 onChange={e => updateSector(i, "eta", e.target.value || null)}
+                onMouseDown={e => e.stopPropagation()}
               />
             </div>
           </div>
@@ -540,7 +541,7 @@ function TaskModal({
 
   function handleSave() {
     const sectors = d.sectors ?? [];
-    if (sectors.length === 0 || !sectors[0].from) {
+    if (sectors.length === 0 || (!sectors[0].from && !sectors[0].fromIcao)) {
       alert("At least one sector with a departure location is required.");
       return;
     }
@@ -604,11 +605,23 @@ function TaskModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Request Time</label>
-              <input type="datetime-local" className={fieldCls} value={d.requestTime?.slice(0,16) ?? ""} onChange={e => set("requestTime", e.target.value)} />
+              <input
+                type="datetime-local"
+                className={fieldCls}
+                value={d.requestTime?.slice(0,16) ?? ""}
+                onChange={e => set("requestTime", e.target.value)}
+                onMouseDown={e => e.stopPropagation()}
+              />
             </div>
             <div>
-              <label className={labelCls}>Required By</label>
-              <input type="datetime-local" className={fieldCls} value={d.requiredBy?.slice(0,16) ?? ""} onChange={e => set("requiredBy", e.target.value || null)} />
+              <label className={labelCls}>Required By <span className="normal-case font-normal text-muted-foreground">(date &amp; time)</span></label>
+              <input
+                type="datetime-local"
+                className={fieldCls}
+                value={d.requiredBy?.slice(0,16) ?? ""}
+                onChange={e => set("requiredBy", e.target.value || null)}
+                onMouseDown={e => e.stopPropagation()}
+              />
             </div>
           </div>
 
@@ -739,7 +752,7 @@ function TaskModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Overall ETA <span className="normal-case font-normal text-muted-foreground">(auto from last sector)</span></label>
-              <input type="datetime-local" className={`${fieldCls} border-cyan-400/30 focus:border-cyan-400/60`} value={d.estimatedEta?.slice(0,16) ?? ""} onChange={e => set("estimatedEta", e.target.value || null)} />
+              <input type="datetime-local" className={`${fieldCls} border-cyan-400/30 focus:border-cyan-400/60`} value={d.estimatedEta?.slice(0,16) ?? ""} onChange={e => set("estimatedEta", e.target.value || null)} onMouseDown={e => e.stopPropagation()} />
             </div>
           </div>
 
@@ -747,11 +760,11 @@ function TaskModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Actual Departure</label>
-              <input type="datetime-local" className={fieldCls} value={d.actualDepart?.slice(0,16) ?? ""} onChange={e => set("actualDepart", e.target.value)} />
+              <input type="datetime-local" className={fieldCls} value={d.actualDepart?.slice(0,16) ?? ""} onChange={e => set("actualDepart", e.target.value)} onMouseDown={e => e.stopPropagation()} />
             </div>
             <div>
               <label className={labelCls}>Actual Arrival</label>
-              <input type="datetime-local" className={fieldCls} value={d.actualArrive?.slice(0,16) ?? ""} onChange={e => set("actualArrive", e.target.value)} />
+              <input type="datetime-local" className={fieldCls} value={d.actualArrive?.slice(0,16) ?? ""} onChange={e => set("actualArrive", e.target.value)} onMouseDown={e => e.stopPropagation()} />
             </div>
           </div>
 
@@ -926,6 +939,8 @@ interface NopData {
   executiveSummary: string;
   issuesIdentified: string;
   actionsPlanned: string;
+  // Financial
+  groundTransportTotal: number;   // sum of all task ground transport costs for the period
 }
 
 const WORKFLOW_STEPS: NopStatus[] = ["Draft", "Under Review", "Approved", "Submitted"];
@@ -963,6 +978,7 @@ function emptyNop(month: number, year: number): NopData {
     executiveSummary: "",
     issuesIdentified: "",
     actionsPlanned: "",
+    groundTransportTotal: 0,
   };
 }
 
@@ -1005,6 +1021,11 @@ function NoticeOfOps({ tasks, month, year, setMonth, setYear }: {
     const cancelled = monthTasks.filter(t => t.status === "Cancelled").length;
     // Simulate on-time from completed tasks (demo: 94%)
     const onTime    = Math.round(completed * 0.94);
+    // Ground transport: sum each task's cost × 2 (pick-up + drop-off)
+    const groundTransportTotal = monthTasks.reduce((sum, t) => {
+      const rate = (t as any).groundTransportCost ?? 200;
+      return sum + rate * 2;
+    }, 0);
     setNop(prev => ({
       ...emptyNop(selMonth, selYear),
       // keep narrative & changes
@@ -1025,6 +1046,7 @@ function NoticeOfOps({ tasks, month, year, setMonth, setYear }: {
       avgResponseMins: total > 0 ? 42 : 0, // demo value
       p1ResponseMins: total > 0 ? 18 : 0,
       p2ResponseMins: total > 0 ? 55 : 0,
+      groundTransportTotal,
     }));
   }, [selMonth, selYear, monthTasks]);
 
@@ -1066,6 +1088,7 @@ function NoticeOfOps({ tasks, month, year, setMonth, setYear }: {
       executiveSummary:   nop.executiveSummary,
       issuesIdentified:   nop.issuesIdentified,
       actionsPlanned:     nop.actionsPlanned,
+      groundTransportTotal: nop.groundTransportTotal,
     });
   }
 
