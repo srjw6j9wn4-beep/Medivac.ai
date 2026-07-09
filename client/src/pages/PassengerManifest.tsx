@@ -604,13 +604,22 @@ export default function PassengerManifest({ role }: Props) {
                         onChange={v => updateSector(s.id, "eta", v)}
                       />
                     </div>
-                    {/* Aerodrome warnings inline */}
+                    {/* Aerodrome warnings and NSWAA ops notes inline */}
                     {[s.from, s.to].map(icao => {
                       const a = getAerodrome(icao);
-                      if (!a?.warning) return null;
+                      if (!a?.warning && !a?.nswaaNote) return null;
                       return (
-                        <div key={icao} className="mt-2 text-xs text-amber-300 bg-amber-900/30 border border-amber-700 rounded-lg px-3 py-2">
-                          {a.warning}
+                        <div key={icao} className="flex flex-col gap-1 mt-2">
+                          {a?.warning && (
+                            <div className="text-xs text-amber-300 bg-amber-900/30 border border-amber-700 rounded-lg px-3 py-2">
+                              ⚠️ {a.warning}
+                            </div>
+                          )}
+                          {a?.nswaaNote && (
+                            <div className="text-xs text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2 leading-relaxed">
+                              🦘 NSWAA: {a.nswaaNote}
+                            </div>
+                          )}
                         </div>
                       );
                     })}

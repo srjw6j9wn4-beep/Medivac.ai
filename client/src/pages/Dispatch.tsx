@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { type UserRole } from "@/lib/data";
 import { Radio, MapPin, AlertTriangle, CheckCircle, X, Plane, UserPlus, Trash2, ChevronDown } from "lucide-react";
+import { ERSA_AERODROMES, getAerodrome, type ERSAAerodrome } from "@/data/ersa-airports";
 
 interface Props { role: UserRole; }
 
@@ -302,8 +303,8 @@ export default function Dispatch({ role }: Props) {
 
           {/* Route + priority */}
           <div className="grid grid-cols-3 gap-3">
-            <FormField label="Departure ICAO" value={from} onChange={setFrom} type="text" placeholder="e.g. YSDU" />
-            <FormField label="Destination ICAO" value={to} onChange={setTo} type="text" placeholder="e.g. YSSY" />
+            <AirportSelect label="Departure" value={from} onChange={setFrom} />
+            <AirportSelect label="Destination" value={to} onChange={setTo} />
             <FormField label="Priority" value={priority} onChange={setPriority} type="select" options={["P1","P2","P3","Routine"]} />
           </div>
 
@@ -637,6 +638,50 @@ function TimeInput24({ label, value, onChange }: { label: string; value: string;
         onBlur={handleBlur}
         className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-cyan-500/50 font-mono"
       />
+    </div>
+  );
+}
+
+// ── ERSA Airport Selector ─────────────────────────────────────────────────────
+function AirportSelect({ label, value, onChange }: {
+  label: string; value: string; onChange: (v: string) => void;
+}) {
+  const grouped: Record<string, ERSAAerodrome[]> = {};
+  ERSA_AERODROMES.forEach(a => {
+    if (!grouped[a.state]) grouped[a.state] = [];
+    grouped[a.state].push(a);
+  });
+  const states = Object.keys(grouped).sort();
+  const selected = getAerodrome(value);
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground mb-1.5 block font-medium">{label}</label>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-cyan-500/50"
+      >
+        <option value="">— Select aerodrome —</option>
+        {states.map(state => (
+          <optgroup key={state} label={`── ${state} ──`}>
+            {grouped[state].map(a => (
+              <option key={a.icao} value={a.icao}>
+                {a.icao} — {a.name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      {selected?.warning && (
+        <div className="mt-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 leading-relaxed">
+          ⚠️ {selected.warning}
+        </div>
+      )}
+      {selected?.nswaaNote && (
+        <div className="mt-1.5 text-xs text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2 leading-relaxed">
+          🦘 NSWAA: {selected.nswaaNote}
+        </div>
+      )}
     </div>
   );
 }
