@@ -17,18 +17,14 @@ interface Passenger {
   weight: string; // kg
   phone: string;
   notes: string;
-  // Sector assignment: array of sector IDs this pax travels on
-  boardSectors: string[];
-  // Return flight: if true, pax also travels the reverse of their sectors
-  hasReturn: boolean;
 }
 
 interface Sector {
   id: string;
   from: string;
   to: string;
-  etd: string; // stored as "HH:MM" (24hr)
-  eta: string; // stored as "HH:MM" (24hr)
+  etd: string;
+  eta: string;
 }
 
 const BOOKING_TEAMS = ["RAHS", "Dental", "Dispatch", "Operations", "Other"];
@@ -40,28 +36,10 @@ const ALLOWED_ROLES = ["rahs", "dental", "dispatcher", "operations", "admin", "m
 interface Props { role?: UserRole; }
 
 function newPassenger(): Passenger {
-  return {
-    id: crypto.randomUUID(),
-    firstName: "",
-    lastName: "",
-    dob: "",
-    weight: "",
-    phone: "",
-    notes: "",
-    boardSectors: [],
-    hasReturn: false,
-  };
+  return { id: crypto.randomUUID(), firstName: "", lastName: "", dob: "", weight: "", phone: "", notes: "" };
 }
 function newSector(): Sector {
   return { id: crypto.randomUUID(), from: "", to: "", etd: "", eta: "" };
-}
-
-// ── 24hr time display helper ──────────────────────────────────────────────────
-// Formats "HH:MM" string to always display as 24hr regardless of locale
-function fmt24(t: string): string {
-  if (!t) return "";
-  // Already "HH:MM" — just return as-is
-  return t;
 }
 
 // ── Airport Selector ──────────────────────────────────────────────────────────
@@ -133,111 +111,6 @@ function WarningBanner({ message, onDismiss }: { message: string; onDismiss: () 
   );
 }
 
-// ── Sector Checkboxes for a passenger ────────────────────────────────────────
-function SectorPicker({
-  sectors,
-  selectedIds,
-  onChange,
-}: {
-  sectors: Sector[];
-  selectedIds: string[];
-  onChange: (ids: string[]) => void;
-}) {
-  if (sectors.length === 0 || sectors.every(s => !s.from && !s.to)) {
-    return (
-      <p className="text-xs text-slate-500 italic">Add sectors above first</p>
-    );
-  }
-  function toggle(id: string) {
-    onChange(
-      selectedIds.includes(id)
-        ? selectedIds.filter(x => x !== id)
-        : [...selectedIds, id]
-    );
-  }
-  return (
-    <div className="flex flex-wrap gap-2">
-      {sectors.map((s, idx) => {
-        const label = s.from && s.to ? `${s.from}→${s.to}` : `Sector ${idx + 1}`;
-        const active = selectedIds.includes(s.id);
-        return (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => toggle(s.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-              active
-                ? "bg-blue-600 border-blue-500 text-white"
-                : "bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200"
-            }`}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Time Input (forced 24hr) ──────────────────────────────────────────────────
-// Uses type="text" with pattern validation to prevent browser 12hr conversion
-function TimeInput24({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  label: string;
-}) {
-  const [raw, setRaw] = useState(value);
-
-  useEffect(() => { setRaw(value); }, [value]);
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value;
-    setRaw(v);
-    // Accept if matches HH:MM pattern
-    if (/^\d{0,2}:?\d{0,2}$/.test(v)) {
-      onChange(v);
-    }
-  }
-
-  function handleBlur() {
-    // Normalise to HH:MM on blur
-    const match = raw.replace(":", "").match(/^(\d{1,2})(\d{2})?$/);
-    if (match) {
-      const hh = match[1].padStart(2, "0");
-      const mm = (match[2] || "00").padStart(2, "0");
-      const h = parseInt(hh, 10);
-      const m = parseInt(mm, 10);
-      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
-        const normalised = `${hh}:${mm}`;
-        setRaw(normalised);
-        onChange(normalised);
-        return;
-      }
-    }
-    // If invalid, keep what user typed
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">{label}</label>
-      <input
-        type="text"
-        inputMode="numeric"
-        value={raw}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        placeholder="HH:MM"
-        maxLength={5}
-        className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-      />
-    </div>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PassengerManifest({ role }: Props) {
 
@@ -296,18 +169,11 @@ export default function PassengerManifest({ role }: Props) {
   }
 
   function removeSector(id: string) {
-    if (sectors.length > 1) {
-      setSectors(prev => prev.filter(s => s.id !== id));
-      // Also remove from passenger sector assignments
-      setPassengers(prev => prev.map(p => ({
-        ...p,
-        boardSectors: p.boardSectors.filter(sid => sid !== id),
-      })));
-    }
+    if (sectors.length > 1) setSectors(prev => prev.filter(s => s.id !== id));
   }
 
   // ── Passenger handlers ───────────────────────────────────────────────────────
-  function updatePassenger(id: string, field: keyof Passenger, val: any) {
+  function updatePassenger(id: string, field: keyof Passenger, val: string) {
     setPassengers(prev => prev.map(p => p.id === id ? { ...p, [field]: val } : p));
   }
 
@@ -319,27 +185,11 @@ export default function PassengerManifest({ role }: Props) {
     if (passengers.length > 1) setPassengers(prev => prev.filter(p => p.id !== id));
   }
 
-  // ── Return sector label ──────────────────────────────────────────────────────
-  // For a passenger's selected sectors, build the return leg description
-  function returnSectorLabel(pax: Passenger): string {
-    const assigned = sectors.filter(s => pax.boardSectors.includes(s.id));
-    if (assigned.length === 0) return "reverse of selected sectors";
-    return assigned.map(s => s.from && s.to ? `${s.to}→${s.from}` : "").filter(Boolean).join(" · ") || "reverse of selected sectors";
-  }
-
   // ── Save / Send ──────────────────────────────────────────────────────────────
   async function saveManifest() {
     setSaving(true);
     try {
-      const body = {
-        flightDate,
-        flightNumber,
-        aircraftReg,
-        bookingTeam,
-        sectors,
-        passengers,
-        createdBy: (role as string) || "booking",
-      };
+      const body = { flightDate, flightNumber, aircraftReg, bookingTeam, sectors, passengers, createdBy: (role as string) || "booking" };
       if (editingId) {
         await apiRequest("PATCH", `/api/manifests/${editingId}`, body);
         showToast("Manifest updated.");
@@ -362,15 +212,7 @@ export default function PassengerManifest({ role }: Props) {
     setAircraftReg(m.aircraft_reg || m.aircraftReg);
     setBookingTeam(m.booking_team || m.bookingTeam);
     try { setSectors(JSON.parse(m.sectors)); } catch { setSectors([newSector()]); }
-    try {
-      const paxRaw = JSON.parse(m.passengers);
-      // Migrate old records that don't have boardSectors/hasReturn
-      setPassengers(paxRaw.map((p: any) => ({
-        ...p,
-        boardSectors: p.boardSectors || [],
-        hasReturn: p.hasReturn || false,
-      })));
-    } catch { setPassengers([newPassenger()]); }
+    try { setPassengers(JSON.parse(m.passengers)); } catch { setPassengers([newPassenger()]); }
     setEditingId(m.id);
     setActiveTab("build");
   }
@@ -462,7 +304,6 @@ export default function PassengerManifest({ role }: Props) {
                   const pax_: Passenger[] = (() => { try { return JSON.parse(m.passengers); } catch { return []; } })();
                   const statusColor = m.status === "signed" ? "text-green-400 bg-green-900/30 border-green-700"
                     : "text-slate-400 bg-slate-800 border-slate-600";
-                  const returnCount = pax_.filter((p: any) => p.hasReturn).length;
                   return (
                     <div key={m.id} className="bg-slate-800 border border-slate-700 rounded-xl p-4 hover:border-slate-500 transition-colors">
                       <div className="flex items-start justify-between gap-4">
@@ -477,14 +318,11 @@ export default function PassengerManifest({ role }: Props) {
                           </div>
                           <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-400">
                             <span>{m.booking_team || m.bookingTeam}</span>
-                            <span>{pax_.length} pax{returnCount > 0 ? ` (${returnCount} return)` : ""}</span>
+                            <span>{pax_.length} pax</span>
                             <span>{sectors_.length} sector{sectors_.length !== 1 ? "s" : ""}</span>
                             {sectors_.length > 0 && (
                               <span className="text-slate-300">
-                                {sectors_.map(s => {
-                                  const etd = fmt24(s.etd);
-                                  return `${s.from}→${s.to}${etd ? ` ${etd}` : ""}`;
-                                }).join(" · ")}
+                                {sectors_.map(s => `${s.from}→${s.to}`).join(" · ")}
                               </span>
                             )}
                           </div>
@@ -593,16 +431,16 @@ export default function PassengerManifest({ role }: Props) {
                         onChange={v => updateSector(s.id, "to", v)}
                         required
                       />
-                      <TimeInput24
-                        label="ETD (local)"
-                        value={s.etd}
-                        onChange={v => updateSector(s.id, "etd", v)}
-                      />
-                      <TimeInput24
-                        label="ETA (local)"
-                        value={s.eta}
-                        onChange={v => updateSector(s.id, "eta", v)}
-                      />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">ETD (local)</label>
+                        <input type="time" value={s.etd} onChange={e => updateSector(s.id, "etd", e.target.value)}
+                          className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">ETA (local)</label>
+                        <input type="time" value={s.eta} onChange={e => updateSector(s.id, "eta", e.target.value)}
+                          className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
                     </div>
                     {/* Aerodrome warnings inline */}
                     {[s.from, s.to].map(icao => {
@@ -637,7 +475,7 @@ export default function PassengerManifest({ role }: Props) {
                   </button>
                 )}
               </div>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {passengers.map((p, idx) => (
                   <div key={p.id} className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-3">
@@ -649,8 +487,6 @@ export default function PassengerManifest({ role }: Props) {
                         </button>
                       )}
                     </div>
-
-                    {/* Personal details */}
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">First Name</label>
@@ -688,50 +524,10 @@ export default function PassengerManifest({ role }: Props) {
                           className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                       </div>
                     </div>
-
-                    {/* Sector assignment */}
-                    <div className="mt-4 border-t border-slate-600 pt-3">
-                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2 block">
-                        Travelling on sectors
-                      </label>
-                      <SectorPicker
-                        sectors={sectors}
-                        selectedIds={p.boardSectors}
-                        onChange={ids => updatePassenger(p.id, "boardSectors", ids)}
-                      />
-                    </div>
-
-                    {/* Return flight toggle */}
-                    <div className="mt-3 flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => updatePassenger(p.id, "hasReturn", !p.hasReturn)}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                          p.hasReturn
-                            ? "bg-emerald-700 border-emerald-500 text-white"
-                            : "bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-400 hover:text-slate-200"
-                        }`}
-                      >
-                        <span>{p.hasReturn ? "↩ Return flight" : "+ Add return flight"}</span>
-                      </button>
-                      {p.hasReturn && (
-                        <span className="text-xs text-emerald-400">
-                          Return leg: {returnSectorLabel(p)}
-                          <span className="text-slate-500 ml-2">— stored as separate record for reporting</span>
-                        </span>
-                      )}
-                    </div>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Return flight explanation */}
-            {passengers.some(p => p.hasReturn) && (
-              <div className="bg-slate-800 border border-emerald-700/40 rounded-xl p-4 text-sm text-slate-400">
-                <span className="text-emerald-400 font-semibold">↩ Return flights</span> — when saved, passengers with a return flag are automatically recorded as travelling both outbound and return legs. Reports will show each direction as a separate entry. You only need to enter the passenger once.
-              </div>
-            )}
 
             {/* Save bar */}
             <div className="flex gap-3 justify-end pb-6">

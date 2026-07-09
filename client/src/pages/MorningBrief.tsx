@@ -11,7 +11,7 @@ import {
   Sun, Cloud, CloudDrizzle, CloudSnow, CloudLightning, Droplets,
   Thermometer, Navigation, CloudFog, Edit3, Save, X, ExternalLink,
   LayoutGrid, Table2, Plus, Trash2, Maximize, Minimize, Monitor,
-  Mic, MicOff, Square, Copy, ChevronUp, UserPlus, Timer, Briefcase
+  Mic, MicOff, Square, Copy, ChevronUp, UserPlus, Timer, Briefcase, PanelRight
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -77,7 +77,7 @@ const SMARTSHEET_URL = "https://app.smartsheet.com/b/publish?EQBCT=50ddc199d8cc4
 
 // ── Default data ─────────────────────────────────────────────────────────────
 
-type CrewStatus = "green" | "offline";
+type CrewStatus = "green" | "red" | "offline";
 
 interface Service {
   code: string; status: "green" | "amber" | "offline";
@@ -105,21 +105,28 @@ const DEFAULT_SERVICES: Service[] = [
 ];
 
 interface Aircraft {
-  rego: string; status: "green" | "red"; location: string; mel?: string; bisDate?: string;
+  rego: string;
+  status: "green" | "red";
+  location: string;
+  mel?: string;
+  melRestriction?: string;   // "Nil" | "Restriction — see tech log" | free text
+  bisDate?: string;
+  aogReason?: string;        // why it's AOG/U/S
+  scheduledMaint?: string;   // e.g. "100hr due 28/07 @ YBHI"
 }
 const DEFAULT_AIRCRAFT: Aircraft[] = [
   { rego: "VH-LTQ", status: "green", location: "Bankstown" },
   { rego: "VH-MQD", status: "green", location: "Launceston" },
   { rego: "VH-MQK", status: "green", location: "Essendon" },
-  { rego: "VH-MVW", status: "green", location: "Dubbo" },
+  { rego: "VH-MVW", status: "green", location: "Dubbo", scheduledMaint: "Phase check due 15/08 @ YSDU" },
   { rego: "VH-MVX", status: "green", location: "Broken Hill", mel: "Cabin Alt Controller Exp 18/06" },
-  { rego: "VH-MWH", status: "red",   location: "Toowoomba",   bisDate: "24/06/26" },
+  { rego: "VH-MWH", status: "red",   location: "Toowoomba",   bisDate: "24/06/26", aogReason: "Hydraulic system fault — LAME assessment pending" },
   { rego: "VH-MWK", status: "green", location: "Broken Hill", mel: "COM2 Exp 27/07 · Headset squeal" },
   { rego: "VH-NAJ", status: "green", location: "Essendon" },
   { rego: "VH-RFD", status: "green", location: "Launceston",  mel: "MEL active" },
   { rego: "VH-XYJ", status: "green", location: "Dubbo" },
   { rego: "VH-XYO", status: "green", location: "Broken Hill" },
-  { rego: "VH-XYR", status: "green", location: "Broken Hill" },
+  { rego: "VH-XYR", status: "green", location: "Broken Hill", scheduledMaint: "100hr due 28/07 @ YBHI" },
   { rego: "VH-VPQ", status: "green", location: "Bankstown",   mel: "Window shades INOP Exp 25/08" },
   { rego: "VH-XYU", status: "green", location: "Dubbo",       mel: "VHF Exp 25/06" },
 ];
@@ -131,11 +138,11 @@ const DEFAULT_NOTAMS: Notam[] = [
   { location: "Dubbo Airport",       detail: "Runway closure 22:00–05:00 (15/06 – 20/06)", active: true, today: true },
 ];
 
-interface FerryFlight { id: string; rego: string; route: string; date: string; crew: string; confirmed: boolean; }
+interface FerryFlight { id: string; rego: string; route: string; date: string; crew: string; confirmed: boolean; reason?: string; }
 const DEFAULT_FERRY: FerryFlight[] = [
-  { id: "Ferry269", rego: "VH-NAJ", route: "ESS → BHI", date: "Today",  crew: "A Striffler", confirmed: true  },
-  { id: "Ferry267", rego: "VH-LTQ", route: "BKK → DU",  date: "19/06",  crew: "TBC",          confirmed: false },
-  { id: "Ferry268", rego: "VH-NAJ", route: "BHI → BKK", date: "19/06",  crew: "TBC",          confirmed: false },
+  { id: "Ferry269", rego: "VH-NAJ", route: "ESS → BHI", date: "Today",  crew: "A Striffler", confirmed: true,  reason: "Maintenance" },
+  { id: "Ferry267", rego: "VH-LTQ", route: "BKK → DU",  date: "19/06",  crew: "TBC",          confirmed: false, reason: "Shift Coverage" },
+  { id: "Ferry268", rego: "VH-NAJ", route: "BHI → BKK", date: "19/06",  crew: "TBC",          confirmed: false, reason: "Post Maintenance RTB" },
 ];
 
 interface Clinic { name: string; base: string; type: string; }
@@ -290,8 +297,16 @@ function StatusDot({ status, size = "sm" }: { status: "green" | "amber" | "red" 
 function CrewDot({ role, status }: { role: "P" | "D" | "N"; status: CrewStatus }) {
   return (
     <span className="flex items-center gap-0.5">
-      <span className={`text-[10px] font-bold ${status === "green" ? "text-green-400" : "text-zinc-500"}`}>{role}</span>
-      <span className={`w-2.5 h-2.5 rounded-full ${status === "green" ? "bg-green-400" : "bg-zinc-600"}`} />
+      <span className={`text-[10px] font-bold ${
+        status === "green" ? "text-green-400" :
+        status === "red"   ? "text-red-400" :
+                             "text-zinc-500"
+      }`}>{role}</span>
+      <span className={`w-2.5 h-2.5 rounded-full ${
+        status === "green" ? "bg-green-400" :
+        status === "red"   ? "bg-red-400" :
+                             "bg-zinc-600"
+      }`} />
     </span>
   );
 }
@@ -366,13 +381,19 @@ function StatusCycle({ status, onChange, editMode, options }: {
     red:   "bg-red-500/20   border-red-500/50   text-red-400",
     offline: "bg-zinc-700   border-zinc-500     text-zinc-400",
   };
+  const labelMap: Record<string, string> = {
+    green:   "Serviceable",
+    red:     "Unserviceable",
+    amber:   "Restricted",
+    offline: "Offline",
+  };
   return (
     <button
       onClick={next}
       className={`text-xs font-bold px-2 py-0.5 rounded-full border cursor-pointer transition-all ${colorMap[status] || "bg-zinc-700 border-zinc-500 text-zinc-400"}`}
       title="Click to cycle status"
     >
-      {status}
+      {labelMap[status] ?? status}
     </button>
   );
 }
@@ -835,6 +856,7 @@ export default function MorningBrief({ role }: Props) {
 
   // Presentation / fullscreen mode
   const [presentMode, setPresentMode] = useState(false);
+  const [agendaSidePanel, setAgendaSidePanel] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const presentRef = useRef<HTMLDivElement>(null);
@@ -1205,6 +1227,15 @@ export default function MorningBrief({ role }: Props) {
             Join The 8:45
           </a>
 
+          {/* Agenda side panel toggle */}
+          <button
+            onClick={() => setAgendaSidePanel(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${agendaSidePanel ? "bg-cyan-500/20 border-cyan-400/50 text-cyan-300" : "bg-white/5 border-white/10 text-white/60 hover:text-white"}`}
+            title="Toggle agenda side panel"
+          >
+            <PanelRight size={13} /> Agenda Panel
+          </button>
+
           {/* Exit */}
           <button
             onClick={exitPresentation}
@@ -1216,7 +1247,8 @@ export default function MorningBrief({ role }: Props) {
         </div>
       )}
 
-      <div className={presentMode ? "px-4 lg:px-8 pb-8 pt-4 space-y-5" : "contents"}>
+      <div className={presentMode ? "flex flex-row h-full overflow-hidden" : "contents"}>
+      <div className={presentMode ? (agendaSidePanel ? "flex-1 overflow-y-auto px-4 lg:px-6 pb-8 pt-4 space-y-5" : "px-4 lg:px-8 pb-8 pt-4 space-y-5") : "contents"}>
       {/* ══ MEETING SELECTOR (top-level, above everything) ══════════════════ */}
       {!presentMode && (
         <div className="flex items-center gap-1 bg-card border border-card-border rounded-xl p-1 w-fit mb-5">
@@ -1540,14 +1572,19 @@ export default function MorningBrief({ role }: Props) {
               Open in Smartsheet
             </a>
           </div>
-          <div className="relative w-full" style={{ height: "720px" }}>
-            <iframe
-              src={SMARTSHEET_URL}
-              className="w-full h-full border-0"
-              title="Smartsheet Operations Board"
-              loading="lazy"
-              allowFullScreen
-            />
+          <div className="flex flex-col items-center justify-center py-20 gap-5 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center">
+              <LayoutGrid size={28} className="text-cyan-400" />
+            </div>
+            <div>
+              <p className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Operations Board</p>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                This integrated board is designed to replace Smartsheet for day-to-day operations management — one less platform, everything in one place.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground max-w-sm">
+              Full board functionality is coming in the next release. All your task tracking, assignments, and progress reporting will live natively here.
+            </p>
           </div>
         </div>
       )}
@@ -1587,14 +1624,22 @@ export default function MorningBrief({ role }: Props) {
                         </td>
                         <td className="text-center px-2">
                           <StatusCycle status={svc.status} editMode={editMode} options={["green","amber","offline"]}
-                            onChange={v => setServices(prev => prev.map((s, i) => i === idx ? { ...s, status: v as Service["status"] } : s))} />
+                            onChange={v => {
+                              const now = new Date();
+                              const hhmm = now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0");
+                              setServices(prev => prev.map((s, i) => i === idx ? { ...s, status: v as any, updated: hhmm } : s));
+                            }} />
                         </td>
                         <td className="px-2">
                           {editMode ? (
                             <div className="flex items-center justify-center gap-1">
                               {(["pilot","doctor","nurse"] as const).map(crew => (
-                                <StatusCycle key={crew} status={svc[crew]} editMode={editMode} options={["green","offline"]}
-                                  onChange={v => setServices(prev => prev.map((s, i) => i === idx ? { ...s, [crew]: v as CrewStatus } : s))} />
+                                <StatusCycle key={crew} status={svc[crew]} editMode={editMode} options={["green","red","offline"]}
+                                  onChange={v => {
+                                    const now = new Date();
+                                    const hhmm = now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0");
+                                    setServices(prev => prev.map((s, i) => i === idx ? { ...s, [crew]: v as CrewStatus, updated: hhmm } : s));
+                                  }} />
                               ))}
                             </div>
                           ) : (
@@ -1607,9 +1652,7 @@ export default function MorningBrief({ role }: Props) {
                         </td>
                         <td className="text-right pl-2 text-xs text-muted-foreground tabular-nums">
                           {editMode ? (
-                            <input className="bg-background/80 border border-cyan-500/40 rounded px-1 py-0.5 text-xs w-14 text-right focus:outline-none"
-                              value={svc.updated}
-                              onChange={e => setServices(prev => prev.map((s, i) => i === idx ? { ...s, updated: e.target.value } : s))} />
+                            <span className="text-[10px] text-muted-foreground italic">auto</span>
                           ) : svc.updated}
                         </td>
                       </tr>
@@ -1639,7 +1682,7 @@ export default function MorningBrief({ role }: Props) {
                 {aircraft.map((ac, idx) => (
                   <div key={idx}>
                     <div className={`flex items-center gap-2.5 p-3 rounded-xl bg-background/50 ${!editMode ? "cursor-pointer hover:bg-white/[0.04]" : ""} transition-colors`}
-                      onClick={() => !editMode && setExpandedMel(expandedMel === ac.rego ? null : ac.rego)}>
+                      onClick={() => !editMode && ((ac.mel || ac.bisDate || ac.scheduledMaint) ? setExpandedMel(expandedMel === ac.rego ? null : ac.rego) : undefined)}>
                       <StatusCycle status={ac.status} editMode={editMode} options={["green","red"]}
                         onChange={v => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, status: v as Aircraft["status"] } : a))} />
                       {editMode ? (
@@ -1658,7 +1701,10 @@ export default function MorningBrief({ role }: Props) {
                       )}
                       {!editMode && ac.mel && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-400">MEL</span>}
                       {!editMode && ac.bisDate && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/35 text-red-400">AOG</span>}
-                      {!editMode && (ac.mel || ac.bisDate) && (
+                      {!editMode && ac.scheduledMaint && ac.status === "green" && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/35 text-blue-400">SCHED</span>
+                      )}
+                      {!editMode && (ac.mel || ac.bisDate || ac.scheduledMaint) && (
                         <ChevronDown size={13} className={`text-muted-foreground transition-transform ${expandedMel === ac.rego ? "rotate-180" : ""}`} />
                       )}
                       {editMode && (
@@ -1674,12 +1720,44 @@ export default function MorningBrief({ role }: Props) {
                         <input className="bg-background/80 border border-card-border rounded px-2 py-0.5 text-xs w-full focus:outline-none focus:border-cyan-500/40"
                           placeholder="BIS date (AOG, optional)" value={ac.bisDate || ""}
                           onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, bisDate: e.target.value || undefined } : a))} />
+                        <input className="bg-background/80 border border-card-border rounded px-2 py-0.5 text-xs w-full focus:outline-none focus:border-cyan-500/40"
+                          placeholder="AOG / U/S reason" value={ac.aogReason || ""}
+                          onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, aogReason: e.target.value || undefined } : a))} />
+                        <input className="bg-background/80 border border-card-border rounded px-2 py-0.5 text-xs w-full focus:outline-none focus:border-cyan-500/40"
+                          placeholder="Scheduled maintenance (optional)" value={ac.scheduledMaint || ""}
+                          onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, scheduledMaint: e.target.value || undefined } : a))} />
+                        <select className="bg-background/80 border border-card-border rounded px-2 py-0.5 text-xs w-full focus:outline-none focus:border-cyan-500/40"
+                          value={ac.melRestriction || ""}
+                          onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, melRestriction: e.target.value || undefined } : a))}>
+                          <option value="">MEL restriction (optional)</option>
+                          <option value="Restrictions Nil">Restrictions Nil</option>
+                          <option value="Operational Restriction — see tech log">Operational Restriction — see tech log</option>
+                        </select>
                       </div>
                     )}
-                    {!editMode && expandedMel === ac.rego && (ac.mel || ac.bisDate) && (
+                    {!editMode && expandedMel === ac.rego && (ac.mel || ac.bisDate || ac.scheduledMaint) && (
                       <div className="mx-2 mb-1.5 px-3 py-2 rounded-b-xl bg-amber-500/5 border-x border-b border-amber-500/20 text-sm">
                         {ac.mel && <p className="text-amber-300"><span className="font-semibold text-amber-400">MEL:</span> {ac.mel}</p>}
                         {ac.bisDate && <p className="text-red-300 mt-0.5"><span className="font-semibold text-red-400">Back in service:</span> {ac.bisDate}</p>}
+                        {ac.aogReason && (
+                          <p className="text-red-300 mt-1"><span className="font-semibold text-red-400">Reason:</span> {ac.aogReason}</p>
+                        )}
+                        {ac.scheduledMaint && (
+                          <p className="text-blue-300 mt-1"><span className="font-semibold text-blue-400">Scheduled Maint:</span> {ac.scheduledMaint}</p>
+                        )}
+                        {ac.mel && ac.melRestriction && (
+                          <p className={`mt-1 ${ac.melRestriction.startsWith("Operational") ? "text-amber-300" : "text-green-300"}`}>
+                            <span className="font-semibold">MEL Restriction:</span>{" "}
+                            {ac.melRestriction.startsWith("Operational") ? (
+                              <a
+                                href={`#/tech-log?search=${encodeURIComponent(ac.rego)}`}
+                                onClick={e => { e.stopPropagation(); }}
+                                className="underline cursor-pointer hover:text-amber-200 transition-colors"
+                                title="View in tech log"
+                              >{ac.melRestriction}</a>
+                            ) : ac.melRestriction}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1693,7 +1771,7 @@ export default function MorningBrief({ role }: Props) {
               )}
               <div className="flex items-center gap-5 mt-4 pt-3 border-t border-card-border text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-400 inline-block" /> Serviceable ({aircraft.filter(a => a.status === "green").length})</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" /> AOG ({aircraft.filter(a => a.status === "red").length})</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" /> Unserviceable / AOG ({aircraft.filter(a => a.status === "red").length})</span>
               </div>
             </div>
 
@@ -1703,6 +1781,7 @@ export default function MorningBrief({ role }: Props) {
               {/* NOTAMs */}
               <div className="bg-card border border-card-border rounded-2xl p-5">
                 <SectionHeading label="Weather & Airport NOTAMs" icon={<CloudRain size={14} />} />
+                <p className="text-[10px] text-muted-foreground/60 italic mb-1">Manually entered — check AIP/Naips for current NOTAMs</p>
                 <div className="space-y-2.5">
                   {notams.map((n, idx) => (
                     <div key={idx} className={`flex gap-3 p-3 rounded-xl border ${
@@ -1771,6 +1850,14 @@ export default function MorningBrief({ role }: Props) {
                             onChange={e => setFerry(prev => prev.map((x,i) => i===idx ? {...x, rego: e.target.value} : x))} />
                           <input className="bg-background/80 border border-cyan-500/40 rounded px-1.5 py-0.5 text-xs w-24 focus:outline-none" value={f.route}
                             onChange={e => setFerry(prev => prev.map((x,i) => i===idx ? {...x, route: e.target.value} : x))} />
+                          <select className="bg-background/80 border border-cyan-500/40 rounded px-1.5 py-0.5 text-xs focus:outline-none"
+                            value={f.reason || ""}
+                            onChange={e => setFerry(prev => prev.map((x,i) => i===idx ? {...x, reason: e.target.value||undefined} : x))}>
+                            <option value="">Reason</option>
+                            <option value="Shift Coverage">Shift Coverage</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Post Maintenance RTB">Post Maintenance RTB</option>
+                          </select>
                           <input className="bg-background/80 border border-cyan-500/40 rounded px-1.5 py-0.5 text-xs w-16 focus:outline-none" value={f.date}
                             onChange={e => setFerry(prev => prev.map((x,i) => i===idx ? {...x, date: e.target.value} : x))} />
                           <input className="bg-background/80 border border-cyan-500/40 rounded px-1.5 py-0.5 text-xs w-28 focus:outline-none" value={f.crew}
@@ -1789,6 +1876,7 @@ export default function MorningBrief({ role }: Props) {
                             style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{f.id}</span>
                           <span className="text-sm font-semibold w-14 flex-shrink-0 truncate">{f.rego}</span>
                           <span className="text-sm text-muted-foreground flex-1 min-w-0 truncate">{f.route}</span>
+                          {f.reason && <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/30 text-muted-foreground border border-card-border">{f.reason}</span>}
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
                             f.date === "Today" ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30" : "text-muted-foreground"
                           }`}>{f.date}</span>
@@ -1824,10 +1912,23 @@ export default function MorningBrief({ role }: Props) {
                         <>
                           <input className="bg-background/80 border border-cyan-500/40 rounded px-2 py-0.5 text-sm font-semibold flex-1 focus:outline-none" value={c.name}
                             onChange={e => setClinics(prev => prev.map((x,i) => i===idx ? {...x, name: e.target.value} : x))} />
-                          <input className="bg-background/80 border border-cyan-500/40 rounded px-2 py-0.5 text-xs w-14 focus:outline-none" value={c.base}
-                            onChange={e => setClinics(prev => prev.map((x,i) => i===idx ? {...x, base: e.target.value} : x))} />
-                          <input className="bg-background/80 border border-cyan-500/40 rounded px-2 py-0.5 text-xs w-24 focus:outline-none" value={c.type}
-                            onChange={e => setClinics(prev => prev.map((x,i) => i===idx ? {...x, type: e.target.value} : x))} />
+                          <select className="bg-background/80 border border-cyan-500/40 rounded px-1.5 py-0.5 text-xs focus:outline-none"
+                            value={c.base}
+                            onChange={e => setClinics(prev => prev.map((x,i) => i===idx ? {...x, base: e.target.value} : x))}>
+                            <option value="BHI">BHI — Broken Hill</option>
+                            <option value="DU">DU — Dubbo</option>
+                            <option value="BK">BK — Bankstown</option>
+                            <option value="ESS">ESS — Essendon</option>
+                            <option value="TAS">TAS — Launceston</option>
+                            <option value="MLD">MLD — Mildura</option>
+                          </select>
+                          <select className="bg-background/80 border border-cyan-500/40 rounded px-1.5 py-0.5 text-xs focus:outline-none"
+                            value={c.type}
+                            onChange={e => setClinics(prev => prev.map((x,i) => i===idx ? {...x, type: e.target.value} : x))}>
+                            <option value="Air Only">Air Only</option>
+                            <option value="Road Only">Road Only</option>
+                            <option value="Air & Road">Air & Road</option>
+                          </select>
                           <button onClick={() => setClinics(prev => prev.filter((_,i) => i!==idx))}
                             className="text-zinc-500 hover:text-red-400 transition-colors"><Trash2 size={11} /></button>
                         </>
@@ -1923,6 +2024,13 @@ export default function MorningBrief({ role }: Props) {
                 <Plus size={12} /> Add vehicle
               </button>
             )}
+            <div className="flex items-center gap-4 mt-4 pt-3 border-t border-card-border">
+              {[["bg-green-400","Online"],["bg-amber-400","Restricted"],["bg-red-400","Unserviceable"]].map(([dot,lbl]) => (
+                <span key={lbl} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className={`w-2 h-2 rounded-full ${dot}`} />{lbl}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* ══ MEETING AGENDA ════════════════════════════════════════════════ */}
@@ -2176,6 +2284,23 @@ export default function MorningBrief({ role }: Props) {
         </div>
       )}
       </div>{/* end present/normal content wrapper */}
+
+      {/* Agenda side panel — only in present mode */}
+      {presentMode && agendaSidePanel && (
+        <div className="w-72 shrink-0 border-l border-white/10 bg-black/40 backdrop-blur-md overflow-y-auto px-4 py-5 space-y-3">
+          <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-3">Agenda</p>
+          {AGENDA.map(item => (
+            <div key={item.num} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/5 border border-white/10">
+              <span className="text-[10px] font-bold text-white/40 w-4 shrink-0 mt-0.5">{item.num}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white/90 leading-snug">{item.title}</p>
+                <p className="text-[10px] text-white/40 mt-0.5">{item.duration}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      </div>{/* end flex row wrapper */}
     </div>
   );
 }
