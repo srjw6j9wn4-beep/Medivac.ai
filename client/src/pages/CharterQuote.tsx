@@ -351,11 +351,22 @@ export default function CharterQuote() {
   });
 
   // ─── Mutations ────────────────────────────────────────────────────────────
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const saveMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/charter-quotes", data).then(r => r.json()),
-    onSuccess: () => {
+    mutationFn: (data: any) => apiRequest("POST", "/api/charter-quotes", data).then(r => {
+      if (!r.ok) throw new Error(`Server error ${r.status}`);
+      return r.json();
+    }),
+    onSuccess: (saved) => {
       qc.invalidateQueries({ queryKey: ["/api/charter-quotes"] });
       qc.invalidateQueries({ queryKey: ["/api/charter-quotes/next-number"] });
+      setSaveMessage({ type: 'success', text: `Quote ${saved.quoteNumber} saved successfully.` });
+      setTimeout(() => setSaveMessage(null), 6000);
+    },
+    onError: (err: any) => {
+      setSaveMessage({ type: 'error', text: `Failed to save — ${err?.message ?? 'please try again'}.` });
+      setTimeout(() => setSaveMessage(null), 8000);
     },
   });
 
@@ -1005,8 +1016,9 @@ export default function CharterQuote() {
 
               {/* Action buttons */}
               <div className="flex flex-wrap gap-2 mt-4">
-                <button onClick={handleSaveQuote} disabled={saveMutation.isPending}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-md text-white disabled:opacity-50"
+                <button onClick={handleSaveQuote} disabled={saveMutation.isPending || !breakdown}
+                  title={!breakdown ? "Calculate the quote first" : ""}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-md text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ backgroundColor: TEAL }}>
                   <Save size={13} /> {saveMutation.isPending ? "Saving..." : "Save Quote"}
                 </button>
@@ -1019,8 +1031,10 @@ export default function CharterQuote() {
                   <RotateCcw size={13} /> Start New
                 </button>
               </div>
-              {saveMutation.isSuccess && (
-                <div className="mt-2 text-[11px] text-green-400">Quote saved successfully.</div>
+              {saveMessage && (
+                <div className={`mt-2 text-[11px] font-medium ${
+                  saveMessage.type === 'success' ? 'text-green-400' : 'text-red-400'
+                }`}>{saveMessage.text}</div>
               )}
             </div>
           )}
