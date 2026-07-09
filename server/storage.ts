@@ -172,13 +172,17 @@ export class DatabaseStorage {
     return data ? mapManifest(data) : undefined;
   }
   async listManifests(flightDate?: string): Promise<PassengerManifest[]> {
-    let q = supabase.from('passenger_manifests').select('*');
+    let q = supabase.from('passenger_manifests').select('*').order('created_at', { ascending: false });
     if (flightDate) q = q.eq('flight_date', flightDate);
     const { data } = await q;
     return (data ?? []).map(mapManifest);
   }
   async updateManifest(id: number, u: Partial<PassengerManifest>): Promise<PassengerManifest> {
     const row: any = { updated_at: new Date().toISOString() };
+    if (u.flightDate !== undefined) row.flight_date = u.flightDate;
+    if (u.flightNumber !== undefined) row.flight_number = u.flightNumber;
+    if (u.aircraftReg !== undefined) row.aircraft_reg = u.aircraftReg;
+    if (u.bookingTeam !== undefined) row.booking_team = u.bookingTeam;
     if (u.status !== undefined) row.status = u.status;
     if (u.signToken !== undefined) row.sign_token = u.signToken;
     if (u.signedAt !== undefined) row.signed_at = u.signedAt;

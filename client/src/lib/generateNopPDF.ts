@@ -44,6 +44,9 @@ export interface NopPDFData {
   executiveSummary: string;
   issuesIdentified: string;
   actionsPlanned: string;
+
+  // Financial
+  groundTransportTotal: number;  // total van ground transport for the period ($)
 }
 
 export function generateNopPDF(d: NopPDFData) {
@@ -467,9 +470,43 @@ export function generateNopPDF(d: NopPDFData) {
     ${narrativeRow("Planned Actions / Improvements", d.actionsPlanned)}
   </div>
 
+  <!-- ── Section 7: Financial Summary ────────────────────────────────── -->
+  <div class="section">
+    <div class="section-heading">7. Financial Summary — Ground Transport</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width:30%">Cost Category</th>
+          <th>Basis</th>
+          <th style="text-align:right;width:60px">Missions</th>
+          <th style="text-align:right;width:90px">Rate / Transfer</th>
+          <th style="text-align:right;width:90px">Period Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:600">Van — Ground Transport</td>
+          <td>Pick-up + drop-off per task (2 transfers / task) at operator-recorded rate. Default $200/transfer.</td>
+          <td style="text-align:right">${d.totalMissions}</td>
+          <td style="text-align:right">${d.totalMissions > 0 ? "$" + Math.round(d.groundTransportTotal / d.totalMissions / 2).toLocaleString() : "$200"}/transfer</td>
+          <td style="text-align:right;font-weight:700;color:#0891b2;font-size:10pt">$${d.groundTransportTotal.toLocaleString()}</td>
+        </tr>
+        <tr style="background:#f1f5f9">
+          <td colspan="4" style="font-weight:700;text-align:right;padding-right:10px;font-size:9pt">Ground Transport Sub-total (excl. GST)</td>
+          <td style="text-align:right;font-weight:800;font-size:11pt;color:#0891b2">$${d.groundTransportTotal.toLocaleString()}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:7.5pt;color:#64748b;margin-top:6px;line-height:1.5">
+      Ground transport costs reflect van transfers (patient pick-up and drop-off) at the per-task rate recorded
+      in the NEPT Tasker for each mission during the reporting period. The rate is operator-configurable per task
+      (default $200 per transfer). Figures are exclusive of GST and do not include NSW Ambulance contracted ground legs.
+    </p>
+  </div>
+
   <!-- ── Section 7: Pre-Submission Checklist ──────────────────────── -->
   <div class="section">
-    <div class="section-heading">7. Pre-Submission Checklist</div>
+    <div class="section-heading">8. Pre-Submission Checklist</div>
     <table class="chk-table">
       <tbody>${checklistHTML}</tbody>
     </table>
@@ -477,7 +514,7 @@ export function generateNopPDF(d: NopPDFData) {
 
   <!-- ── Section 8: Authorisation & Signatures ────────────────────── -->
   <div class="section">
-    <div class="section-heading">8. Authorisation</div>
+    <div class="section-heading">9. Authorisation</div>
     <p style="font-size:8.5pt;color:#374151;margin-bottom:14px;">
       This Notice of Operations has been prepared in accordance with the NSW Health Non-Emergency Patient Transport
       Service Agreement and accurately reflects the operations conducted by RFDS South Eastern Section during the

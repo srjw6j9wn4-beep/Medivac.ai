@@ -275,7 +275,7 @@ export default function PassengerManifest({ role }: Props) {
     try {
       const res = await apiRequest("GET", "/api/manifests");
       const data = await res.json();
-      setManifests(Array.isArray(data) ? data.reverse() : []);
+      setManifests(Array.isArray(data) ? data : []);
     } catch { setManifests([]); }
     finally { setLoadingList(false); }
   }

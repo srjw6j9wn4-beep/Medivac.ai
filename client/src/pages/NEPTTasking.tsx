@@ -1538,7 +1538,7 @@ function NoticeOfOps({ tasks, month, year, setMonth, setYear }: {
 export default function NEPTTasking({ role }: Props) {
   const qc = useQueryClient();
   const [search, setSearch]           = useState("");
-  const [filterStatus, setFilterStatus] = useState<TaskStatus | "All">("Pending");
+  const [filterStatus, setFilterStatus] = useState<TaskStatus | "All">("All");
   const [filterPriority, setFilterPriority] = useState<TaskPriority | "All">("All");
   const [showModal, setShowModal]     = useState(false);
   const [editTask, setEditTask]       = useState<NeptTask | null>(null);
@@ -1654,6 +1654,8 @@ export default function NEPTTasking({ role }: Props) {
 
   function handleStatusChange(id: number, status: TaskStatus) {
     updateMutation.mutate({ id, data: { status } });
+    // Switch filter to All so the task remains visible after status change
+    setFilterStatus("All");
   }
 
   function handleDelete(task: NeptTask) {
