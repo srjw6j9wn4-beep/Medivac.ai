@@ -1275,15 +1275,24 @@ export default function MissionOptimiser(){
                 <div><span className="text-muted-foreground">Case type: </span><span className="font-semibold capitalize text-white">{inputs.caseType}</span></div>
                 <div><span className="text-muted-foreground">Aircraft: </span><span className="font-semibold text-white">{inputs.availableAircraft.join(', ')}</span></div>
               </div>
-              {/* Leg distances for recommended route */}
+              {/* Cost + leg distances for recommended route */}
               {recommended&&(
-                <div className="mt-2 pt-2 border-t border-card-border flex flex-wrap gap-3 text-muted-foreground">
-                  <span>Base→Pickup: <span className="text-white font-semibold">{fmtNm(recommended.leg1Km)}</span></span>
-                  <span className="text-card-border">|</span>
-                  <span>Pickup→Hospital: <span className="text-white font-semibold">{fmtNm(recommended.leg2Km)}</span></span>
-                  <span className="text-card-border">|</span>
-                  <span>Return: <span className="text-white font-semibold">{fmtNm(recommended.leg3Km)}</span></span>
-                </div>
+                <>
+                  <div className="mt-2 pt-2 border-t border-card-border flex items-center justify-between">
+                    <div className="text-muted-foreground">Est. mission cost</div>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-cyan-400">{fmtCost(recommended.totalCost)}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{fmtTime(recommended.totalTimeMin)} total</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-muted-foreground pt-1">
+                    <span>Base→Pickup: <span className="text-white font-semibold">{fmtNm(recommended.leg1Km)}</span></span>
+                    <span className="text-card-border">|</span>
+                    <span>Pickup→Hospital: <span className="text-white font-semibold">{fmtNm(recommended.leg2Km)}</span></span>
+                    <span className="text-card-border">|</span>
+                    <span>Return: <span className="text-white font-semibold">{fmtNm(recommended.leg3Km)}</span></span>
+                  </div>
+                </>
               )}
             </div>
             <div className="text-xs text-muted-foreground font-semibold uppercase tracking-wide px-1">Ranked options</div>
