@@ -1577,7 +1577,8 @@ export default function NEPTTasking({ role }: Props) {
 
   const createMutation = useMutation({
     mutationFn: (d: TaskDraft) => apiRequest("POST", "/api/nept-tasks", serializeForApi(d)),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/nept-tasks"] }); setShowModal(false); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/nept-tasks"] }); setShowModal(false); setEditTask(null); },
+    onError: (err: Error) => { alert(`Failed to create task: ${err.message}`); },
   });
 
   const updateMutation = useMutation({
@@ -1585,7 +1586,8 @@ export default function NEPTTasking({ role }: Props) {
       const payload = { ...data, sectors: data.sectors ? JSON.stringify(data.sectors) : data.sectors };
       return apiRequest("PATCH", `/api/nept-tasks/${id}`, payload);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/nept-tasks"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/nept-tasks"] }); setEditTask(null); },
+    onError: (err: Error) => { alert(`Failed to update task: ${err.message}`); },
   });
 
   const deleteMutation = useMutation({
