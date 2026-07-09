@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import type { Server } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { storage } from "./storage";
+import { storage, seedDefaultRates } from "./storage";
 import { getNotamsForAirport, getNotamsForAirports, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } from "./notam";
 import webpush from "web-push";
 
@@ -109,7 +109,7 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   // Health check for Railway / uptime monitors
-  app.get("/api/health", (_req: Request, res: Response) => {
+  app.get("/api/health", async (_req: Request, res: Response) => {
     res.json({ status: "ok", ts: new Date().toISOString() });
   });
 
@@ -643,12 +643,12 @@ export async function registerRoutes(
   // ── Web Push ─────────────────────────────────────────────────────────────────
 
   // GET /api/push/vapid-public-key  — returns VAPID public key for SW subscription
-  app.get("/api/push/vapid-public-key", (_req: Request, res: Response) => {
+  app.get("/api/push/vapid-public-key", async (_req: Request, res: Response) => {
     res.json({ publicKey: VAPID_PUBLIC_KEY });
   });
 
   // POST /api/push/subscribe  — save a device push subscription
-  app.post("/api/push/subscribe", (req: Request, res: Response) => {
+  app.post("/api/push/subscribe", async (req: Request, res: Response) => {
     try {
       const { endpoint, keys, deviceLabel = 'device' } = req.body;
       if (!endpoint || !keys) return res.status(400).json({ error: "Missing endpoint or keys" });
@@ -661,7 +661,7 @@ export async function registerRoutes(
   });
 
   // DELETE /api/push/subscribe  — remove a subscription on unsubscribe
-  app.delete("/api/push/subscribe", (req: Request, res: Response) => {
+  app.delete("/api/push/subscribe", async (req: Request, res: Response) => {
     try {
       const { endpoint } = req.body;
       if (endpoint) storage.deletePushSubscription(endpoint);
@@ -696,7 +696,7 @@ export async function registerRoutes(
   // ── Active mission tracking ───────────────────────────────────────────────
 
   // POST /api/missions/active  — register an active flight mission for NOTAM watching
-  app.post("/api/missions/active", (req: Request, res: Response) => {
+  app.post("/api/missions/active", async (req: Request, res: Response) => {
     try {
       const { missionId, aircraft, airports, pic, missionType, date } = req.body;
       if (!missionId || !airports) return res.status(400).json({ error: "Missing required fields" });
@@ -708,7 +708,7 @@ export async function registerRoutes(
   });
 
   // PATCH /api/missions/active/:id/complete  — mark mission completed
-  app.patch("/api/missions/active/:id/complete", (req: Request, res: Response) => {
+  app.patch("/api/missions/active/:id/complete", async (req: Request, res: Response) => {
     try {
       storage.completeMission(req.params.id);
       return res.json({ ok: true });
@@ -718,7 +718,7 @@ export async function registerRoutes(
   });
 
   // GET /api/missions/active  — list active missions
-  app.get("/api/missions/active", (_req: Request, res: Response) => {
+  app.get("/api/missions/active", async (_req: Request, res: Response) => {
     return res.json({ missions: storage.listActiveMissions() });
   });
 
@@ -818,7 +818,7 @@ export async function registerRoutes(
           ? `${task.pickupLocation} → ${task.destLocation}`
           : task.taskRef;
         const patient = task.patientName ? ` · Patient: ${task.patientName}` : "";
-        storage.createNotification({
+        await storage.createNotification({
           type:    "task_released",
           title:   `Task Released to Gate`,
           body:    `${task.taskRef} — ${route}${ task.aircraftReg ? ` · ${task.aircraftReg}` : "" }${patient}`,
@@ -832,22 +832,22 @@ export async function registerRoutes(
   });
 
   // ── Notifications ─────────────────────────────────────────────────────────
-  app.get("/api/notifications", (_req: Request, res: Response) => {
+  app.get("/api/notifications", async (_req: Request, res: Response) => {
     try {
-      res.json(storage.listUnreadNotifications());
+      res.json(await storage.listUnreadNotifications());
     } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
-  app.post("/api/notifications/:id/read", (req: Request, res: Response) => {
+  app.post("/api/notifications/:id/read", async (req: Request, res: Response) => {
     try {
-      const n = storage.markNotificationRead(parseInt(req.params.id));
+      const n = await storage.markNotificationRead(parseInt(req.params.id));
       res.json(n ?? { ok: true });
     } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
-  app.post("/api/notifications/read-all", (_req: Request, res: Response) => {
+  app.post("/api/notifications/read-all", async (_req: Request, res: Response) => {
     try {
-      storage.markAllNotificationsRead();
+      await storage.markAllNotificationsRead();
       res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: String(err) }); }
   });
@@ -921,11 +921,11 @@ export async function registerRoutes(
   // Stores pending reorder items so StockUsage can consume them cross-page
   const chestReorderQueue: { stockId: string; qty: number; note: string }[] = [];
 
-  app.get("/api/chest-reorder-queue", (_req: Request, res: Response) => {
+  app.get("/api/chest-reorder-queue", async (_req: Request, res: Response) => {
     res.json([...chestReorderQueue]);
   });
 
-  app.post("/api/chest-reorder-queue", (req: Request, res: Response) => {
+  app.post("/api/chest-reorder-queue", async (req: Request, res: Response) => {
     const items: { stockId: string; qty: number; note: string }[] = req.body ?? [];
     items.forEach(item => {
       const idx = chestReorderQueue.findIndex(e => e.stockId === item.stockId);
@@ -938,7 +938,7 @@ export async function registerRoutes(
     res.json({ ok: true, count: chestReorderQueue.length });
   });
 
-  app.delete("/api/chest-reorder-queue", (_req: Request, res: Response) => {
+  app.delete("/api/chest-reorder-queue", async (_req: Request, res: Response) => {
     chestReorderQueue.length = 0;
     res.json({ ok: true });
   });
@@ -946,7 +946,7 @@ export async function registerRoutes(
   // ── Video streaming route (byte-range aware) ─────────────────────────────
   // S3 static hosting does not support Range requests. Serve all video files
   // through Express so browsers can seek and autoplay reliably.
-  app.get("/api/video/:filename", (req: Request, res: Response) => {
+  app.get("/api/video/:filename", async (req: Request, res: Response) => {
     const filename = path.basename(req.params.filename); // prevent path traversal
     const videoPath = path.join(__dirname, "public", "video", filename);
     if (!fs.existsSync(videoPath)) {
@@ -998,19 +998,19 @@ export async function registerRoutes(
   setTimeout(runNotamWatch, 2 * 60 * 1000);
 
   // ── Special Mission QC Sessions ─────────────────────────────────────────────
-  app.get("/api/special-missions", (_req: Request, res: Response) => {
+  app.get("/api/special-missions", async (_req: Request, res: Response) => {
     try {
-      const sessions = storage.listSpecialMissionSessions();
+      const sessions = await storage.listSpecialMissionSessions();
       res.json(sessions);
     } catch (e) {
       res.status(500).json({ error: String(e) });
     }
   });
 
-  app.post("/api/special-missions", (req: Request, res: Response) => {
+  app.post("/api/special-missions", async (req: Request, res: Response) => {
     try {
       const now = new Date().toISOString();
-      const session = storage.createSpecialMissionSession({
+      const session = await storage.createSpecialMissionSession({
         missionType:   req.body.missionType,
         missionRef:    req.body.missionRef,
         status:        req.body.status ?? "pre-flight",
@@ -1029,12 +1029,12 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/special-missions/:id", (req: Request, res: Response) => {
+  app.patch("/api/special-missions/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const updates: any = { ...req.body };
       if (updates.status === "complete") updates.completedAt = new Date().toISOString();
-      const session = storage.updateSpecialMissionSession(id, updates);
+      const session = await storage.updateSpecialMissionSession(id, updates);
       res.json(session);
     } catch (e) {
       res.status(500).json({ error: String(e) });
@@ -1042,31 +1042,31 @@ export async function registerRoutes(
   });
 
   // ── Invoices ─────────────────────────────────────────────────────────────────
-  app.get("/api/invoices", (_req: Request, res: Response) => {
+  app.get("/api/invoices", async (_req: Request, res: Response) => {
     try {
-      res.json(storage.listInvoices());
+      res.json(await storage.listInvoices());
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.get("/api/invoices/next-number", (_req: Request, res: Response) => {
+  app.get("/api/invoices/next-number", async (_req: Request, res: Response) => {
     try {
-      res.json({ invoiceNumber: storage.getNextInvoiceNumber() });
+      res.json({ invoiceNumber: await storage.getNextInvoiceNumber() });
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.get("/api/invoices/:id", (req: Request, res: Response) => {
+  app.get("/api/invoices/:id", async (req: Request, res: Response) => {
     try {
-      const inv = storage.getInvoice(parseInt(req.params.id));
+      const inv = await storage.getInvoice(parseInt(req.params.id));
       if (!inv) return res.status(404).json({ error: "Not found" });
       res.json(inv);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.post("/api/invoices", (req: Request, res: Response) => {
+  app.post("/api/invoices", async (req: Request, res: Response) => {
     try {
       const now = new Date().toISOString();
       const body = req.body;
-      const inv = storage.createInvoice({
+      const inv = await storage.createInvoice({
         invoiceNumber:       body.invoiceNumber,
         invoiceDate:         body.invoiceDate,
         dueDate:             body.dueDate,
@@ -1095,50 +1095,50 @@ export async function registerRoutes(
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.patch("/api/invoices/:id", (req: Request, res: Response) => {
+  app.patch("/api/invoices/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const updates: any = { ...req.body };
       if (updates.status === "Submitted" && !updates.submittedAt) updates.submittedAt = new Date().toISOString();
       if (updates.status === "Paid" && !updates.paidAt) updates.paidAt = new Date().toISOString();
-      res.json(storage.updateInvoice(id, updates));
+      res.json(await storage.updateInvoice(id, updates));
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.delete("/api/invoices/:id", (req: Request, res: Response) => {
+  app.delete("/api/invoices/:id", async (req: Request, res: Response) => {
     try {
-      const ok = storage.deleteInvoice(parseInt(req.params.id));
+      const ok = await storage.deleteInvoice(parseInt(req.params.id));
       if (!ok) return res.status(404).json({ error: "Not found" });
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
   // ── Charter Quotes ────────────────────────────────────────────────────────────
-  app.get("/api/charter-quotes", (_req: Request, res: Response) => {
+  app.get("/api/charter-quotes", async (_req: Request, res: Response) => {
     try {
-      res.json(storage.getCharterQuotes());
+      res.json(await storage.getCharterQuotes());
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.get("/api/charter-quotes/next-number", (_req: Request, res: Response) => {
+  app.get("/api/charter-quotes/next-number", async (_req: Request, res: Response) => {
     try {
-      res.json({ quoteNumber: storage.getNextQuoteNumber() });
+      res.json({ quoteNumber: await storage.getNextQuoteNumber() });
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.get("/api/charter-quotes/:id", (req: Request, res: Response) => {
+  app.get("/api/charter-quotes/:id", async (req: Request, res: Response) => {
     try {
-      const q = storage.getCharterQuote(parseInt(req.params.id));
+      const q = await storage.getCharterQuote(parseInt(req.params.id));
       if (!q) return res.status(404).json({ error: "Not found" });
       res.json(q);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.post("/api/charter-quotes", (req: Request, res: Response) => {
+  app.post("/api/charter-quotes", async (req: Request, res: Response) => {
     try {
       const now = new Date().toISOString();
       const body = req.body;
-      const quote = storage.createCharterQuote({
+      const quote = await storage.createCharterQuote({
         quoteNumber:    body.quoteNumber,
         clientName:     body.clientName,
         clientContact:  body.clientContact ?? null,
@@ -1160,52 +1160,52 @@ export async function registerRoutes(
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.patch("/api/charter-quotes/:id", (req: Request, res: Response) => {
+  app.patch("/api/charter-quotes/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const updated = storage.updateCharterQuote(id, req.body);
+      const updated = await storage.updateCharterQuote(id, req.body);
       if (!updated) return res.status(404).json({ error: "Not found" });
       res.json(updated);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.delete("/api/charter-quotes/:id", (req: Request, res: Response) => {
+  app.delete("/api/charter-quotes/:id", async (req: Request, res: Response) => {
     try {
-      const ok = storage.deleteCharterQuote(parseInt(req.params.id));
+      const ok = await storage.deleteCharterQuote(parseInt(req.params.id));
       if (!ok) return res.status(404).json({ error: "Not found" });
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
   // ── Cost Optimizer ───────────────────────────────────────────────────────
-  app.get("/api/cost-optimizer/config", (_req: Request, res: Response) => {
+  app.get("/api/cost-optimizer/config", async (_req: Request, res: Response) => {
     try {
-      res.json(storage.getCostConfig());
+      res.json(await storage.getCostConfig());
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.put("/api/cost-optimizer/config/:key", (req: Request, res: Response) => {
+  app.put("/api/cost-optimizer/config/:key", async (req: Request, res: Response) => {
     try {
       const key = String(req.params.key);
       const { value, category } = req.body as { value?: string; category?: string };
       if (value === undefined || value === null) {
         return res.status(400).json({ error: "value is required" });
       }
-      const row = storage.upsertCostConfig(key, String(value), category ?? "general");
+      const row = await storage.upsertCostConfig(key, String(value), category ?? "general");
       res.json(row);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.get("/api/action-plan", (_req: Request, res: Response) => {
+  app.get("/api/action-plan", async (_req: Request, res: Response) => {
     try {
-      res.json(storage.getActionPlan());
+      res.json(await storage.getActionPlan());
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.post("/api/action-plan", (req: Request, res: Response) => {
+  app.post("/api/action-plan", async (req: Request, res: Response) => {
     try {
       const body = req.body;
-      const item = storage.createActionItem({
+      const item = await storage.createActionItem({
         title: body.title,
         category: body.category,
         estimatedAnnualValue: body.estimatedAnnualValue,
@@ -1218,18 +1218,18 @@ export async function registerRoutes(
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.put("/api/action-plan/:id", (req: Request, res: Response) => {
+  app.put("/api/action-plan/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
-      const updated = storage.updateActionItem(id, req.body);
+      const updated = await storage.updateActionItem(id, req.body);
       if (!updated) return res.status(404).json({ error: "Not found" });
       res.json(updated);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
-  app.delete("/api/action-plan/:id", (req: Request, res: Response) => {
+  app.delete("/api/action-plan/:id", async (req: Request, res: Response) => {
     try {
-      const ok = storage.deleteActionItem(parseInt(req.params.id));
+      const ok = await storage.deleteActionItem(parseInt(req.params.id));
       if (!ok) return res.status(404).json({ error: "Not found" });
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: String(e) }); }
@@ -1238,21 +1238,21 @@ export async function registerRoutes(
   // ── Quote Rates — live rate monitor for Charter Quote engine ────────────────
 
   // GET /api/quote-rates — all rates, ordered by category then label
-  app.get("/api/quote-rates", (_req: Request, res: Response) => {
+  app.get("/api/quote-rates", async (_req: Request, res: Response) => {
     try {
-      res.json(storage.getAllRates());
+      res.json(await storage.getAllRates());
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
   // PUT /api/quote-rates/:key — ops manual override
-  app.put("/api/quote-rates/:key", (req: Request, res: Response) => {
+  app.put("/api/quote-rates/:key", async (req: Request, res: Response) => {
     try {
       const key = String(req.params.key);
       const { value, notes } = req.body as { value?: string | number; notes?: string };
       if (value === undefined || value === null || value === "") {
         return res.status(400).json({ error: "value is required" });
       }
-      const rate = storage.updateRateManual(key, String(value), notes);
+      const rate = await storage.updateRateManual(key, String(value), notes);
       if (!rate) return res.status(404).json({ error: "Rate not found" });
       res.json(rate);
     } catch (e) { res.status(500).json({ error: String(e) }); }
@@ -1276,16 +1276,16 @@ export async function registerRoutes(
           const icao = match[1];
           const newValue = match[2];
           const key = `landing_${icao}`;
-          const existing = storage.getRateByKey(key);
+          const existing = await storage.getRateByKey(key);
           if (!existing) continue; // only track airports we already seed
           checked++;
           const oldValue = parseFloat(existing.rateValue);
           const newNum = parseFloat(newValue);
           if (Math.abs(oldValue - newNum) > 0.10) {
-            storage.upsertRate(key, newValue, existing.rateValue, today, nowIso);
+            await storage.upsertRate(key, newValue, existing.rateValue, today, nowIso);
             changes.push({ key, old: existing.rateValue, new: newValue });
           } else {
-            storage.upsertRate(key, existing.rateValue, undefined, undefined, nowIso);
+            await storage.upsertRate(key, existing.rateValue, undefined, undefined, nowIso);
           }
         }
       }
@@ -1301,26 +1301,26 @@ export async function registerRoutes(
         const enrouteMatch = /Up to 20 tonnes.*?\$([0-9]+\.[0-9]+)/i.exec(html);
         if (enrouteMatch) {
           const key = "enroute_rate";
-          const existing = storage.getRateByKey(key);
+          const existing = await storage.getRateByKey(key);
           if (existing) {
             checked++;
             const newValue = enrouteMatch[1];
             const oldValue = parseFloat(existing.rateValue);
             const newNum = parseFloat(newValue);
             if (Math.abs(oldValue - newNum) > 0.10) {
-              storage.upsertRate(key, newValue, existing.rateValue, today, nowIso);
+              await storage.upsertRate(key, newValue, existing.rateValue, today, nowIso);
               changes.push({ key, old: existing.rateValue, new: newValue });
             } else {
-              storage.upsertRate(key, existing.rateValue, undefined, undefined, nowIso);
+              await storage.upsertRate(key, existing.rateValue, undefined, undefined, nowIso);
             }
           }
         }
         // Update last_checked for other airservices rates regardless of a specific match
         for (const k of ["met_surcharge_rate", "tnc_major_rate", "tnc_regional_rate", "tnc_out_of_hours", "tnc_minimum_major"]) {
-          const existing = storage.getRateByKey(k);
+          const existing = await storage.getRateByKey(k);
           if (existing) {
             checked++;
-            storage.upsertRate(k, existing.rateValue, undefined, undefined, nowIso);
+            await storage.upsertRate(k, existing.rateValue, undefined, undefined, nowIso);
           }
         }
       }
