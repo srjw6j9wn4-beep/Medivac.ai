@@ -11,7 +11,7 @@ import { generatePDF } from "@/lib/generatePDF";
 interface Props { role: UserRole; }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type VehicleStatus = "compliant" | "due_soon" | "overdue" | "out_of_service";
+type VehicleStatus = "compliant" | "due_soon" | "overdue" | "out_of_service" | "required";
 type VehicleType   = "PTV" | "Base Car" | "4WD" | "Utility" | "Golf Buggy";
 
 interface Vehicle {
@@ -387,10 +387,92 @@ const VEHICLES: Vehicle[] = [
     notes: "Newer Tempo model — increased passenger capacity. Not road-registered — airside movements only. Assigned to tarmac crew transfer and equipment staging at Dubbo.",
     overallStatus: "compliant",
   },
+
+  // ═══ REQUIRED — NOT YET ASSIGNED ════════════════════════════════════════════
+  {
+    id: "req01",
+    rego: "TBA", state: "NSW", make: "Mercedes-Benz", model: "Sprinter 519 CDI", year: 0,
+    type: "PTV", base: "Griffith (YGTH)", purpose: "Patient Transfer — Griffith (Required)",
+    colour: "TBA", vin: "TBA",
+    regoExpiry: "—", regoDaysLeft: 999, regoStatus: "required" as VehicleStatus,
+    insuranceProvider: "TBA", insurancePolicyNo: "TBA",
+    insuranceExpiry: "—", insuranceDaysLeft: 999, insuranceStatus: "required" as VehicleStatus,
+    ctpProvider: "TBA", ctpExpiry: "—", ctpDaysLeft: 999, ctpStatus: "required" as VehicleStatus,
+    nextService: "—", serviceDaysLeft: 999, serviceStatus: "required" as VehicleStatus,
+    roadworthyExpiry: null, roadworthyDaysLeft: null, rwcStatus: null,
+    lastInspection: "—", odometer: 0,
+    driverAccess: "Authorised RFDS drivers — HR licence required",
+    notes: "Van required for Griffith base. Regional hub — high patient volume to Wagga & Sydney. Pending procurement and assignment.",
+    overallStatus: "required" as VehicleStatus,
+  },
+  {
+    id: "req02",
+    rego: "TBA", state: "NSW", make: "Mercedes-Benz", model: "Sprinter 519 CDI", year: 0,
+    type: "PTV", base: "Wagga Wagga (YSWG)", purpose: "Patient Transfer — Wagga Wagga (Required)",
+    colour: "TBA", vin: "TBA",
+    regoExpiry: "—", regoDaysLeft: 999, regoStatus: "required" as VehicleStatus,
+    insuranceProvider: "TBA", insurancePolicyNo: "TBA",
+    insuranceExpiry: "—", insuranceDaysLeft: 999, insuranceStatus: "required" as VehicleStatus,
+    ctpProvider: "TBA", ctpExpiry: "—", ctpDaysLeft: 999, ctpStatus: "required" as VehicleStatus,
+    nextService: "—", serviceDaysLeft: 999, serviceStatus: "required" as VehicleStatus,
+    roadworthyExpiry: null, roadworthyDaysLeft: null, rwcStatus: null,
+    lastInspection: "—", odometer: 0,
+    driverAccess: "Authorised RFDS drivers — HR licence required",
+    notes: "Van required for Wagga Wagga base. Major referral point — Base Hospital transfers. Pending procurement and assignment.",
+    overallStatus: "required" as VehicleStatus,
+  },
+  {
+    id: "req03",
+    rego: "TBA", state: "NSW", make: "Mercedes-Benz", model: "Sprinter 519 CDI", year: 0,
+    type: "PTV", base: "Orange (YORG)", purpose: "Patient Transfer — Orange (Required)",
+    colour: "TBA", vin: "TBA",
+    regoExpiry: "—", regoDaysLeft: 999, regoStatus: "required" as VehicleStatus,
+    insuranceProvider: "TBA", insurancePolicyNo: "TBA",
+    insuranceExpiry: "—", insuranceDaysLeft: 999, insuranceStatus: "required" as VehicleStatus,
+    ctpProvider: "TBA", ctpExpiry: "—", ctpDaysLeft: 999, ctpStatus: "required" as VehicleStatus,
+    nextService: "—", serviceDaysLeft: 999, serviceStatus: "required" as VehicleStatus,
+    roadworthyExpiry: null, roadworthyDaysLeft: null, rwcStatus: null,
+    lastInspection: "—", odometer: 0,
+    driverAccess: "Authorised RFDS drivers — HR licence required",
+    notes: "Van required for Orange base. Central West hub — Orange Base Hospital connections. Pending procurement and assignment.",
+    overallStatus: "required" as VehicleStatus,
+  },
+  {
+    id: "req04",
+    rego: "TBA", state: "NSW", make: "Mercedes-Benz", model: "Sprinter 519 CDI", year: 0,
+    type: "PTV", base: "Bourke (YBKE)", purpose: "Patient Transfer — Bourke (Required)",
+    colour: "TBA", vin: "TBA",
+    regoExpiry: "—", regoDaysLeft: 999, regoStatus: "required" as VehicleStatus,
+    insuranceProvider: "TBA", insurancePolicyNo: "TBA",
+    insuranceExpiry: "—", insuranceDaysLeft: 999, insuranceStatus: "required" as VehicleStatus,
+    ctpProvider: "TBA", ctpExpiry: "—", ctpDaysLeft: 999, ctpStatus: "required" as VehicleStatus,
+    nextService: "—", serviceDaysLeft: 999, serviceStatus: "required" as VehicleStatus,
+    roadworthyExpiry: null, roadworthyDaysLeft: null, rwcStatus: null,
+    lastInspection: "—", odometer: 0,
+    driverAccess: "Authorised RFDS drivers — HR licence required",
+    notes: "Van required for Bourke base. Remote Far West — limited transport alternatives. Pending procurement and assignment.",
+    overallStatus: "required" as VehicleStatus,
+  },
+  {
+    id: "req05",
+    rego: "TBA", state: "NSW", make: "Mercedes-Benz", model: "Sprinter 519 CDI", year: 0,
+    type: "PTV", base: "Lightning Ridge (YLRD)", purpose: "Patient Transfer — Lightning Ridge (Required)",
+    colour: "TBA", vin: "TBA",
+    regoExpiry: "—", regoDaysLeft: 999, regoStatus: "required" as VehicleStatus,
+    insuranceProvider: "TBA", insurancePolicyNo: "TBA",
+    insuranceExpiry: "—", insuranceDaysLeft: 999, insuranceStatus: "required" as VehicleStatus,
+    ctpProvider: "TBA", ctpExpiry: "—", ctpDaysLeft: 999, ctpStatus: "required" as VehicleStatus,
+    nextService: "—", serviceDaysLeft: 999, serviceStatus: "required" as VehicleStatus,
+    roadworthyExpiry: null, roadworthyDaysLeft: null, rwcStatus: null,
+    lastInspection: "—", odometer: 0,
+    driverAccess: "Authorised RFDS drivers — HR licence required",
+    notes: "Van required for Lightning Ridge base. Outback remote — nearest major hospital 100+ km. Pending procurement and assignment.",
+    overallStatus: "required" as VehicleStatus,
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const BASES   = ["All Bases", "Dubbo (YSDU)", "Broken Hill (YBHI)", "Bankstown (YSBK)"];
+const BASES   = ["All Bases", "Dubbo (YSDU)", "Broken Hill (YBHI)", "Bankstown (YSBK)", "Griffith (YGTH)", "Wagga Wagga (YSWG)", "Orange (YORG)", "Bourke (YBKE)", "Lightning Ridge (YLRD)"];
 const STATES  = ["All States", "NSW", "SA", "ACT"];
 const V_TYPES = ["All Types", "PTV", "Base Car", "4WD", "Utility", "Golf Buggy"];
 
@@ -408,6 +490,7 @@ function statusColor(s: VehicleStatus) {
     due_soon:       "text-amber-400",
     overdue:        "text-red-400",
     out_of_service: "text-gray-400",
+    required:       "text-purple-400",
   }[s];
 }
 function statusBg(s: VehicleStatus) {
@@ -416,10 +499,11 @@ function statusBg(s: VehicleStatus) {
     due_soon:       "bg-amber-500/15 text-amber-400 border border-amber-500/30",
     overdue:        "bg-red-500/15 text-red-400 border border-red-500/30",
     out_of_service: "bg-gray-500/15 text-gray-400 border border-gray-500/30",
+    required:       "bg-purple-500/15 text-purple-400 border border-purple-500/30",
   }[s];
 }
 function statusLabel(s: VehicleStatus) {
-  return { compliant: "Compliant", due_soon: "Due Soon", overdue: "OVERDUE", out_of_service: "Off Road" }[s];
+  return { compliant: "Compliant", due_soon: "Due Soon", overdue: "OVERDUE", out_of_service: "Off Road", required: "Van Required" }[s];
 }
 function typeIcon(t: VehicleType) {
   return t === "PTV" ? <Truck size={14} /> : <Car size={14} />;
@@ -447,7 +531,7 @@ export default function GroundVehicles({ role }: Props) {
   const canManage = ["senior_management", "dispatcher", "safety", "admin"].includes(role);
 
   const filtered = VEHICLES.filter(v => {
-    if (filterBase  !== "All Bases"   && !v.base.includes(filterBase.split(" ")[0])) return false;
+    if (filterBase  !== "All Bases"   && !v.base.toLowerCase().startsWith(filterBase.split(" (")[0].toLowerCase())) return false;
     if (filterState !== "All States"  && v.state !== filterState) return false;
     if (filterType  !== "All Types"   && v.type  !== filterType)  return false;
     if (filterStatus === "Alerts"     && v.overallStatus === "compliant") return false;
@@ -630,6 +714,39 @@ export default function GroundVehicles({ role }: Props) {
                 </div>
               );
             })}
+          </div>
+
+          {/* Extra bases required */}
+          <div className="bg-card border border-card-border rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Plus size={13} className="text-amber-400" />
+              <span className="text-sm font-semibold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Extra Bases Required — Van Allocation</span>
+              <span className="ml-auto text-xs bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded px-2 py-0.5">Pending Assignment</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">The following locations have been identified as requiring a dedicated patient transfer van to support NEPT operations. No vehicle is currently assigned.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {[
+                { town: "Griffith",         state: "NSW", icao: "YGTH", note: "Regional hub — high patient volume to Wagga & Sydney" },
+                { town: "Wagga Wagga",      state: "NSW", icao: "YSWG", note: "Major referral point — Base Wagga hospital transfers" },
+                { town: "Orange",           state: "NSW", icao: "YORG", note: "Central West hub — Orange Base Hospital connections" },
+                { town: "Bourke",           state: "NSW", icao: "YBKE", note: "Remote Far West — limited transport alternatives" },
+                { town: "Lightning Ridge",  state: "NSW", icao: "YLRD", note: "Outback remote — nearest major hospital 100+ km" },
+              ].map(loc => (
+                <div key={loc.town} className="flex items-start gap-2.5 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center shrink-0 mt-0.5">
+                    <Truck size={13} className="text-amber-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-foreground" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{loc.town}</span>
+                      <span className="text-[10px] font-mono text-muted-foreground">{loc.icao}</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{loc.note}</div>
+                    <div className="mt-1.5 text-[10px] bg-amber-500/10 text-amber-400 rounded px-1.5 py-0.5 inline-block font-semibold">Van Required</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Upcoming renewals */}
