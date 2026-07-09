@@ -112,6 +112,16 @@ const WORK_ORDERS = [
   { id: "WO-2026-0085", aircraft: "VH-XYR", type: "120 hr Check — Complete", status: "Closed", lame: "J. Torres (LAME)", opened: "28 Apr 2026", eta: "02 May 2026", priority: "low" },
 ];
 
+// Format hour values to always show one decimal place (e.g. "14,822 hrs" → "14,822.0 hrs")
+function formatHrs(val: string): string {
+  // Only transform values ending in " hrs" that don't already have a decimal
+  return val.replace(/(\d[\d,]*) hrs/g, (_, n) => {
+    const num = parseFloat(n.replace(/,/g, ''));
+    if (!isNaN(num)) return `${n}.0 hrs`;
+    return _ ;
+  });
+}
+
 function priorityBadge(p: string) {
   if (p === "high") return "status-red";
   if (p === "medium") return "status-orange";
@@ -365,7 +375,7 @@ export default function Engineering({ role }: Props) {
               .filter((c: any) => c.status !== "ok")
               .map((c: any) => ({
                 label: `${ac.rego} — ${c.name}`,
-                value: `${c.tsn} TSN · Remaining: ${c.remaining} · Status: ${c.status.toUpperCase()}`,
+                value: `${formatHrs(c.tsn)} TSN · Remaining: ${formatHrs(c.remaining)} · Status: ${c.status.toUpperCase()}`,
               }))
           ),
         },
@@ -444,7 +454,7 @@ export default function Engineering({ role }: Props) {
               {f.defects.length > 0 && (
                 <span className="text-[10px] text-amber-400 font-semibold">{f.defects.length} defect{f.defects.length > 1 ? "s" : ""}</span>
               )}
-              <span className="text-[10px] text-muted-foreground ml-auto">{f.totalTime}</span>
+              <span className="text-[10px] text-muted-foreground ml-auto">{formatHrs(f.totalTime)}</span>
             </div>
           </button>
         ))}
@@ -474,10 +484,10 @@ export default function Engineering({ role }: Props) {
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: "Total Time", value: ac.totalTime, icon: <Clock size={13} className="text-cyan-400" /> },
+                { label: "Total Time", value: formatHrs(ac.totalTime), icon: <Clock size={13} className="text-cyan-400" /> },
                 { label: "Total Cycles", value: ac.totalCycles, icon: <RefreshCw size={13} className="text-blue-400" /> },
                 { label: "Last Service", value: ac.lastService, icon: <Wrench size={13} className="text-green-400" /> },
-                { label: "Next Service Due", value: ac.nextServiceDue, icon: <AlertCircle size={13} className={ac.status === "Maintenance" ? "text-orange-400" : "text-amber-400"} /> },
+                { label: "Next Service Due", value: formatHrs(ac.nextServiceDue), icon: <AlertCircle size={13} className={ac.status === "Maintenance" ? "text-orange-400" : "text-amber-400"} /> },
               ].map((c, i) => (
                 <div key={i} className="p-3 bg-background rounded-lg border border-border">
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">{c.icon} {c.label}</div>
@@ -573,11 +583,11 @@ export default function Engineering({ role }: Props) {
                       <div className="text-[10px] text-muted-foreground font-mono">{c.partNo}</div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-xs font-mono text-muted-foreground">TSN: {c.tsn}</div>
+                      <div className="text-xs font-mono text-muted-foreground">TSN: {formatHrs(c.tsn)}</div>
                       <div className={`text-[11px] font-semibold ${
                         c.status === "ok" ? "text-green-400" :
                         c.status === "warn" ? "text-amber-400" : "text-red-400"
-                      }`}>{c.remaining} remaining</div>
+                      }`}>{formatHrs(c.remaining)} remaining</div>
                     </div>
                   </div>
                 ))}

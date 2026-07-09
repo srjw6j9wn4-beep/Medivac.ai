@@ -3,7 +3,7 @@ import {
   MapPin, Plane, Clock, DollarSign, Navigation,
   AlertTriangle, CheckCircle, ChevronDown, ChevronUp,
   RotateCcw, Zap, Layers, X, FileText, Fuel, Wrench, Users,
-  TrendingUp, BarChart3, ArrowLeftRight, Info, Award, Gauge
+  TrendingUp, BarChart3, ArrowLeftRight, Info, Award, Gauge, Search, Building2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import "leaflet/dist/leaflet.css";
+import { searchFacilities, FACILITY_TYPE_LABELS, FACILITY_TYPE_ICONS, type PatientFacility } from "@/lib/patientFacilities";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NSW AMBULANCE FEES — effective 1 July 2025
@@ -766,7 +767,7 @@ function FleetComparison({
 // ─────────────────────────────────────────────────────────────────────────────
 interface RouteOption {
   hospital:typeof HOSPITALS[0]; aircraftKey:AircraftKey;
-  flightTimeMin:number; flightKm:number; gndTimeMin:number; totalTimeMin:number;
+  flightTimeMin:number; flightKm:number; handlingMin:number; gndTimeMin:number; totalTimeMin:number;
   aircraftCost:number; gndCost:number; totalCost:number;
   capabilityMatch:boolean; divertedFrom?:string; isRecommended:boolean; score:number;
 }
@@ -783,11 +784,15 @@ function optimise(inputs:MissionInputs):RouteOption[]{
   for(const hosp of HOSPITALS){
     for(const acKey of inputs.availableAircraft){
       const ac=AIRCRAFT[acKey];
-      const legKm=(haversineKm(base.lat,base.lon,pLat,pLon)+haversineKm(pLat,pLon,hosp.lat,hosp.lon))*1.12;
-      if(kmToNm(legKm)>ac.rangeNm)continue;
+      // Round-trip: base→patient + patient→hosp + hosp→base (all 3 legs × 1.12 routing factor)
+      const leg1Km=haversineKm(base.lat,base.lon,pLat,pLon)*1.12;
+      const leg2Km=haversineKm(pLat,pLon,hosp.lat,hosp.lon)*1.12;
+      const leg3Km=haversineKm(hosp.lat,hosp.lon,base.lat,base.lon)*1.12;
+      const legKm=leg1Km+leg2Km+leg3Km;
+      if(kmToNm(leg1Km+leg2Km)>ac.rangeNm)continue; // range check on outbound legs only
       const fHrs=kmToNm(legKm)/ac.cruiseKts;
-      // Aircraft leg = air time + 2×STARTUP (engine start/taxi at base + pickup airfield)
-      const fMin=Math.round(fHrs*60 + STARTUP_MIN*2);
+      // Aircraft leg = air time + 3×STARTUP (base departure + pickup + hospital departure)
+      const fMin=Math.round(fHrs*60 + STARTUP_MIN*3);
       // Patient handling is ground time — separate from aircraft leg
       const handlingMin=PATIENT_HANDLING_MIN*2;  // 30 min load + 30 min unload
       const gMin=Math.round((hosp.gndKm/hosp.gndSpeedKph)*60);
@@ -820,6 +825,121 @@ const PRIORITY_STYLE:Record<CasePriority,string>={
   P3:"bg-cyan-500/20 text-cyan-400 border-cyan-500/40",
 };
 const LEVEL_LABEL:Record<number,string>={1:"Level 1 — Major Trauma",2:"Level 2 — Metropolitan",3:"Level 3 — Regional"};
+
+// ─── Patient Facility Picker ──────────────────────────────────────────────────
+interface FacilityPickerProps {
+  onSelect: (f: PatientFacility) => void;
+  currentLocation: string;
+}
+function FacilityPicker({ onSelect, currentLocation }: FacilityPickerProps) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<PatientFacility[]>(() => searchFacilities("", 8));
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<PatientFacility | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropRef  = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setResults(searchFacilities(query, 12));
+  }, [query]);
+
+  // Close on outside click
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  function pick(f: PatientFacility) {
+    setSelected(f);
+    setQuery(f.name);
+    setOpen(false);
+    onSelect(f);
+  }
+
+  function clear() {
+    setSelected(null);
+    setQuery("");
+    setResults(searchFacilities("", 8));
+    inputRef.current?.focus();
+  }
+
+  const typeColor: Record<PatientFacility["type"], string> = {
+    hospital:     "text-cyan-400  bg-cyan-500/10  border-cyan-500/20",
+    nursing_home: "text-purple-400 bg-purple-500/10 border-purple-500/20",
+    aged_care:    "text-amber-400  bg-amber-500/10  border-amber-500/20",
+    retirement:   "text-green-400  bg-green-500/10  border-green-500/20",
+  };
+
+  return (
+    <div ref={dropRef} className="relative">
+      <Label className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+        <Building2 size={11}/> Patient Location — Facility
+      </Label>
+      <div className="relative">
+        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"/>
+        <input
+          ref={inputRef}
+          type="text"
+          className="w-full h-8 pl-8 pr-7 text-sm rounded-md border border-input bg-background focus:outline-none focus:ring-1 focus:ring-cyan-500"
+          placeholder="Search hospital, aged care, nursing home…"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); setSelected(null); }}
+          onFocus={() => setOpen(true)}
+          autoComplete="off"
+        />
+        {query && (
+          <button onClick={clear} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            <X size={12}/>
+          </button>
+        )}
+      </div>
+
+      {/* Selected facility info */}
+      {selected && (
+        <div className="mt-1.5 flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-xs">
+          <span className="text-base">{FACILITY_TYPE_ICONS[selected.type]}</span>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-foreground truncate">{selected.name}</div>
+            <div className="text-muted-foreground">{selected.suburb}, {selected.state}{selected.icao ? ` · Nearest airfield: ${selected.icao}` : ""}</div>
+          </div>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold shrink-0 ${typeColor[selected.type]}`}>
+            {FACILITY_TYPE_LABELS[selected.type]}
+          </span>
+        </div>
+      )}
+
+      {/* Dropdown */}
+      {open && results.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-xl max-h-72 overflow-y-auto">
+          {/* Group label */}
+          <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-b border-border">
+            {query.length < 2 ? "Most common RFDS pickups" : `${results.length} matching facilities`}
+          </div>
+          {results.map(f => (
+            <button
+              key={f.id}
+              type="button"
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/50 transition-colors border-b border-border/50 last:border-0"
+              onMouseDown={() => pick(f)}
+            >
+              <span className="text-base shrink-0">{FACILITY_TYPE_ICONS[f.type]}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-foreground truncate">{f.name}</div>
+                <div className="text-xs text-muted-foreground">{f.suburb}, {f.state}{f.icao ? ` · ${f.icao}` : ""}</div>
+              </div>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold shrink-0 whitespace-nowrap ${typeColor[f.type]}`}>
+                {FACILITY_TYPE_LABELS[f.type]}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface CostModalProps{route:RouteOption;patientLocation:string;priority:CasePriority;onClose:()=>void;}
 function CostBreakdownModal({route,patientLocation,priority,onClose}:CostModalProps){
@@ -970,8 +1090,11 @@ export default function MissionOptimiser(){
 
   const toggleAc=(key:AircraftKey)=>setInputs(p=>({...p,availableAircraft:p.availableAircraft.includes(key)?p.availableAircraft.filter(k=>k!==key):[...p.availableAircraft,key]}));
   const toggleFleet=(key:FleetKey)=>setFleetEnabled(p=>p.includes(key)?p.filter(k=>k!==key):[...p,key]);
-  const run=useCallback(()=>{setResults(optimise(inputs));setHasRun(true);setExpandedIdx(0);},[inputs]);
-  const reset=()=>{setResults([]);setHasRun(false);setExpandedIdx(null);};
+  const hasRunRef=useRef(false);
+  const run=useCallback(()=>{hasRunRef.current=true;setResults(optimise(inputs));setHasRun(true);setExpandedIdx(0);},[inputs]);
+  // Auto-recalculate whenever inputs change — but only after the user has run once
+  useEffect(()=>{if(hasRunRef.current){setResults(optimise(inputs));setExpandedIdx(prev=>prev??0);}},[inputs]);
+  const reset=()=>{setResults([]);setHasRun(false);hasRunRef.current=false;setExpandedIdx(null);};
 
   const base=RFDS_BASES.find(b=>b.id===inputs.aircraftBase)||RFDS_BASES[0];
   const pLat=parseFloat(inputs.patientLat),pLon=parseFloat(inputs.patientLon);
@@ -1019,11 +1142,29 @@ export default function MissionOptimiser(){
           <Card className="border-card-border bg-card">
             <CardHeader className="pb-3"><CardTitle className="text-sm font-semibold flex items-center gap-2"><MapPin size={14} className="text-cyan-400"/>Patient & Task</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div><Label className="text-xs text-muted-foreground">Latitude</Label><Input value={inputs.patientLat} onChange={e=>setInputs(p=>({...p,patientLat:e.target.value}))} placeholder="-32.247" className="h-8 text-sm mt-1"/></div>
-                <div><Label className="text-xs text-muted-foreground">Longitude</Label><Input value={inputs.patientLon} onChange={e=>setInputs(p=>({...p,patientLon:e.target.value}))} placeholder="148.605" className="h-8 text-sm mt-1"/></div>
-              </div>
-              <div><Label className="text-xs text-muted-foreground">Location description</Label><Input value={inputs.patientLocation} onChange={e=>setInputs(p=>({...p,patientLocation:e.target.value}))} className="h-8 text-sm mt-1"/></div>
+              {/* Facility picker — auto-fills lat/lon and description */}
+              <FacilityPicker
+                currentLocation={inputs.patientLocation}
+                onSelect={f => setInputs(p => ({
+                  ...p,
+                  patientLat: f.lat.toString(),
+                  patientLon: f.lon.toString(),
+                  patientLocation: `${f.name}, ${f.suburb} ${f.state}`,
+                }))}
+              />
+              {/* Manual lat/lon override — collapsed by default */}
+              <details className="group">
+                <summary className="text-[10px] text-muted-foreground cursor-pointer select-none flex items-center gap-1 hover:text-foreground">
+                  <span className="group-open:hidden">▶</span>
+                  <span className="hidden group-open:inline">▼</span>
+                  Manual coordinates override
+                </summary>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div><Label className="text-xs text-muted-foreground">Latitude</Label><Input value={inputs.patientLat} onChange={e=>setInputs(p=>({...p,patientLat:e.target.value}))} placeholder="-32.247" className="h-8 text-sm mt-1"/></div>
+                  <div><Label className="text-xs text-muted-foreground">Longitude</Label><Input value={inputs.patientLon} onChange={e=>setInputs(p=>({...p,patientLon:e.target.value}))} placeholder="148.605" className="h-8 text-sm mt-1"/></div>
+                </div>
+                <div className="mt-2"><Label className="text-xs text-muted-foreground">Location description</Label><Input value={inputs.patientLocation} onChange={e=>setInputs(p=>({...p,patientLocation:e.target.value}))} className="h-8 text-sm mt-1"/></div>
+              </details>
               <div><Label className="text-xs text-muted-foreground">Patient's LHD</Label>
                 <Select value={inputs.lhd} onValueChange={v=>setInputs(p=>({...p,lhd:v}))}>
                   <SelectTrigger className="h-8 text-sm mt-1"><SelectValue/></SelectTrigger>

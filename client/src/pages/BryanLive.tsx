@@ -144,7 +144,14 @@ export default function BryanLive({ role }: { role: UserRole }) {
     try {
       const res  = await apiRequest("POST", "/api/bryan/heygen-token", { avatar_id: AVATAR_ID, voice_id: VOICE_ID });
       const data = await res.json() as { token?: string; error?: string };
-      if (!data.token) throw new Error(data.error || "Failed to get session token");
+      if (!data.token) {
+        const errMsg = data.error || "Failed to get session token";
+        // HeyGen 400 = invalid or expired API key
+        if (res.status === 400 || errMsg.toLowerCase().includes("invalid") || errMsg.toLowerCase().includes("api")) {
+          throw new Error("Graham Live is temporarily unavailable — the HeyGen API key needs to be updated in Railway. Please contact your system administrator.");
+        }
+        throw new Error(errMsg);
+      }
 
       setConnState("connecting");
       setStatusMsg("Connecting to Graham…");
@@ -294,11 +301,17 @@ export default function BryanLive({ role }: { role: UserRole }) {
     function scheduleNext() {
       const v = videoRef.current;
       if (!v) return;
-      // Prefer requestVideoFrameCallback (frame-accurate, avoids redundant ticks)
+      // AV-SYNC FIX: prefer requestVideoFrameCallback over rAF. rVFC only fires
+      // when the <video> element has actually decoded a new frame, so we never
+      // reprocess/redraw a stale frame between real frame arrivals. Processing
+      // on every rAF tick (up to 60/s) instead of on true new-frame events is
+      // what causes the canvas to visually drift from the audio track over
+      // time — rVFC keeps the keyed canvas locked to the same frame boundaries
+      // the audio track's playback clock is already using.
       if ('requestVideoFrameCallback' in v) {
         (v as any).requestVideoFrameCallback(processFrame);
       } else {
-        // Fallback: rAF for browsers without rVFC
+        // Fallback: rAF for browsers without rVFC (e.g. Firefox < 132)
         rafRef.current = requestAnimationFrame(processFrame);
       }
     }
@@ -544,15 +557,46 @@ export default function BryanLive({ role }: { role: UserRole }) {
 
       {/* ── Intro Video ───────────────────────────────────────── */}
       {!isLive && (
-        <div className="rounded-2xl border border-card-border overflow-hidden" style={{ background: '#050d1a' }}>
-          <div className="px-4 py-3 border-b border-card-border">
-            <p className="font-semibold text-sm" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Medivac.AI — Aeromedical Operations Reimagined</p>
-            <p className="text-xs text-muted-foreground mt-0.5">2:34 · Watch Graham introduce the platform, then go live to ask questions</p>
+        <>
+          {/* Jennifer blink simulation — pre-recorded video has no real blinks,
+              so we overlay a thin animated strip over the eye line to fake a
+              natural ~15 blinks/min cadence (1 blink every 4s). */}
+          <style>{`
+            @keyframes jennifer-blink {
+              0%, 96%, 100% { transform: scaleY(0); opacity: 0; }
+              97%   { transform: scaleY(1); opacity: 0.95; }
+              98%   { transform: scaleY(0.05); opacity: 0.6; }
+              99%   { transform: scaleY(1); opacity: 0.95; }
+              99.5% { transform: scaleY(0); opacity: 0; }
+            }
+          `}</style>
+          <div className="rounded-2xl border border-card-border overflow-hidden" style={{ background: '#050d1a' }}>
+            <div className="px-4 py-3 border-b border-card-border">
+              <p className="font-semibold text-sm" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Medivac.AI — Aeromedical Operations Reimagined</p>
+              <p className="text-xs text-muted-foreground mt-0.5">2:34 · Watch Graham introduce the platform, then go live to ask questions</p>
+            </div>
+            <div className="relative" style={{ paddingBottom: '56.25%' }}>
+              <video className="absolute inset-0 w-full h-full" src={`${API_BASE}/api/video/jennifer_intro.mp4`} controls playsInline poster="/jennifer_bg.jpg" style={{ background: '#050d1a' }} />
+              {/* Simulated blink overlay — only rendered while intro video is showing (!isLive) */}
+              {!isLive && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '26%',
+                    left: 0,
+                    right: 0,
+                    height: '6%',
+                    background: 'rgba(10, 15, 25, 0.92)',
+                    transformOrigin: 'top',
+                    animation: 'jennifer-blink 4s infinite',
+                    pointerEvents: 'none',
+                    zIndex: 5,
+                  }}
+                />
+              )}
+            </div>
           </div>
-          <div className="relative" style={{ paddingBottom: '56.25%' }}>
-            <video className="absolute inset-0 w-full h-full" src={`${API_BASE}/api/video/jennifer_intro.mp4`} controls playsInline poster="/jennifer_bg.jpg" style={{ background: '#050d1a' }} />
-          </div>
-        </div>
+        </>
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">

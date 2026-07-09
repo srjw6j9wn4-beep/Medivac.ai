@@ -129,9 +129,11 @@ export async function registerRoutes(
     try {
       const apiKey = process.env.LIVEAVATAR_API_KEY
         || process.env.HEYGEN_API_KEY
-        || process.env.CUSTOM_CRED_API_LIVEAVATAR_COM_TOKEN
-        || "sk_V2_hgu_kEppUKCFDsZ_3TM9ikT0oDbTrnSAmBPkVZAA6ggzSfGj";
+        || process.env.CUSTOM_CRED_API_LIVEAVATAR_COM_TOKEN;
       console.log("[HeyGen] using key:", apiKey ? apiKey.substring(0, 12) + "..." : "NONE");
+      if (!apiKey) {
+        return res.status(400).json({ error: "HeyGen API key not configured. Please set LIVEAVATAR_API_KEY in Railway environment variables." });
+      }
 
       const response = await fetch("https://api.liveavatar.com/v1/sessions/token", {
         method: "POST",

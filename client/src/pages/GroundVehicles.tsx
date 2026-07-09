@@ -610,7 +610,7 @@ export default function GroundVehicles({ role }: Props) {
                 <div key={base} className="bg-card border border-card-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <MapPin size={13} className="text-cyan-400" />
-                    <span className="text-sm font-semibold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{base.split(" ")[0]}</span>
+                    <span className="text-sm font-semibold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{base.split(" (")[0]}</span>
                     {bo > 0 && <span className="ml-auto text-xs bg-red-500/15 text-red-400 border border-red-500/30 rounded px-1.5 py-0.5">{bo} overdue</span>}
                     {bd > 0 && bo === 0 && <span className="ml-auto text-xs bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded px-1.5 py-0.5">{bd} due soon</span>}
                     {bd === 0 && bo === 0 && <span className="ml-auto text-xs bg-green-500/15 text-green-400 border border-green-500/30 rounded px-1.5 py-0.5">All OK</span>}

@@ -11,6 +11,20 @@ import { generatePDF } from "@/lib/generatePDF";
 
 interface Props { role: UserRole; }
 
+// ── Shift allocation data ────────────────────────────────────────────────────
+
+const SHIFT_ALLOCATION_DATA = {
+  days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+  aircraft: [
+    { rego: 'VH-XYJ', base: 'Dubbo',       shifts: ['AM', 'AM', 'PM', 'PM', 'Night', 'Spare', 'Spare'] },
+    { rego: 'VH-XYR', base: 'Broken Hill',  shifts: ['AM', 'PM', 'Maintenance', 'Maintenance', 'RTS', 'AM', 'PM'] },
+    { rego: 'VH-XYU', base: 'Dubbo',        shifts: ['Maintenance', 'Maintenance', 'Maintenance', 'RTS', 'AM', 'PM', 'Night'] },
+    { rego: 'VH-MWH', base: 'Dubbo',        shifts: ['PM', 'Night', 'AM', 'PM', 'Spare', 'Spare', 'AM'] },
+    { rego: 'VH-MVX', base: 'Broken Hill',  shifts: ['Night', 'Spare', 'AM', 'AM', 'PM', 'Night', 'Spare'] },
+    { rego: 'VH-NAJ', base: 'Dubbo',        shifts: ['Ferry', 'Ferry', 'AM', 'PM', 'Night', 'AM', 'PM'] },
+  ],
+};
+
 // ── Maintenance event data ───────────────────────────────────────────────────
 
 const UPCOMING_EVENTS = [
@@ -188,6 +202,31 @@ function urgencyToText(u: string) {
   if (u === "urgent")   return "text-orange-400";
   if (u === "watch")    return "text-amber-400";
   return "text-blue-400";
+}
+
+// ── Shift allocation helpers ──────────────────────────────────────────────────
+
+function aircraftShiftStatus(shifts: string[]): { label: string; cls: string } {
+  if (shifts.some(s => s === "Maintenance" || s === "RTS")) {
+    return { label: "Maintenance", cls: "status-orange" };
+  }
+  if (shifts.some(s => s === "Ferry")) {
+    return { label: "Ferry", cls: "bg-amber-500/20 text-amber-300 border border-amber-500/30" };
+  }
+  return { label: "Operational", cls: "status-green" };
+}
+
+function shiftCellStyle(shift: string): string {
+  switch (shift) {
+    case "AM":           return "bg-teal-500/20 text-teal-300 border-teal-500/30";
+    case "PM":           return "bg-blue-500/20 text-blue-300 border-blue-500/30";
+    case "Night":        return "bg-purple-500/20 text-purple-300 border-purple-500/30";
+    case "Spare":        return "bg-muted/60 text-muted-foreground border-border";
+    case "Maintenance":  return "bg-orange-500/20 text-orange-300 border-orange-500/30";
+    case "RTS":          return "bg-green-500/20 text-green-300 border-green-500/30";
+    case "Ferry":        return "bg-amber-500/20 text-amber-300 border-amber-500/30";
+    default:             return "bg-muted/60 text-muted-foreground border-border";
+  }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -503,10 +542,137 @@ function MaintenanceCalendar({ onSelectEvent }: { onSelectEvent: (id: string) =>
   );
 }
 
+// ── SHIFT ALLOCATION VIEW COMPONENT ───────────────────────────────────────────
+
+function ShiftAllocationView() {
+  const { days, aircraft } = SHIFT_ALLOCATION_DATA;
+  const bases = Array.from(new Set(aircraft.map(a => a.base)));
+
+  const windowStart = new Date(2026, 6, 9); // 09 Jul 2026 — "current date"
+  const windowEnd = new Date(2026, 6, 16);  // +7 days
+
+  const spareCountsPerDay = days.map((_, dayIdx) =>
+    aircraft.filter(a => a.shifts[dayIdx] === "Spare").length
+  );
+
+  return (
+    <div className="space-y-4">
+      {/* Note */}
+      <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-xs text-cyan-300">
+        <Info size={13} className="shrink-0" />
+        <span>
+          Shift allocation view — week of {windowStart.toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+          {" "}–{" "}
+          {windowEnd.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}.
+          Tap any cell for details.
+        </span>
+      </div>
+
+      {/* Legend */}
+      <div className="flex flex-wrap items-center gap-3 text-[11px]">
+        <span className="font-semibold text-muted-foreground uppercase tracking-wider">Legend:</span>
+        {[
+          { cls: shiftCellStyle("AM"), label: "AM" },
+          { cls: shiftCellStyle("PM"), label: "PM" },
+          { cls: shiftCellStyle("Night"), label: "Night" },
+          { cls: shiftCellStyle("Spare"), label: "Spare" },
+          { cls: shiftCellStyle("Maintenance"), label: "Maintenance" },
+          { cls: shiftCellStyle("RTS"), label: "RTS" },
+          { cls: shiftCellStyle("Ferry"), label: "Ferry" },
+        ].map(l => (
+          <span key={l.label} className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border ${l.cls}`}>
+            {l.label === "Maintenance" && <Wrench size={10} />}
+            {l.label}
+          </span>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="bg-card rounded-xl border border-card-border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse" style={{ minWidth: "760px" }}>
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 bg-card text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-card-border" style={{ minWidth: "180px" }}>
+                  Aircraft
+                </th>
+                {days.map(d => (
+                  <th key={d} className="text-center px-2 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-l border-card-border" style={{ minWidth: "80px" }}>
+                    {d}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bases.map(base => (
+                <FragmentBaseGroup key={base} base={base} aircraft={aircraft.filter(a => a.base === base)} days={days} />
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-muted/20">
+                <td className="sticky left-0 z-10 bg-muted/20 px-4 py-3 text-xs font-bold border-t border-card-border">
+                  Spare capacity per day
+                </td>
+                {spareCountsPerDay.map((count, i) => (
+                  <td key={i} className="text-center px-2 py-3 border-t border-l border-card-border">
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
+                      count === 0 ? "bg-red-500/10 text-red-400" : "bg-muted/60 text-muted-foreground"
+                    }`}>
+                      {count}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FragmentBaseGroup({ base, aircraft, days }: { base: string; aircraft: typeof SHIFT_ALLOCATION_DATA.aircraft; days: string[] }) {
+  return (
+    <>
+      <tr>
+        <td colSpan={days.length + 1} className="px-4 py-1.5 bg-muted/30 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-t border-b border-card-border">
+          {base}
+        </td>
+      </tr>
+      {aircraft.map(a => {
+        const status = aircraftShiftStatus(a.shifts);
+        return (
+          <tr key={a.rego} className="border-b border-border last:border-0 hover:bg-muted/10 transition-colors">
+            <td className="sticky left-0 z-10 bg-card px-4 py-2.5 border-r border-card-border">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold">{a.rego}</span>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${status.cls}`}>{status.label}</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground mt-0.5">{a.base}</div>
+            </td>
+            {a.shifts.map((s, i) => (
+              <td key={i} className="p-1 border-l border-card-border">
+                <button
+                  title={`${a.rego} — ${days[i]}: ${s}`}
+                  className={`w-full h-8 flex items-center justify-center gap-1 rounded-lg border text-[10px] font-semibold transition-opacity hover:opacity-70 ${shiftCellStyle(s)}`}
+                >
+                  {s === "Maintenance" && <Wrench size={9} />}
+                  {s === "RTS" ? "RTS" : s}
+                </button>
+              </td>
+            ))}
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
+
 // ── MAIN PAGE ─────────────────────────────────────────────────────────────────
 
 export default function MaintenancePlanner({ role }: Props) {
-  const [tab, setTab] = useState<"planner" | "calendar" | "timeline">("planner");
+  const [tab, setTab] = useState<"planner" | "shiftview" | "calendar" | "timeline">("planner");
   const [selectedEvent, setSelectedEvent] = useState(UPCOMING_EVENTS[1]);
   const [runningAI, setRunningAI] = useState(false);
   const [aiRun, setAiRun] = useState(true);
@@ -645,9 +811,10 @@ export default function MaintenancePlanner({ role }: Props) {
       {/* ── TAB BAR ── */}
       <div className="flex gap-1 bg-muted/30 p-1 rounded-xl border border-card-border w-fit">
         {([
-          { id: "planner",  icon: <Brain size={13} />,       label: "AI Planner" },
-          { id: "calendar", icon: <Calendar size={13} />,    label: "Maintenance Calendar" },
-          { id: "timeline", icon: <BarChart size={13} />,    label: "Skynet Timeline" },
+          { id: "planner",   icon: <Brain size={13} />,       label: "AI Planner" },
+          { id: "shiftview", icon: <Grid3x3 size={13} />,     label: "Shift View" },
+          { id: "calendar",  icon: <Calendar size={13} />,    label: "Maintenance Calendar" },
+          { id: "timeline",  icon: <BarChart size={13} />,    label: "Skynet Timeline" },
         ] as const).map(t => (
           <button
             key={t.id}
@@ -663,6 +830,11 @@ export default function MaintenancePlanner({ role }: Props) {
           </button>
         ))}
       </div>
+
+      {/* ── SHIFT VIEW TAB ── */}
+      {tab === "shiftview" && (
+        <ShiftAllocationView />
+      )}
 
       {/* ── CALENDAR TAB ── */}
       {tab === "calendar" && (

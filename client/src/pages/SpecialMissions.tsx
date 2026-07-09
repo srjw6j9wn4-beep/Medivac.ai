@@ -1177,7 +1177,7 @@ export default function SpecialMissions({ role }: Props) {
             <div className={`text-2xl font-black ${m.color}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
               {sessions.filter(s => s.missionType === m.id).length}
             </div>
-            <div className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{m.label.split(" ")[0]}</div>
+            <div className="text-[10px] text-muted-foreground uppercase tracking-wide mt-0.5">{m.label === "Lord Howe Island" ? "Lord Howe" : m.label.split(" ")[0]}</div>
           </div>
         ))}
       </div>

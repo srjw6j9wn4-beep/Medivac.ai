@@ -424,6 +424,55 @@ const ALL_MODULES: TrainingModule[] = TRAINING_PROGRAM.flatMap(w => w.modules);
 const TOTAL_MODULES = ALL_MODULES.length; // 30
 const WEEK5_MODULE_IDS = TRAINING_PROGRAM.find(w => w.id === "w5")!.modules.map(m => m.id);
 
+// ─── High-Risk Task Competency — Infrequent Emergency Procedures ───────────────
+const HIGH_RISK_MODULES: TrainingModule[] = [
+  { id: 'hr01', title: 'Mass Casualty Incident (MCI) — Ops Role & Responsibilities' },
+  { id: 'hr02', title: 'Aircraft Emergency — Crash/Fire/Rescue Notification Procedures' },
+  { id: 'hr03', title: 'Medical Emergency on Ground — Crew Incapacitation' },
+  { id: 'hr04', title: 'Bomb Threat & Security Threat — Ops Response' },
+  { id: 'hr05', title: 'Dangerous Goods Incident — Reportable Event Procedures' },
+  { id: 'hr06', title: 'CBRN / Hazmat Transport Protocols' },
+  { id: 'hr07', title: 'Kidnap & Extortion — Notification Chain' },
+  { id: 'hr08', title: 'Overdue Aircraft — SAR Initiation & JRCC Notification' },
+  { id: 'hr09', title: 'Major Disruption — Alternate Base Activation' },
+  { id: 'hr10', title: 'Emergency Event Review & Debrief Procedures' },
+];
+const TOTAL_HIGH_RISK_MODULES = HIGH_RISK_MODULES.length; // 10
+
+function defaultHighRiskStatusMap(): Record<string, CellStatus> {
+  const map: Record<string, CellStatus> = {};
+  HIGH_RISK_MODULES.forEach(m => { map[m.id] = "not-started"; });
+  return map;
+}
+
+// Seed some realistic demo progress for the high-risk matrix
+function seedHighRiskStatusMap(seedIndex: number): Record<string, CellStatus> {
+  const map = defaultHighRiskStatusMap();
+  const patterns: CellStatus[][] = [
+    ["complete","complete","complete","complete","in-progress","not-started","not-started","not-started","not-started","not-started"],
+    ["complete","complete","gap","complete","not-started","not-started","not-started","not-started","not-started","not-started"],
+    ["complete","in-progress","not-started","not-started","not-started","not-started","not-started","not-started","not-started","not-started"],
+    ["in-progress","not-started","not-started","not-started","not-started","not-started","not-started","not-started","not-started","not-started"],
+    ["not-started","not-started","not-started","not-started","not-started","not-started","not-started","not-started","not-started","not-started"],
+  ];
+  const pattern = patterns[seedIndex % patterns.length];
+  HIGH_RISK_MODULES.forEach((m, i) => { map[m.id] = pattern[i] ?? "not-started"; });
+  return map;
+}
+
+function highRiskCellStatusMeta(status: CellStatus) {
+  switch (status) {
+    case "complete":
+      return { label: "\u2713", icon: <CheckSquare size={13} className="text-green-400" />, bg: "bg-green-500/15", border: "border-green-500/40" };
+    case "in-progress":
+      return { label: "", icon: <div className="w-2 h-2 rounded-full bg-yellow-400" />, bg: "bg-yellow-500/15", border: "border-yellow-500/40" };
+    case "gap":
+      return { label: "GAP", icon: <XCircle size={13} className="text-red-400" />, bg: "bg-red-500/20", border: "border-red-500/50" };
+    default:
+      return { label: "\u2014", icon: null, bg: "bg-background/60", border: "border-card-border" };
+  }
+}
+
 function defaultStatusMap(): Record<string, CellStatus> {
   const map: Record<string, CellStatus> = {};
   ALL_MODULES.forEach(m => { map[m.id] = "not-started"; });
@@ -554,6 +603,11 @@ export default function CheckTraining({ role }: Props) {
     OPS_STAFF_DEFAULT.forEach((s, i) => { init[s.id] = seedStatusMap(i); });
     return init;
   });
+  const [highRiskStatus, setHighRiskStatus] = useState<Record<string, Record<string, CellStatus>>>(() => {
+    const init: Record<string, Record<string, CellStatus>> = {};
+    OPS_STAFF_DEFAULT.forEach((s, i) => { init[s.id] = seedHighRiskStatusMap(i); });
+    return init;
+  });
   const [opsGapNotes, setOpsGapNotes] = useState<Record<string, GapNote[]>>({});
   const [opsSignOffs, setOpsSignOffs] = useState<Record<string, WeekSignOff[]>>({});
   const [selectedOpsStaffId, setSelectedOpsStaffId] = useState<string | null>(null);
@@ -604,6 +658,15 @@ export default function CheckTraining({ role }: Props) {
   }
 
   // ── Ops Staff Training Matrix handlers ──
+  function cycleHighRiskCell(staffId: string, moduleId: string) {
+    setHighRiskStatus(prev => {
+      const staffMap = { ...(prev[staffId] ?? defaultHighRiskStatusMap()) };
+      const current = staffMap[moduleId] ?? "not-started";
+      staffMap[moduleId] = nextStatus(current);
+      return { ...prev, [staffId]: staffMap };
+    });
+  }
+
   function cycleOpsCell(staffId: string, moduleId: string) {
     setOpsStatus(prev => {
       const staffMap = { ...(prev[staffId] ?? defaultStatusMap()) };
@@ -1540,6 +1603,83 @@ export default function CheckTraining({ role }: Props) {
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-amber-500/10 border border-amber-500/30 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-amber-400" /></div> In Progress</div>
               <div className="flex items-center gap-1.5"><CheckSquare size={12} className="text-green-400" /> Complete</div>
               <div className="flex items-center gap-1.5"><XCircle size={12} className="text-red-400" /> Gap</div>
+            </div>
+          </div>
+
+
+          {/* ═══════════ HIGH-RISK TASK COMPETENCY — Infrequent Emergency Procedures ═══════════ */}
+          <div className="bg-card rounded-xl border border-red-500/30 overflow-hidden">
+            <div className="px-4 py-3 border-b border-red-500/20 flex items-center justify-between flex-wrap gap-2" style={{ background: "rgba(239,68,68,0.06)" }}>
+              <div>
+                <h2 className="text-sm font-bold flex items-center gap-2 text-red-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                  <AlertTriangle size={14} /> ⚠️ HIGH-RISK TASK COMPETENCY — Infrequent Emergency Procedures
+                </h2>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Annual review required · Refresher triggered by any activation
+                </p>
+              </div>
+              <span className="text-[10px] text-muted-foreground">Click a cell to cycle status</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse" style={{ minWidth: "900px", tableLayout: "fixed" }}>
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-card-border" style={{ width: "180px", minWidth: "180px" }}>
+                      Staff
+                    </th>
+                    {HIGH_RISK_MODULES.map(m => (
+                      <th
+                        key={m.id}
+                        title={m.title}
+                        className="px-0 py-1.5 border-b border-l border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom"
+                        style={{ writingMode: "vertical-rl", width: "48px", minWidth: "48px", maxWidth: "48px" }}
+                      >
+                        <span style={{ display: "inline-block", height: "140px", overflow: "hidden", lineHeight: 1.2 }}>{m.title}</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {opsStaff.map(staff => {
+                    const map = highRiskStatus[staff.id] ?? defaultHighRiskStatusMap();
+                    return (
+                      <tr key={staff.id} className="border-b border-border last:border-0 hover:bg-red-500/5 transition-colors">
+                        <td className="sticky left-0 z-10 bg-card px-4 py-2 border-r border-card-border">
+                          <div className="text-xs font-semibold">{staff.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{staff.role} · {staff.base}</div>
+                        </td>
+                        {HIGH_RISK_MODULES.map(m => {
+                          const status = map[m.id] ?? "not-started";
+                          const meta = highRiskCellStatusMeta(status);
+                          return (
+                            <td key={m.id} className="p-0.5 border-l border-card-border" style={{ width: "48px", minWidth: "48px", maxWidth: "48px" }}>
+                              <button
+                                onClick={() => cycleHighRiskCell(staff.id, m.id)}
+                                title={`${m.title} — ${status} · Last activation review: — (click to record)`}
+                                className={`w-full h-8 flex items-center justify-center gap-1 rounded border text-[10px] font-bold ${meta.bg} ${meta.border} hover:opacity-70 transition-opacity`}
+                              >
+                                {meta.icon}
+                                {status === "gap" && <span className="text-red-400 text-[9px]">GAP</span>}
+                                {status === "not-started" && <span className="text-muted-foreground text-[10px]">—</span>}
+                              </button>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-4 px-4 py-3 border-t border-red-500/20 text-[10px] text-muted-foreground">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-background/60 border border-card-border flex items-center justify-center text-[8px]">—</div> Not Started</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-yellow-500/15 border border-yellow-500/40 flex items-center justify-center"><div className="w-1.5 h-1.5 rounded-full bg-yellow-400" /></div> In Progress</div>
+              <div className="flex items-center gap-1.5"><CheckSquare size={12} className="text-green-400" /> Complete</div>
+              <div className="flex items-center gap-1.5"><XCircle size={12} className="text-red-400" /> GAP</div>
+              <span className="ml-auto italic">Last activation review: — (click to record)</span>
             </div>
           </div>
 

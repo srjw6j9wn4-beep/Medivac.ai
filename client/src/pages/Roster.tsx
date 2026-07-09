@@ -14,6 +14,7 @@ interface CrewMember {
   name: string;
   role: string;
   base: string;
+  touringBase?: string;
   dutyStatus: string;
   currency: boolean;
   hoursFlown?: number;
@@ -72,11 +73,11 @@ const ENGINEERING: CrewMember[] = [
 ];
 
 const MANAGEMENT: CrewMember[] = [
-  { id: 'M1', name: 'Fiona Gallagher',    role: 'Base Manager — Dubbo',     base: 'Dubbo',       dutyStatus: 'On Duty',  currency: true,  qualifications: ['OPS', 'CASA', 'ISO'],    week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
-  { id: 'M2', name: 'Robert Chen',        role: 'Operations Manager',       base: 'Dubbo',       dutyStatus: 'On Duty',  currency: true,  qualifications: ['OPS', 'FRMS', 'Dispatch'], week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
-  { id: 'M3', name: 'Angela Morris',      role: 'Base Manager — Broken Hill',base: 'Broken Hill', dutyStatus: 'On Duty', currency: true,  qualifications: ['OPS', 'CASA'],           week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
-  { id: 'M5', name: 'Sarah Blackwell',    role: 'Base Manager — Launceston', base: 'Launceston',  dutyStatus: 'On Duty', currency: true,  qualifications: ['OPS', 'CASA', 'TAS Amb'], week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
-  { id: 'M4', name: 'Peter Huang',        role: 'Chief Pilot',              base: 'Dubbo',       dutyStatus: 'On Duty',  currency: true,  qualifications: ['B200', 'B350', 'LAME', 'CASA', 'EBA'], week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
+  { id: 'M1', name: 'Fiona Gallagher',    role: 'Base Manager — Dubbo',     base: 'Dubbo',       touringBase: undefined,      dutyStatus: 'On Duty',  currency: true,  qualifications: ['OPS', 'CASA', 'ISO'],    week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
+  { id: 'M2', name: 'Robert Chen',        role: 'Operations Manager',       base: 'Dubbo',       touringBase: 'Broken Hill',  dutyStatus: 'Touring',  currency: true,  qualifications: ['OPS', 'FRMS', 'Dispatch'], week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
+  { id: 'M3', name: 'Angela Morris',      role: 'Base Manager — Broken Hill',base: 'Broken Hill', touringBase: undefined,      dutyStatus: 'On Duty', currency: true,  qualifications: ['OPS', 'CASA'],           week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
+  { id: 'M5', name: 'Sarah Blackwell',    role: 'Base Manager — Launceston', base: 'Launceston',  touringBase: undefined,      dutyStatus: 'On Duty', currency: true,  qualifications: ['OPS', 'CASA', 'TAS Amb'], week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
+  { id: 'M4', name: 'Peter Huang',        role: 'Chief Pilot',              base: 'Dubbo',       touringBase: 'Bankstown',    dutyStatus: 'Touring',  currency: true,  qualifications: ['B200', 'B350', 'LAME', 'CASA', 'EBA'], week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
 ];
 
 const GROUP_DATA: Record<RosterGroup, CrewMember[]> = {
@@ -115,6 +116,7 @@ const DUTY_STYLE: Record<string, string> = {
   'Off Duty': 'status-gray',
   'P Day':    'status-gray',
   'Leave':    'status-orange',
+  'Touring':  'bg-amber-500/15 text-amber-400 border border-amber-500/30',
 };
 
 // ─── Today's duty counts ──────────────────────────────────────────────────────
@@ -261,7 +263,14 @@ export default function Roster() {
               return (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-semibold text-sm">{c.name}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold text-sm">{c.name}</div>
+                      {c.touringBase && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold">
+                          Touring: {c.touringBase}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">{c.role} · {c.base}</div>
                     {c.notes && (
                       <div className="text-xs text-orange-400 mt-0.5 flex items-center gap-1">
