@@ -556,6 +556,7 @@ export default function CharterQuote() {
               <div>
                 <label className="text-xs text-muted-foreground block mb-1">Departure Date</label>
                 <input type="date" value={departureDate} onChange={e => setDepartureDate(e.target.value)}
+                  onMouseDown={e => e.stopPropagation()}
                   className="w-full text-sm bg-background border border-card-border rounded-md px-3 py-1.5 focus:outline-none" />
               </div>
               <div>

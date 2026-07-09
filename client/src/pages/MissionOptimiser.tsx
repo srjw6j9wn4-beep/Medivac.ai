@@ -856,7 +856,7 @@ function FacilityPicker({ onSelect, currentLocation }: FacilityPickerProps) {
   // Close on outside click
   useEffect(() => {
     function handle(e: MouseEvent) {
-      if (dropRef.current && !dropRef.current.contains(e.target as Node)) setOpen(false);
+      if (dropRef.current && !dropRef.current.contains(e.target as Node)) setOpen(prev => prev ? false : prev);
     }
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
