@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type Purpose = "medevac_charter" | "scenic" | "freight" | "corporate" | "other";
+type Purpose = "medevac_charter" | "clinic_dental" | "clinic_rahs" | "clinic_mental_health" | "clinic_specialist" | "clinic_other" | "scenic" | "freight" | "corporate" | "other";
 type QuoteStatus = "draft" | "sent" | "accepted" | "declined";
 
 interface CharterQuoteRecord {
@@ -40,11 +40,16 @@ interface CharterQuoteRecord {
 }
 
 const PURPOSE_OPTIONS: { value: Purpose; label: string }[] = [
-  { value: "medevac_charter", label: "Aeromedical Transfer" },
-  { value: "scenic", label: "Scenic" },
-  { value: "freight", label: "Freight" },
-  { value: "corporate", label: "Corporate" },
-  { value: "other", label: "Other" },
+  { value: "medevac_charter",     label: "Aeromedical Transfer" },
+  { value: "clinic_dental",       label: "Clinic — Dental" },
+  { value: "clinic_rahs",         label: "Clinic — RAHS" },
+  { value: "clinic_mental_health",label: "Clinic — Mental Health" },
+  { value: "clinic_specialist",   label: "Clinic — Specialist" },
+  { value: "clinic_other",        label: "Clinic — Other" },
+  { value: "scenic",              label: "Scenic" },
+  { value: "freight",             label: "Freight" },
+  { value: "corporate",           label: "Corporate" },
+  { value: "other",               label: "Other" },
 ];
 
 const GROUND_OPTIONS: { value: GroundTransportType; label: string }[] = [
@@ -1131,6 +1136,8 @@ const RATE_CATEGORY_LABELS: Record<string, string> = {
   ACCOMMODATION: "Accommodation",
   GROUND: "Ground Transport",
 };
+// Normalise category to uppercase so Supabase lowercase values match the order/labels above
+function normCategory(cat: string): string { return cat.toUpperCase(); }
 
 function fmtRateDate(d: string | null | undefined): string {
   if (!d) return "—";
@@ -1156,7 +1163,7 @@ interface RateCardProps {
 }
 
 function RateCard({ rates, loading, lastChecked, refreshMutation, updateMutation, refreshMessage }: RateCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [landingExpanded, setLandingExpanded] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -1164,8 +1171,9 @@ function RateCard({ rates, loading, lastChecked, refreshMutation, updateMutation
   const grouped = useMemo(() => {
     const map: Record<string, LiveQuoteRate[]> = {};
     for (const r of rates) {
-      if (!map[r.category]) map[r.category] = [];
-      map[r.category].push(r);
+      const cat = normCategory(r.category);
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(r);
     }
     return map;
   }, [rates]);
