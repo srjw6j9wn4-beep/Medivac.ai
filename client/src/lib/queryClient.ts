@@ -24,19 +24,36 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/** Sleep for ms milliseconds */
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+/**
+ * apiRequest with automatic 503 retry (cold-start wake-up).
+ * The pplx.app sandbox pauses when idle and returns 503 while waking.
+ * We retry up to 4 times with increasing delays (2s, 4s, 6s, 8s).
+ */
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(`${API_BASE}${url}`, {
-    method,
-    headers: buildHeaders(data ? { "Content-Type": "application/json" } : {}),
-    body: data ? JSON.stringify(data) : undefined,
-  });
-
-  await throwIfResNotOk(res);
-  return res;
+  const maxRetries = 4;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(`${API_BASE}${url}`, {
+      method,
+      headers: buildHeaders(data ? { "Content-Type": "application/json" } : {}),
+      body: data ? JSON.stringify(data) : undefined,
+    });
+    // 503 = sandbox cold-starting — wait and retry
+    if (res.status === 503 && attempt < maxRetries) {
+      await sleep((attempt + 1) * 2000);
+      continue;
+    }
+    await throwIfResNotOk(res);
+    return res;
+  }
+  // Should never reach here, but satisfies TypeScript
+  throw new Error("Max retries exceeded");
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

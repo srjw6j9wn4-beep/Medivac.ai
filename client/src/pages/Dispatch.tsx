@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { type UserRole } from "@/lib/data";
-import { Radio, MapPin, AlertTriangle, CheckCircle, X, Plane, UserPlus, Trash2, ChevronDown } from "lucide-react";
+import { Radio, MapPin, AlertTriangle, CheckCircle, X, Plane, UserPlus, Trash2, ChevronDown, Send } from "lucide-react";
 import { ERSA_AERODROMES, getAerodrome, type ERSAAerodrome } from "@/data/ersa-airports";
 
 interface Props { role: UserRole; }
@@ -83,6 +85,28 @@ export default function Dispatch({ role }: Props) {
   const [patientWeight, setPatientWeight] = useState("78");
   const [medCategory, setMedCategory] = useState("Cardiac");
   const [created, setCreated]         = useState<CreatedMission | null>(null);
+  const [dispatched, setDispatched]   = useState<string | null>(null); // callsign after authorise
+
+  // Dispatch mutation — registers the mission as active and records authorisation
+  const dispatchMutation = useMutation({
+    mutationFn: async (mission: CreatedMission) => {
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0];
+      await apiRequest('POST', '/api/missions/active', {
+        missionId: mission.callsign,
+        aircraft: mission.aircraft,
+        airports: [mission.from, mission.to],
+        pic: mission.pilot,
+        missionType: mission.type,
+        date: dateStr,
+      });
+      return mission.callsign;
+    },
+    onSuccess: (callsign) => {
+      setDispatched(callsign);
+      setCreated(null);
+    },
+  });
 
   // Crew assignment mode
   const [crewMode, setCrewMode]       = useState<CrewMode>("shift");
@@ -146,6 +170,41 @@ export default function Dispatch({ role }: Props) {
         { label: "Fuel Confirmed",       ok: false },
       ],
     });
+  }
+
+  // ── Dispatched success view ──────────────────────────────────────────────
+  if (dispatched) {
+    return (
+      <div className="p-6 flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="w-20 h-20 rounded-full bg-green-500/20 border-2 border-green-500/40 flex items-center justify-center">
+            <Send size={36} className="text-green-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-green-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              Dispatch Authorised
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm">All gates cleared — mission is live</p>
+          </div>
+          <div className="bg-card border border-green-500/30 rounded-xl px-8 py-4 text-center">
+            <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Callsign</div>
+            <div className="text-3xl font-bold text-cyan-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              {dispatched}
+            </div>
+            <div className="text-xs text-green-400 mt-2 font-semibold">● AIRBORNE — tracking active</div>
+          </div>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            Mission recorded in the Mission Board. All gate approvals logged to the CASA audit trail.
+          </p>
+        </div>
+        <button
+          onClick={() => { setDispatched(null); }}
+          className="flex items-center gap-2 px-6 py-2.5 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-400 font-semibold rounded-xl transition-colors text-sm"
+        >
+          <Plane size={15} /> Dispatch Another Mission
+        </button>
+      </div>
+    );
   }
 
   // ── Created view ────────────────────────────────────────────────────────────
@@ -255,17 +314,26 @@ export default function Dispatch({ role }: Props) {
 
         {/* Dispatch button */}
         <button
-          disabled={!allGreen}
+          disabled={!allGreen || dispatchMutation.isPending}
+          onClick={() => dispatchMutation.mutate(created)}
           className={`w-full flex items-center justify-center gap-2 p-3.5 rounded-xl font-semibold text-sm transition-colors ${
-            allGreen
+            allGreen && !dispatchMutation.isPending
               ? "bg-green-500 hover:bg-green-400 text-black cursor-pointer shadow-lg shadow-green-500/20"
               : "bg-muted text-muted-foreground cursor-not-allowed border border-border"
           }`}
         >
-          {allGreen
-            ? <><Plane size={16} /> Authorise Dispatch — All Gates Green</>
-            : `⛔ Dispatch Locked — ${created.gates.filter(g => !g.ok).length} gate(s) outstanding`}
+          {dispatchMutation.isPending
+            ? <><span className="animate-spin inline-block w-4 h-4 border-2 border-black/30 border-t-black rounded-full" /> Authorising...  </>
+            : allGreen
+              ? <><Plane size={16} /> Authorise Dispatch — All Gates Green</>
+              : `⛔ Dispatch Locked — ${created.gates.filter(g => !g.ok).length} gate(s) outstanding`
+          }
         </button>
+        {dispatchMutation.isError && (
+          <p className="text-xs text-red-400 text-center mt-1">
+            Failed to record dispatch — please try again.
+          </p>
+        )}
       </div>
     );
   }
