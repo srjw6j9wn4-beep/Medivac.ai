@@ -57,6 +57,177 @@ const GROUND_OPTIONS: { value: GroundTransportType; label: string }[] = [
 
 const TEAL = "#01696F";
 
+// ─── Corporate Traveller Accommodation Data ──────────────────────────────────
+interface AccomProperty {
+  name: string;
+  chain: string;
+  stars: number;
+  approxRateAUD: number; // per night AUD
+  phone: string;
+  bookingUrl: string;
+}
+interface AccomLocation {
+  label: string;
+  icaoCodes: string[]; // match legs with these ICAO codes
+  hotels: AccomProperty[];
+}
+
+const CORPORATE_TRAVELLER_ACCOM: AccomLocation[] = [
+  {
+    label: "Dubbo NSW",
+    icaoCodes: ["YSDU"],
+    hotels: [
+      { name: "Grand Mercure Dubbo", chain: "Accor", stars: 4, approxRateAUD: 175, phone: "+61 2 6882 0900", bookingUrl: "https://all.accor.com/hotel/8536" },
+      { name: "ibis budget Dubbo", chain: "Accor", stars: 2, approxRateAUD: 105, phone: "+61 2 6882 0499", bookingUrl: "https://all.accor.com/hotel/6860" },
+      { name: "Quality Inn Dubbo International", chain: "Choice Hotels", stars: 3, approxRateAUD: 160, phone: "+61 2 6882 0922", bookingUrl: "https://www.choicehotels.com/new-south-wales/dubbo" },
+      { name: "Comfort Inn & Suites Dubbo", chain: "Choice Hotels", stars: 3, approxRateAUD: 150, phone: "+61 2 6884 8877", bookingUrl: "https://www.choicehotels.com/new-south-wales/dubbo" },
+    ],
+  },
+  {
+    label: "Broken Hill NSW",
+    icaoCodes: ["YBHI"],
+    hotels: [
+      { name: "ibis Styles Broken Hill", chain: "Accor", stars: 3, approxRateAUD: 150, phone: "+61 8 8088 4044", bookingUrl: "https://all.accor.com/hotel/8085" },
+      { name: "Comfort Inn Crystal", chain: "Choice Hotels", stars: 3, approxRateAUD: 140, phone: "+61 8 8088 2344", bookingUrl: "https://www.choicehotels.com/new-south-wales/broken-hill/comfort-inn-hotels/au107" },
+      { name: "The Palace Hotel", chain: "Independent", stars: 3, approxRateAUD: 125, phone: "+61 8 8088 1699", bookingUrl: "https://www.thepalacehotelbrokenhill.com.au" },
+      { name: "Desert Sand Motor Inn", chain: "Independent", stars: 3, approxRateAUD: 115, phone: "+61 8 8088 2566", bookingUrl: "https://www.booking.com/hotel/au/desert-sand-motor-inn-broken-hill.html" },
+    ],
+  },
+  {
+    label: "Sydney / Bankstown NSW",
+    icaoCodes: ["YSSY", "YSBK"],
+    hotels: [
+      { name: "Mercure Sydney Bankstown", chain: "Accor", stars: 4, approxRateAUD: 130, phone: "+61 2 9709 0000", bookingUrl: "https://all.accor.com/hotel/1619" },
+      { name: "Travelodge Hotel Bankstown Sydney", chain: "TFE Hotels", stars: 3, approxRateAUD: 120, phone: "+61 2 9790 0600", bookingUrl: "https://www.travelodgehotels.com.au/hotels/bankstown" },
+      { name: "BreakFree Bankstown International", chain: "Accor", stars: 3, approxRateAUD: 115, phone: "+61 2 9708 5000", bookingUrl: "https://all.accor.com/hotel/2175" },
+      { name: "Novotel Sydney Airport", chain: "Accor", stars: 4, approxRateAUD: 259, phone: "+61 2 9518 0000", bookingUrl: "https://all.accor.com/hotel/3562" },
+      { name: "Holiday Inn Sydney Airport", chain: "IHG", stars: 4, approxRateAUD: 239, phone: "+61 2 9101 6800", bookingUrl: "https://www.ihg.com/holidayinn/hotels/au/en/sydney" },
+      { name: "Crowne Plaza Sydney Airport", chain: "IHG", stars: 4, approxRateAUD: 265, phone: "+61 2 8332 7600", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/sydney" },
+    ],
+  },
+  {
+    label: "Melbourne / Essendon VIC",
+    icaoCodes: ["YMEN", "YMML"],
+    hotels: [
+      { name: "Hyatt Place Melbourne Essendon Fields", chain: "Hyatt", stars: 4, approxRateAUD: 215, phone: "+61 3 9336 1234", bookingUrl: "https://www.hyatt.com/hyatt-place/en-US/melef-hyatt-place-melbourne-essendon-fields" },
+      { name: "ibis Styles Melbourne Airport", chain: "Accor", stars: 3, approxRateAUD: 169, phone: "+61 3 9335 2200", bookingUrl: "https://all.accor.com/hotel/9565" },
+      { name: "Novotel Melbourne Airport", chain: "Accor", stars: 4, approxRateAUD: 249, phone: "+61 3 9933 0000", bookingUrl: "https://all.accor.com/hotel/5575" },
+      { name: "Crowne Plaza Melbourne", chain: "IHG", stars: 5, approxRateAUD: 285, phone: "+61 3 9648 2777", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/melbourne" },
+      { name: "Adina Apartment Hotel Melbourne", chain: "TFE Hotels", stars: 4, approxRateAUD: 210, phone: "+61 3 8663 0000", bookingUrl: "https://www.adinahotels.com/en/apartments/melbourne" },
+      { name: "Vibe Hotel Melbourne Docklands", chain: "TFE Hotels", stars: 4, approxRateAUD: 215, phone: "+61 3 8684 8000", bookingUrl: "https://www.vibehotels.com/hotels/melbourne/docklands" },
+    ],
+  },
+  {
+    label: "Launceston TAS",
+    icaoCodes: ["YMLT"],
+    hotels: [
+      { name: "Peppers Silo Launceston", chain: "Accor", stars: 5, approxRateAUD: 245, phone: "+61 3 6337 8300", bookingUrl: "https://all.accor.com/hotel/A1B1" },
+      { name: "The Sebel Launceston", chain: "Accor", stars: 4, approxRateAUD: 205, phone: "+61 3 6333 3500", bookingUrl: "https://all.accor.com/hotel/5882" },
+      { name: "Mantra Charles Hotel Launceston", chain: "Accor", stars: 4, approxRateAUD: 185, phone: "+61 3 6334 3434", bookingUrl: "https://all.accor.com/hotel/1899" },
+      { name: "Mercure Launceston", chain: "Accor", stars: 4, approxRateAUD: 175, phone: "+61 3 6334 3599", bookingUrl: "https://all.accor.com/hotel/6523" },
+    ],
+  },
+  {
+    label: "Brisbane QLD",
+    icaoCodes: ["YBBN", "YBCG"],
+    hotels: [
+      { name: "Crystalbrook Vincent", chain: "Crystalbrook Collection", stars: 5, approxRateAUD: 320, phone: "+61 7 3234 0300", bookingUrl: "https://crystalbrookcollection.com/vincent" },
+      { name: "Sofitel Brisbane Central", chain: "Accor", stars: 5, approxRateAUD: 295, phone: "+61 7 3835 3535", bookingUrl: "https://all.accor.com/hotel/5585" },
+      { name: "Pullman Brisbane King George Square", chain: "Accor", stars: 5, approxRateAUD: 279, phone: "+61 7 3229 9111", bookingUrl: "https://all.accor.com/hotel/3174" },
+      { name: "voco Brisbane City Centre", chain: "IHG", stars: 4, approxRateAUD: 245, phone: "+61 7 3238 2222", bookingUrl: "https://www.ihg.com/voco/hotels/au/en/brisbane" },
+      { name: "Hotel Indigo Brisbane City Centre", chain: "IHG", stars: 4, approxRateAUD: 235, phone: "+61 7 3007 8000", bookingUrl: "https://www.ihg.com/hotelindigo/hotels/au/en/brisbane" },
+      { name: "Adina Apartment Hotel Brisbane", chain: "TFE Hotels", stars: 4, approxRateAUD: 215, phone: "+61 7 3175 7000", bookingUrl: "https://www.adinahotels.com/en/apartments/brisbane" },
+      { name: "Mantra South Bank Brisbane", chain: "Accor", stars: 4, approxRateAUD: 199, phone: "+61 7 3240 0500", bookingUrl: "https://all.accor.com/hotel/6835" },
+      { name: "Travelodge Hotel Garden City Brisbane", chain: "TFE Hotels", stars: 3, approxRateAUD: 145, phone: "+61 7 3216 6000", bookingUrl: "https://www.travelodgehotels.com.au/hotels/brisbane-garden-city" },
+    ],
+  },
+  {
+    label: "Adelaide SA",
+    icaoCodes: ["YPAD"],
+    hotels: [
+      { name: "InterContinental Adelaide", chain: "IHG", stars: 5, approxRateAUD: 310, phone: "+61 8 8238 2400", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/adelaide" },
+      { name: "Sofitel Adelaide", chain: "Accor", stars: 5, approxRateAUD: 295, phone: "+61 8 8217 2300", bookingUrl: "https://all.accor.com/hotel/B1A1" },
+      { name: "Crowne Plaza Adelaide", chain: "IHG", stars: 5, approxRateAUD: 279, phone: "+61 8 8206 8888", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/adelaide" },
+      { name: "The Playford Adelaide — MGallery", chain: "Accor", stars: 5, approxRateAUD: 265, phone: "+61 8 8213 8888", bookingUrl: "https://all.accor.com/hotel/1819" },
+      { name: "Novotel Adelaide (Adelaide Rockford)", chain: "Accor", stars: 4, approxRateAUD: 195, phone: "+61 8 8211 8255", bookingUrl: "https://all.accor.com/hotel/7383" },
+      { name: "Adina Apartment Hotel Adelaide Treasury", chain: "TFE Hotels", stars: 4, approxRateAUD: 185, phone: "+61 8 8112 0000", bookingUrl: "https://www.adinahotels.com/en/apartments/adelaide" },
+      { name: "Holiday Inn Express Adelaide City Centre", chain: "IHG", stars: 3, approxRateAUD: 169, phone: "+61 8 7079 9000", bookingUrl: "https://www.ihg.com/holidayinnexpress/hotels/au/en/adelaide" },
+      { name: "ibis Adelaide", chain: "Accor", stars: 3, approxRateAUD: 145, phone: "+61 8 8211 8888", bookingUrl: "https://all.accor.com/hotel/6178" },
+    ],
+  },
+  {
+    label: "Perth WA",
+    icaoCodes: ["YPPH"],
+    hotels: [
+      { name: "InterContinental Perth", chain: "IHG", stars: 5, approxRateAUD: 315, phone: "+61 8 9486 7777", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/perth" },
+      { name: "Crowne Plaza Perth", chain: "IHG", stars: 5, approxRateAUD: 295, phone: "+61 8 9270 0000", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/perth" },
+      { name: "Novotel Perth Langley", chain: "Accor", stars: 4, approxRateAUD: 229, phone: "+61 8 9221 1200", bookingUrl: "https://all.accor.com/hotel/0782" },
+      { name: "Adina Apartment Hotel Perth Barrack Plaza", chain: "TFE Hotels", stars: 4, approxRateAUD: 215, phone: "+61 8 9322 2500", bookingUrl: "https://www.adinahotels.com/en/apartments/perth-barrack-plaza" },
+      { name: "Rendezvous Hotel Perth Central", chain: "TFE Hotels", stars: 4, approxRateAUD: 205, phone: "+61 8 9321 8088", bookingUrl: "https://www.rendezvoushotels.com/perth-central" },
+      { name: "Vibe Hotel Subiaco Perth", chain: "TFE Hotels", stars: 4, approxRateAUD: 189, phone: "+61 8 6267 7000", bookingUrl: "https://www.vibehotels.com/hotels/perth/subiaco" },
+      { name: "Holiday Inn Perth City Centre", chain: "IHG", stars: 4, approxRateAUD: 219, phone: "+61 8 6559 0000", bookingUrl: "https://www.ihg.com/holidayinn/hotels/au/en/perth" },
+      { name: "Travelodge Hotel Perth", chain: "TFE Hotels", stars: 3, approxRateAUD: 149, phone: "+61 8 9213 9600", bookingUrl: "https://www.travelodgehotels.com.au/hotels/perth" },
+      { name: "ibis Perth", chain: "Accor", stars: 3, approxRateAUD: 145, phone: "+61 8 9322 2844", bookingUrl: "https://all.accor.com/hotel/6165" },
+    ],
+  },
+  {
+    label: "Darwin NT",
+    icaoCodes: ["YPDN"],
+    hotels: [
+      { name: "Novotel Darwin CBD", chain: "Accor", stars: 4, approxRateAUD: 229, phone: "+61 8 8943 5400", bookingUrl: "https://all.accor.com/hotel/2094" },
+      { name: "Novotel Darwin Airport", chain: "Accor", stars: 4, approxRateAUD: 219, phone: "+61 8 8920 3000", bookingUrl: "https://all.accor.com/hotel/8706" },
+      { name: "Mercure Darwin Airport Resort", chain: "Accor", stars: 4, approxRateAUD: 195, phone: "+61 8 8920 0800", bookingUrl: "https://all.accor.com/hotel/7191" },
+      { name: "Adina Apartment Hotel Darwin Waterfront", chain: "TFE Hotels", stars: 4, approxRateAUD: 210, phone: "+61 8 8982 9000", bookingUrl: "https://www.adinahotels.com/en/apartments/darwin-waterfront" },
+      { name: "Vibe Hotel Darwin Waterfront", chain: "TFE Hotels", stars: 4, approxRateAUD: 199, phone: "+61 8 8982 9999", bookingUrl: "https://www.vibehotels.com/hotels/darwin/waterfront" },
+      { name: "Mantra Pandanas Darwin", chain: "Accor", stars: 4, approxRateAUD: 185, phone: "+61 8 8943 4333", bookingUrl: "https://all.accor.com/hotel/3889" },
+      { name: "ibis Darwin Airport Hotel", chain: "Accor", stars: 3, approxRateAUD: 149, phone: "+61 8 8920 0700", bookingUrl: "https://all.accor.com/hotel/9218" },
+    ],
+  },
+  {
+    label: "Alice Springs NT",
+    icaoCodes: ["YBAS"],
+    hotels: [
+      { name: "Crowne Plaza Alice Springs Lasseters", chain: "IHG", stars: 5, approxRateAUD: 269, phone: "+61 8 8950 7777", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/alice-springs" },
+      { name: "Mercure Alice Springs Resort", chain: "Accor", stars: 4, approxRateAUD: 199, phone: "+61 8 8952 8000", bookingUrl: "https://all.accor.com/hotel/5952" },
+      { name: "DoubleTree by Hilton Alice Springs", chain: "Hilton", stars: 4, approxRateAUD: 225, phone: "+61 8 8950 8000", bookingUrl: "https://www.hilton.com/en/hotels/aspdidi-doubletree-alice-springs" },
+    ],
+  },
+  {
+    label: "Cairns QLD",
+    icaoCodes: ["YBCS"],
+    hotels: [
+      { name: "Crystalbrook Riley", chain: "Crystalbrook Collection", stars: 5, approxRateAUD: 345, phone: "+61 7 4252 7777", bookingUrl: "https://crystalbrookcollection.com/riley" },
+      { name: "Crystalbrook Bailey", chain: "Crystalbrook Collection", stars: 5, approxRateAUD: 315, phone: "+61 7 4253 0888", bookingUrl: "https://crystalbrookcollection.com/bailey" },
+      { name: "Crystalbrook Flynn", chain: "Crystalbrook Collection", stars: 5, approxRateAUD: 299, phone: "+61 7 4080 9400", bookingUrl: "https://crystalbrookcollection.com/flynn" },
+      { name: "Pullman Reef Hotel Casino Cairns", chain: "Accor", stars: 5, approxRateAUD: 289, phone: "+61 7 4030 8888", bookingUrl: "https://all.accor.com/hotel/1684" },
+      { name: "Pullman Cairns International", chain: "Accor", stars: 5, approxRateAUD: 279, phone: "+61 7 4031 1300", bookingUrl: "https://all.accor.com/hotel/0046" },
+      { name: "Novotel Cairns Oasis Resort", chain: "Accor", stars: 4, approxRateAUD: 219, phone: "+61 7 4080 1888", bookingUrl: "https://all.accor.com/hotel/0887" },
+      { name: "Mercure Cairns", chain: "Accor", stars: 4, approxRateAUD: 179, phone: "+61 7 4051 3877", bookingUrl: "https://all.accor.com/hotel/0888" },
+      { name: "ibis Styles Cairns", chain: "Accor", stars: 3, approxRateAUD: 149, phone: "+61 7 4031 0300", bookingUrl: "https://all.accor.com/hotel/9157" },
+    ],
+  },
+];
+
+function getRelevantAccomLocations(legs: LegInput[]): AccomLocation[] {
+  const icaoSet = new Set<string>();
+  legs.forEach(l => {
+    if (l.toICAO) icaoSet.add(l.toICAO.toUpperCase());
+  });
+  if (icaoSet.size === 0) return CORPORATE_TRAVELLER_ACCOM; // show all if no route set
+  const matched = CORPORATE_TRAVELLER_ACCOM.filter(loc =>
+    loc.icaoCodes.some(code => icaoSet.has(code))
+  );
+  return matched.length > 0 ? matched : CORPORATE_TRAVELLER_ACCOM;
+}
+
+function StarRating({ stars }: { stars: number }) {
+  return (
+    <span className="text-yellow-400 text-[10px]">
+      {"★".repeat(stars)}{"☆".repeat(5 - stars)}
+    </span>
+  );
+}
+
 function emptyLeg(): LegInput {
   return {
     fromICAO: "", fromName: "", toICAO: "", toName: "",
@@ -103,7 +274,9 @@ export default function CharterQuote() {
   const [crew, setCrew] = useState<CrewConfig>({
     captain: true, firstOfficer: false, flightNurse: false, flightParamedic: false, icuDoctor: false, count: 1,
   });
-  const [accommodationNights, setAccommodationNights] = useState(0);
+  const [accommodationNights, setAccommodationNights] = useState<number | "">(0);
+  const [accomSearch, setAccomSearch] = useState("");
+  const [selectedHotel, setSelectedHotel] = useState<AccomProperty | null>(null);
   const [marginPercent, setMarginPercent] = useState(15);
   const [notes, setNotes] = useState("");
 
@@ -236,7 +409,7 @@ export default function CharterQuote() {
       legs,
       crew: { ...crew, count: crewCount },
       marginPercent,
-      accommodationNights,
+      accommodationNights: accommodationNights === "" ? 0 : accommodationNights,
       includeReturnLeg,
     };
     const result = calculateQuote(input);
@@ -478,6 +651,7 @@ export default function CharterQuote() {
                         type="time"
                         value={leg.departureTime}
                         onChange={e => updateLeg(idx, { departureTime: e.target.value })}
+                        onMouseDown={e => e.stopPropagation()}
                         className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none"
                       />
                     </div>
@@ -559,9 +733,25 @@ export default function CharterQuote() {
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-muted-foreground block mb-1">Accommodation Nights</label>
-                <input type="number" min={0} value={accommodationNights}
-                  onChange={e => setAccommodationNights(parseInt(e.target.value) || 0)}
-                  className="w-full text-sm bg-background border border-card-border rounded-md px-3 py-1.5 focus:outline-none" />
+                <input
+                  type="number"
+                  min={0}
+                  value={accommodationNights}
+                  onChange={e => {
+                    const raw = e.target.value;
+                    if (raw === "" || raw === "-") {
+                      setAccommodationNights("");
+                    } else {
+                      const n = parseInt(raw, 10);
+                      setAccommodationNights(isNaN(n) ? "" : Math.max(0, n));
+                    }
+                  }}
+                  onBlur={() => {
+                    if (accommodationNights === "") setAccommodationNights(0);
+                  }}
+                  onMouseDown={e => e.stopPropagation()}
+                  className="w-full text-sm bg-background border border-card-border rounded-md px-3 py-1.5 focus:outline-none"
+                />
                 {breakdown?.accommodationRequired && (
                   <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 rounded px-2 py-1">
                     <AlertTriangle size={11} />
@@ -569,6 +759,118 @@ export default function CharterQuote() {
                   </div>
                 )}
               </div>
+
+              {/* Corporate Traveller Accommodation Panel */}
+              {accommodationNights > 0 && (() => {
+                const relevantLocs = getRelevantAccomLocations(legs);
+                const searchLc = accomSearch.toLowerCase();
+                const filteredLocs = relevantLocs.map(loc => ({
+                  ...loc,
+                  hotels: loc.hotels.filter(h =>
+                    !searchLc ||
+                    h.name.toLowerCase().includes(searchLc) ||
+                    h.chain.toLowerCase().includes(searchLc) ||
+                    loc.label.toLowerCase().includes(searchLc)
+                  ),
+                })).filter(loc => loc.hotels.length > 0);
+
+                return (
+                  <div className="border border-card-border rounded-xl p-3 bg-background/40">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: TEAL }}>
+                        <Hotel size={11} className="inline mr-1" />
+                        Accommodation — via Corporate Traveller
+                      </span>
+                      <a
+                        href="https://www.corporatetraveller.com.au"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] underline opacity-60 hover:opacity-100"
+                      >
+                        corporatetraveller.com.au
+                      </a>
+                    </div>
+
+                    {/* Search */}
+                    <input
+                      type="text"
+                      value={accomSearch}
+                      onChange={e => setAccomSearch(e.target.value)}
+                      onMouseDown={e => e.stopPropagation()}
+                      placeholder="Search hotels or chains..."
+                      className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none mb-2"
+                    />
+
+                    {/* Selected hotel summary */}
+                    {selectedHotel && (
+                      <div className="mb-2 flex items-start gap-2 bg-teal-500/10 border border-teal-500/30 rounded-lg px-2.5 py-2">
+                        <Hotel size={12} className="mt-0.5 shrink-0" style={{ color: TEAL }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[11px] font-semibold truncate">{selectedHotel.name}</div>
+                          <div className="text-[10px] text-muted-foreground">{selectedHotel.chain} · <StarRating stars={selectedHotel.stars} /> · ~${selectedHotel.approxRateAUD}/night</div>
+                          <div className="text-[10px] mt-0.5">
+                            <span className="text-muted-foreground">{selectedHotel.phone}</span>
+                            {" · "}
+                            <a href={selectedHotel.bookingUrl} target="_blank" rel="noreferrer"
+                              className="underline" style={{ color: TEAL }}>Book via CT</a>
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedHotel(null)} className="text-muted-foreground hover:text-white shrink-0">
+                          <X size={11} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Hotel list by location */}
+                    <div className="space-y-3 max-h-72 overflow-y-auto pr-0.5">
+                      {filteredLocs.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground text-center py-2">No results — try a different search</p>
+                      ) : filteredLocs.map(loc => (
+                        <div key={loc.label}>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{loc.label}</div>
+                          <div className="space-y-1">
+                            {loc.hotels.map(hotel => (
+                              <button
+                                key={hotel.name}
+                                type="button"
+                                onClick={() => setSelectedHotel(hotel === selectedHotel ? null : hotel)}
+                                className={`w-full text-left rounded-lg px-2.5 py-2 border transition-colors ${
+                                  selectedHotel?.name === hotel.name
+                                    ? "border-teal-500/50 bg-teal-500/10"
+                                    : "border-card-border hover:border-white/20 bg-background/60"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[11px] font-medium truncate">{hotel.name}</span>
+                                  <span className="text-[11px] font-semibold shrink-0" style={{ color: TEAL }}>${hotel.approxRateAUD}/nt</span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] text-muted-foreground">{hotel.chain}</span>
+                                  <StarRating stars={hotel.stars} />
+                                  <a
+                                    href={hotel.bookingUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={e => e.stopPropagation()}
+                                    className="text-[10px] underline ml-auto shrink-0"
+                                    style={{ color: TEAL }}
+                                  >
+                                    Book →
+                                  </a>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-[9px] text-muted-foreground mt-2 opacity-60">
+                      Rates are indicative corporate rates via Corporate Traveller preferred partners (Accor, IHG, TFE Hotels, Choice Hotels). Book directly through Corporate Traveller for negotiated pricing.
+                    </p>
+                  </div>
+                );
+              })()}
               <div>
                 <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1"><Percent size={11}/> Margin %</label>
                 <input type="number" min={0} max={100} value={marginPercent}

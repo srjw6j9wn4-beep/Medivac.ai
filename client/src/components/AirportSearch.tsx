@@ -159,11 +159,17 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
     }
   }
 
-  // Close on outside click
+  // Close on outside click — only fire setOpen when dropdown is actually open
+  // to avoid triggering a re-render (which dismisses native time/date pickers)
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        // Use functional updater so we only set state when it changes,
+        // preventing unnecessary re-renders that dismiss native pickers
+        setOpen(prev => (prev ? false : prev));
       }
     }
     document.addEventListener("mousedown", handler);
