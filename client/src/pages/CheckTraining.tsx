@@ -2357,6 +2357,19 @@ function TheoryKnowledgeSection() {
                         <Timer size={11} className="ml-1" /> <span>25 min</span>
                       </div>
                     )}
+                    {/* CASA form link */}
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <a
+                        href="https://www.casa.gov.au/instrument-rating-flight-test-checklist"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="flex items-center gap-1.5 text-[10px] text-sky-400 hover:text-sky-300 transition-colors"
+                      >
+                        <ExternalLink size={10} className="shrink-0" />
+                        CASA Form 61-1503
+                      </a>
+                    </div>
                   </button>
                 );
               })}
