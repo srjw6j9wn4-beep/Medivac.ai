@@ -61,7 +61,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YBKE", name: "Bourke", state: "NSW", type: "AD",
-    nswaaNote: "HIGH KANGAROO & EMU HAZARD — runway incursions regularly reported, especially at dawn, dusk and night. ROO RUN MANDATORY for all dawn/dusk/night operations. Contact aerodrome manager to arrange inspection before arrival. CTAF 126.7. Fuel (Jet-A1) limited — confirm availability 24hr before. After-hours contact: Bourke Shire Council +61 2 6872 2222.",
+    nswaaNote: "HIGH KANGAROO & EMU HAZARD — runway incursions regularly reported, especially at dawn, dusk and night. ROO RUN MANDATORY for all dawn/dusk/night operations. Contact aerodrome manager to arrange inspection before arrival. CTAF 126.7. Fuel (Jet-A1) limited — confirm availability 24hr before. After-hours contact: Bourke Shire Council +61 2 6872 2222. Emergency: Bourke Police +61 2 6872 9399.",
   },
   {
     icao: "YBRW", name: "Brewarrina", state: "NSW", type: "AD",
@@ -69,7 +69,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YCBA", name: "Cobar", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo and emu hazard on runway. ROO RUN required for dawn and dusk arrivals. Aerodrome operator conducts scheduled sweeps — confirm before arrival. CTAF 126.7. Fuel (Jet-A1) available. After-hours contact: Cobar Shire Council +61 2 6836 4522.",
+    nswaaNote: "Kangaroo and emu hazard on runway. ROO RUN required for dawn and dusk arrivals. Aerodrome operator conducts scheduled sweeps — confirm before arrival. CTAF 126.7. Fuel (Jet-A1) available. After-hours contact: Cobar Shire Council +61 2 6836 4522. Emergency: Cobar Police +61 2 6836 9299.",
   },
   {
     icao: "YCFS", name: "Coffs Harbour", state: "NSW", type: "AD",
