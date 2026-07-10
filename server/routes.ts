@@ -821,7 +821,7 @@ export async function registerRoutes(
 
   // ── NEPT AI Auto Tasking Optimiser ────────────────────────────────────────
   app.post("/api/nept/auto-task", async (req: Request, res: Response) => {
-    const { jobSheet, opDate, availableAircraft, crewNotes, nurseEbaRule, dutyStart, maxDutyHours } = req.body;
+    const { jobSheet, opDate, availableAircraft, crewNotes, nurseEbaRule, dutyStart, maxDutyHours, nurseShiftStart } = req.body;
 
     if (!jobSheet || !opDate || !availableAircraft?.length) {
       return res.status(400).json({ error: "jobSheet, opDate and availableAircraft are required." });
@@ -843,16 +843,20 @@ export async function registerRoutes(
 
 Your task is to optimise the day's NEPT (Non-Emergency Patient Transport) tasking across the available aircraft and bases.
 
-HARD RULES — never violate these:
+HARD RULES — never violate these (sourced directly from approved Fair Work enterprise agreements):
 1. Each aircraft has ONE pilot and ONE nurse assigned per day.
 2. Minimum 60 minutes ground time at every airport for patient handling, documentation, and boarding.
-3. Nurse EBA lunch rule: ${nurseEbaRule}. Do not schedule a patient leg during this window.
+3. Nurse EBA lunch break: ${nurseEbaRule}. Do NOT schedule a patient leg during this window — this is a non-negotiable EBA entitlement (Nurses EBA 2023, Cl. 25.2).
 4. Pilot and nurse duty must not exceed ${maxDutyHours} hours from ${dutyStart}.
-5. Realistic cruise speeds: B200 = 240 kts TAS, B350 = 270 kts TAS.
-6. Dubbo (YSDU) is the primary base. Bankstown (YSBK) handles Sydney metro tasking.
-7. Each task leg must have correct ICAO codes for Australian aerodromes.
-8. Return each aircraft to its home base unless impossible within duty time.
-9. Always assign the closest available aircraft to minimise positioning.
+5. NURSE EBA — MAX SHIFT DURATION: Nurse shift workers must not exceed 12 hours of ordinary duty in a single day (Nurses EBA 2023, Cl. 23.4). If the duty window from ${dutyStart} plus ${maxDutyHours} hours would exceed this limit, cap the nurse's duty at 12 hours and flag a warning.
+6. NURSE EBA — MINIMUM REST: Nurses must have a minimum 10 consecutive hours free from duty between shifts (Nurses EBA 2023, Cl. 24.3). If the previous shift end time is known, do not schedule duty that would breach this rest period.
+7. NURSE EBA — REST PENALTY: If a nurse is required to start a shift without the full 10-hour rest, note this in the warnings array — it attracts 200% overtime rate until the rest period is restored (Nurses EBA 2023, Cl. 24.4).
+8. PILOT — FLIGHT TIME: Pilots must not exceed 100 flight hours in 30 consecutive days or 900 hours in 365 days (Pilots Agreement 2025, Cl. 20.3). Flag warnings if cumulative hours are provided.
+9. Realistic cruise speeds: B200 = 240 kts TAS, B350 = 270 kts TAS.
+10. Dubbo (YSDU) is the primary base. Bankstown (YSBK) handles Sydney metro tasking.
+11. Each task leg must have correct ICAO codes for Australian aerodromes.
+12. Return each aircraft to its home base unless impossible within duty time.
+13. Always assign the closest available aircraft to minimise positioning.
 
 EFFICIENCY PRINCIPLES:
 - Combine single-direction trips into round trips where clinically safe
@@ -883,16 +887,22 @@ You must return a JSON object ONLY — no prose, no markdown, no code block mark
       "dutyStart": "07:00",
       "dutyEnd": "17:00",
       "totalFlightTime": "4:20",
-      "notes": "Lunch break protected 12:30–13:00 at Dubbo"
+      "notes": "Lunch break protected 12:30–13:00 at Dubbo per EBA Cl.25.2. Nurse shift ends 17:30 — within 12hr EBA max."
     }
   ],
-  "warnings": ["Any duty limit concerns or scheduling compromises go here as short strings"]
+  "warnings": ["EBA breach alerts go here — e.g. Nurse duty approaches 12hr EBA max, or Nurse rest gap is less than 10hr EBA minimum — as short strings"]
 }`;
 
     const userMsg = `Operations Date: ${opDate}
 Duty Start: ${dutyStart}
 Max Duty: ${maxDutyHours} hours
-Nurse EBA Rule: ${nurseEbaRule}
+
+EBA HARD LIMITS (from approved Fair Work agreements — must be enforced):
+- Nurse max ordinary hours per shift: 12 hours (Nurses EBA 2023, Cl. 23.4)
+- Nurse minimum rest between shifts: 10 consecutive hours (Nurses EBA 2023, Cl. 24.3)
+- Nurse lunch break entitlement: ${nurseEbaRule} (Nurses EBA 2023, Cl. 25.2) — no patient legs in this window
+- Pilot max flight time: 100 hrs/30 days, 900 hrs/365 days (Pilots Agreement 2025, Cl. 20.3)
+- Pilot rest after duty extension: minimum 9–10 consecutive hours (Pilots Agreement 2025, Cl. 20.3(e))
 
 Available Aircraft:
 ${availableAircraft.map((a: any) => `- ${a.reg} (${a.type}) based at ${a.base}`).join("\n")}

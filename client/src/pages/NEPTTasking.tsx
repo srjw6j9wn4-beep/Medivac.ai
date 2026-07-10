@@ -12,7 +12,7 @@ import {
   RefreshCw, ClipboardList, ArrowRight, Ambulance, GripVertical, ChevronsRight,
   FileText, CheckSquare, ChevronRight, Calendar, BarChart3,
   Shield, Printer, Send, RotateCcw, AlertCircle, Check, ExternalLink, Receipt, Monitor,
-  Sparkles, Bot, Upload, Mail, Zap, ChevronUp, Info, Users, Loader2,
+  Sparkles, Bot, Upload, Mail, Zap, ChevronUp, Info, Users, Loader2, Scale,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -1839,17 +1839,48 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
               </div>
             </div>
 
-            {/* Nurse EBA */}
+            {/* EBA Hard Limits — locked panel */}
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/6 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-rose-500/20 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Scale size={12} className="text-rose-400" />
+                  <span className="text-xs font-bold text-rose-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>EBA Hard Limits — Auto-Enforced</span>
+                </div>
+                <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold">LOCKED</span>
+              </div>
+              <div className="divide-y divide-rose-500/10">
+                {[
+                  { label: "Nurse max shift duration", value: "12 hrs", source: "Nurses EBA 2023, Cl. 23.4", icon: "🔴" },
+                  { label: "Nurse min rest between shifts", value: "10 hrs consecutive", source: "Nurses EBA 2023, Cl. 24.3", icon: "🔴" },
+                  { label: "Rest breach penalty rate", value: "200% base hourly rate", source: "Nurses EBA 2023, Cl. 24.4", icon: "🟠" },
+                  { label: "Pilot max flight time (30-day rolling)", value: "100 hrs", source: "Pilots Agreement 2025, Cl. 20.3(a)", icon: "🔴" },
+                  { label: "Min ground time per airport", value: "60 min", source: "RFDS SE Ops Standard", icon: "🔵" },
+                ].map((r, i) => (
+                  <div key={i} className="flex items-center justify-between px-4 py-2 text-[11px]">
+                    <div className="flex items-center gap-2">
+                      <span>{r.icon}</span>
+                      <div>
+                        <span className="text-foreground font-medium">{r.label}</span>
+                        <span className="text-muted-foreground text-[9px] block">{r.source}</span>
+                      </div>
+                    </div>
+                    <span className="font-bold text-rose-200 tabular-nums shrink-0 ml-2">{r.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Nurse EBA lunch break — editable window within locked rule */}
             <div>
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Nurse EBA — Lunch Break Rule
+                <Clock size={11} className="inline mr-1" /> Nurse Lunch Break Window <span className="text-[9px] text-rose-400 ml-1 font-bold">EBA Cl. 25.2 — required</span>
               </label>
               <input
                 value={nurseEba}
                 onChange={e => setNurseEba(e.target.value)}
-                className="w-full bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-cyan-400/60"
+                className="w-full bg-muted/20 border border-rose-500/30 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-rose-400/60"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">AI will protect this window — no patient legs scheduled during lunch.</p>
+              <p className="text-[10px] text-muted-foreground mt-1">30–60 min unpaid break in the 4th–6th hour of shift (Cl. 25.2). AI will protect this window — no patient legs during lunch.</p>
             </div>
 
             {/* Ground time */}
@@ -2346,9 +2377,32 @@ export default function NEPTTasking({ role }: Props) {
                   No tasks found
                 </td></tr>
               )}
-              {filtered.map(t => (
-                <>
-                  <tr
+              {(() => {
+                // Group tasks by base based on aircraft registration
+                const DUBBO_REGS      = ["VH-LTQ", "VH-MVW", "VH-MVX"];
+                const BANKSTOWN_REGS  = ["VH-MWH", "VH-MWK", "VH-RFD"];
+                const dubboTasks      = filtered.filter(t => t.aircraftReg && DUBBO_REGS.includes(t.aircraftReg));
+                const bankstonTasks   = filtered.filter(t => t.aircraftReg && BANKSTOWN_REGS.includes(t.aircraftReg));
+                const otherTasks      = filtered.filter(t => !dubboTasks.includes(t) && !bankstonTasks.includes(t));
+
+                const BaseHeader = ({ label, icao, count, accent, bg, dot }: { label: string; icao: string; count: number; accent: string; bg: string; dot: string }) => (
+                  <tr>
+                    <td colSpan={8} className={`px-4 py-2.5 ${bg} border-y border-card-border`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                        <span className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${accent}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                          {label}
+                        </span>
+                        <span className={`text-[10px] font-mono ${accent} opacity-50 border border-current/20 px-1.5 py-0.5 rounded`}>{icao}</span>
+                        <span className={`ml-auto text-[10px] font-semibold ${accent} opacity-60`}>{count} task{count !== 1 ? "s" : ""}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+
+                const renderRow = (t: NeptTask) => (
+                  <>
+                    <tr
                     key={t.id}
                     className={`border-b border-card-border hover:bg-white/2 cursor-pointer transition-colors ${
                       t.priority === "Emergency" && !["Complete","Cancelled"].includes(t.status) ? "bg-red-500/5" : ""
@@ -2492,7 +2546,31 @@ export default function NEPTTasking({ role }: Props) {
                     </tr>
                   )}
                 </>
-              ))}
+                );
+
+                return (
+                  <>
+                    {dubboTasks.length > 0 && (
+                      <>
+                        <BaseHeader label="Dubbo Base" icao="YSDU" count={dubboTasks.length} accent="text-cyan-300" bg="bg-cyan-500/8" dot="bg-cyan-400" />
+                        {dubboTasks.map(t => renderRow(t))}
+                      </>
+                    )}
+                    {bankstonTasks.length > 0 && (
+                      <>
+                        <BaseHeader label="Bankstown Base" icao="YSBK" count={bankstonTasks.length} accent="text-violet-300" bg="bg-violet-500/8" dot="bg-violet-400" />
+                        {bankstonTasks.map(t => renderRow(t))}
+                      </>
+                    )}
+                    {otherTasks.length > 0 && (
+                      <>
+                        <BaseHeader label="Unassigned / Other" icao="——" count={otherTasks.length} accent="text-muted-foreground" bg="bg-muted/10" dot="bg-muted-foreground" />
+                        {otherTasks.map(t => renderRow(t))}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
             </tbody>
           </table>
         </div>
@@ -2505,7 +2583,23 @@ export default function NEPTTasking({ role }: Props) {
               <ClipboardList size={24} className="mx-auto mb-2 opacity-30" />No tasks found
             </div>
           )}
-          {filtered.map(t => (
+          {(() => {
+            const DUBBO_REGS_M     = ["VH-LTQ", "VH-MVW", "VH-MVX"];
+            const BANKSTOWN_REGS_M = ["VH-MWH", "VH-MWK", "VH-RFD"];
+            const dubboM     = filtered.filter(t => t.aircraftReg && DUBBO_REGS_M.includes(t.aircraftReg));
+            const bankstonM  = filtered.filter(t => t.aircraftReg && BANKSTOWN_REGS_M.includes(t.aircraftReg));
+            const otherM     = filtered.filter(t => !dubboM.includes(t) && !bankstonM.includes(t));
+
+            const MobileBaseHeader = ({ label, icao, count, accent, bg, dot }: { label: string; icao: string; count: number; accent: string; bg: string; dot: string }) => (
+              <div className={`flex items-center gap-3 px-4 py-2.5 ${bg} border-y border-card-border`}>
+                <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
+                <span className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${accent}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{label}</span>
+                <span className={`text-[10px] font-mono ${accent} opacity-50 border border-current/20 px-1.5 py-0.5 rounded`}>{icao}</span>
+                <span className={`ml-auto text-[10px] font-semibold ${accent} opacity-60`}>{count} task{count !== 1 ? "s" : ""}</span>
+              </div>
+            );
+
+            const renderCard = (t: NeptTask) => (
             <div key={t.id} className={`p-4 space-y-3 ${t.priority === "Emergency" && !["Complete","Cancelled"].includes(t.status) ? "bg-red-500/5" : ""}`}>
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -2605,7 +2699,31 @@ export default function NEPTTasking({ role }: Props) {
                 </div>
               )}
             </div>
-          ))}
+            );
+
+            return (
+              <>
+                {dubboM.length > 0 && (
+                  <>
+                    <MobileBaseHeader label="Dubbo Base" icao="YSDU" count={dubboM.length} accent="text-cyan-300" bg="bg-cyan-500/8" dot="bg-cyan-400" />
+                    {dubboM.map(t => renderCard(t))}
+                  </>
+                )}
+                {bankstonM.length > 0 && (
+                  <>
+                    <MobileBaseHeader label="Bankstown Base" icao="YSBK" count={bankstonM.length} accent="text-violet-300" bg="bg-violet-500/8" dot="bg-violet-400" />
+                    {bankstonM.map(t => renderCard(t))}
+                  </>
+                )}
+                {otherM.length > 0 && (
+                  <>
+                    <MobileBaseHeader label="Unassigned / Other" icao="——" count={otherM.length} accent="text-muted-foreground" bg="bg-muted/10" dot="bg-muted-foreground" />
+                    {otherM.map(t => renderCard(t))}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* Footer */}
