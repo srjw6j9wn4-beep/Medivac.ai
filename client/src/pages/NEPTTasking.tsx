@@ -12,7 +12,7 @@ import {
   RefreshCw, ClipboardList, ArrowRight, Ambulance, GripVertical, ChevronsRight,
   FileText, CheckSquare, ChevronRight, Calendar, BarChart3,
   Shield, Printer, Send, RotateCcw, AlertCircle, Check, ExternalLink, Receipt, Monitor,
-  Sparkles, Bot, Upload, Mail, Zap, ChevronUp, Info, Users, Loader2, Scale,
+  Sparkles, Bot, Upload, Mail, Zap, ChevronUp, Info, Users, Loader2, Scale, Truck,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -78,6 +78,7 @@ const AIRCRAFT_OPTIONS = [
 
 const PILOT_OPTIONS = ["Capt. R. Hughes", "Capt. T. Barnes", "Capt. M. Clarke"];
 const NURSE_OPTIONS = ["S. Mitchell RN", "Dr. K. Patel", "J. O'Brien RN"];
+const DRIVER_OPTIONS = ["T. Walsh", "D. Nguyen", "P. Martin", "B. Scott"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 function emptySector(): Sector {
@@ -744,6 +745,13 @@ function TaskModal({
                 <select className={fieldCls} value={d.nurseName ?? ""} onChange={e => set("nurseName", e.target.value)}>
                   <option value="">— Unassigned —</option>
                   {NURSE_OPTIONS.map(n => <option key={n}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Ground Driver</label>
+                <select className={fieldCls} value={d.driverName ?? ""} onChange={e => set("driverName", e.target.value || null)}>
+                  <option value="">— Unassigned —</option>
+                  {DRIVER_OPTIONS.map(dr => <option key={dr}>{dr}</option>)}
                 </select>
               </div>
             </div>
@@ -2348,7 +2356,7 @@ export default function NEPTTasking({ role }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-card-border bg-muted/10">
-                {["Task Ref", "Priority", "Status", "Route", "Patient / Ref", "Aircraft & Crew"].map(h => (
+                {["Task Ref", "Priority", "Status", "Hospital Pickup → Drop-off", "Patient & Escort", "Pilot / Nurse", "Aircraft"].map(h => (
                   <th key={h} className="text-left text-muted-foreground font-medium px-3 py-3 whitespace-nowrap">{h}</th>
                 ))}
                 {/* Sortable ETA header */}
@@ -2369,10 +2377,10 @@ export default function NEPTTasking({ role }: Props) {
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading tasks…</td></tr>
+                <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading tasks…</td></tr>
               )}
               {!isLoading && filtered.length === 0 && (
-                <tr><td colSpan={8} className="px-3 py-10 text-center text-muted-foreground">
+                <tr><td colSpan={9} className="px-3 py-10 text-center text-muted-foreground">
                   <ClipboardList size={24} className="mx-auto mb-2 opacity-30" />
                   No tasks found
                 </td></tr>
@@ -2385,9 +2393,9 @@ export default function NEPTTasking({ role }: Props) {
                 const bankstonTasks   = filtered.filter(t => t.aircraftReg && BANKSTOWN_REGS.includes(t.aircraftReg));
                 const otherTasks      = filtered.filter(t => !dubboTasks.includes(t) && !bankstonTasks.includes(t));
 
-                const BaseHeader = ({ label, icao, count, accent, bg, dot }: { label: string; icao: string; count: number; accent: string; bg: string; dot: string }) => (
+                const BaseHeader = ({ label, icao, count, accent, bg, dot, cols = 8 }: { label: string; icao: string; count: number; accent: string; bg: string; dot: string; cols?: number }) => (
                   <tr>
-                    <td colSpan={8} className={`px-4 py-2.5 ${bg} border-y border-card-border`}>
+                    <td colSpan={cols} className={`px-4 py-2.5 ${bg} border-y border-card-border`}>
                       <div className="flex items-center gap-3">
                         <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
                         <span className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${accent}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
@@ -2409,32 +2417,117 @@ export default function NEPTTasking({ role }: Props) {
                     }`}
                     onClick={() => setExpandedId(expandedId === t.id ? null : t.id)}
                   >
-                    <td className="px-3 py-3">
-                      <div className="font-mono font-semibold text-foreground">{t.taskRef}</div>
+                    {/* Task Ref */}
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="font-mono font-bold text-foreground text-[11px]">{t.taskRef}</div>
                       <div className="text-[10px] text-muted-foreground mt-0.5">{fmtDT(t.requestTime)}</div>
                     </td>
+                    {/* Priority */}
                     <td className="px-3 py-3"><PriorityBadge priority={t.priority} /></td>
+                    {/* Status */}
                     <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                       {canDispatch
                         ? <QuickStatus task={t} onUpdate={handleStatusChange} />
                         : <StatusBadge status={t.status} />}
                     </td>
-                    <td className="px-3 py-3">
-                      <RouteCell task={t} />
+                    {/* Hospital Pickup → Drop-off */}
+                    <td className="px-3 py-3 max-w-[220px]">
+                      <div className="space-y-1">
+                        <div className="flex items-start gap-1.5">
+                          <div className="mt-0.5 shrink-0 w-3.5 h-3.5 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wide leading-none mb-0.5">Pickup</div>
+                            <div className="text-[11px] font-semibold text-foreground leading-tight">
+                              {t.referringHospital || t.pickupLocation || <span className="text-muted-foreground">—</span>}
+                            </div>
+                            {t.referringHospital && t.pickupLocation && (
+                              <div className="text-[10px] text-muted-foreground leading-tight">{t.pickupLocation}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <div className="mt-0.5 shrink-0 w-3.5 h-3.5 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                          </div>
+                          <div>
+                            <div className="text-[10px] text-muted-foreground uppercase tracking-wide leading-none mb-0.5">Drop-off</div>
+                            <div className="text-[11px] font-semibold text-foreground leading-tight">
+                              {t.receivingHospital || t.destLocation || <span className="text-muted-foreground">—</span>}
+                            </div>
+                            {t.receivingHospital && t.destLocation && (
+                              <div className="text-[10px] text-muted-foreground leading-tight">{t.destLocation}</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </td>
+                    {/* Patient & Escort */}
                     <td className="px-3 py-3">
-                      {t.patientName
-                        ? <div className="font-medium text-foreground">{t.patientName}</div>
-                        : <span className="text-muted-foreground">—</span>}
-                      {t.patientRef && <div className="text-[10px] text-muted-foreground font-mono">{t.patientRef}</div>}
-                      {t.escortName && <div className="text-[10px] text-blue-400/80">+ {t.escortName}</div>}
+                      <div className="space-y-1">
+                        {t.patientName ? (
+                          <div className="flex items-center gap-1.5">
+                            <User size={10} className="text-rose-400 shrink-0" />
+                            <div>
+                              <div className="text-[11px] font-semibold text-foreground">{t.patientName}</div>
+                              {t.patientRef && <div className="text-[10px] font-mono text-muted-foreground">{t.patientRef}</div>}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-[10px]">No patient</span>
+                        )}
+                        {t.escortName && (
+                          <div className="flex items-center gap-1.5">
+                            <Users size={10} className="text-blue-400 shrink-0" />
+                            <div className="text-[10px] text-blue-300">{t.escortName}</div>
+                          </div>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-3 py-3">
+                    {/* Pilot / Nurse / Driver */}
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="space-y-1">
+                        {t.pilotName ? (
+                          <div className="flex items-center gap-1.5">
+                            <Plane size={10} className="text-cyan-400 shrink-0" />
+                            <span className="text-[11px] font-medium text-foreground">{t.pilotName}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Plane size={10} className="text-muted-foreground/40 shrink-0" />
+                            <span className="text-[10px] text-muted-foreground italic">Pilot TBA</span>
+                          </div>
+                        )}
+                        {t.nurseName ? (
+                          <div className="flex items-center gap-1.5">
+                            <Shield size={10} className="text-rose-400 shrink-0" />
+                            <span className="text-[11px] font-medium text-foreground">{t.nurseName}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Shield size={10} className="text-muted-foreground/40 shrink-0" />
+                            <span className="text-[10px] text-muted-foreground italic">Nurse TBA</span>
+                          </div>
+                        )}
+                        {t.driverName ? (
+                          <div className="flex items-center gap-1.5">
+                            <Truck size={10} className="text-amber-400 shrink-0" />
+                            <span className="text-[11px] font-medium text-foreground">{t.driverName}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <Truck size={10} className="text-muted-foreground/40 shrink-0" />
+                            <span className="text-[10px] text-muted-foreground italic">Driver TBA</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    {/* Aircraft */}
+                    <td className="px-3 py-3 whitespace-nowrap">
                       {t.aircraftReg
-                        ? <div className="font-semibold text-foreground font-mono">{t.aircraftReg}</div>
+                        ? <div className="font-bold text-foreground font-mono text-[11px] tracking-wide">{t.aircraftReg}</div>
                         : <span className="text-muted-foreground text-[10px]">Unassigned</span>}
-                      {t.pilotName && <div className="text-[10px] text-muted-foreground">{t.pilotName}</div>}
-                      {t.nurseName && <div className="text-[10px] text-muted-foreground">{t.nurseName}</div>}
                     </td>
                     <td className="px-3 py-3">
                       {t.estimatedEta ? (
@@ -2475,7 +2568,7 @@ export default function NEPTTasking({ role }: Props) {
                   {/* Expanded detail row */}
                   {expandedId === t.id && (
                     <tr key={`${t.id}-exp`} className="border-b border-card-border bg-muted/5">
-                      <td colSpan={8} className="px-5 py-4">
+                      <td colSpan={9} className="px-5 py-4">
                         <div className="grid sm:grid-cols-3 gap-4 text-xs">
                           {/* Route / Sectors */}
                           <div className="space-y-1.5">
@@ -2552,19 +2645,19 @@ export default function NEPTTasking({ role }: Props) {
                   <>
                     {dubboTasks.length > 0 && (
                       <>
-                        <BaseHeader label="Dubbo Base" icao="YSDU" count={dubboTasks.length} accent="text-cyan-300" bg="bg-cyan-500/8" dot="bg-cyan-400" />
+                        <BaseHeader label="Dubbo Base" icao="YSDU" count={dubboTasks.length} accent="text-cyan-300" bg="bg-cyan-500/8" dot="bg-cyan-400" cols={9} />
                         {dubboTasks.map(t => renderRow(t))}
                       </>
                     )}
                     {bankstonTasks.length > 0 && (
                       <>
-                        <BaseHeader label="Bankstown Base" icao="YSBK" count={bankstonTasks.length} accent="text-violet-300" bg="bg-violet-500/8" dot="bg-violet-400" />
+                        <BaseHeader label="Bankstown Base" icao="YSBK" count={bankstonTasks.length} accent="text-violet-300" bg="bg-violet-500/8" dot="bg-violet-400" cols={9} />
                         {bankstonTasks.map(t => renderRow(t))}
                       </>
                     )}
                     {otherTasks.length > 0 && (
                       <>
-                        <BaseHeader label="Unassigned / Other" icao="——" count={otherTasks.length} accent="text-muted-foreground" bg="bg-muted/10" dot="bg-muted-foreground" />
+                        <BaseHeader label="Unassigned / Other" icao="——" count={otherTasks.length} accent="text-muted-foreground" bg="bg-muted/10" dot="bg-muted-foreground" cols={9} />
                         {otherTasks.map(t => renderRow(t))}
                       </>
                     )}
@@ -2645,8 +2738,25 @@ export default function NEPTTasking({ role }: Props) {
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-0.5">Aircraft / Crew</div>
-                  <div className="text-foreground font-mono">{t.aircraftReg ?? "Unassigned"}</div>
-                  {t.pilotName && <div className="text-[10px] text-muted-foreground">{t.pilotName}</div>}
+                  <div className="text-foreground font-mono font-bold text-[11px]">{t.aircraftReg ?? "Unassigned"}</div>
+                  {t.pilotName && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Plane size={9} className="text-cyan-400 shrink-0" />
+                      <span className="text-[10px] text-foreground">{t.pilotName}</span>
+                    </div>
+                  )}
+                  {t.nurseName && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Shield size={9} className="text-rose-400 shrink-0" />
+                      <span className="text-[10px] text-foreground">{t.nurseName}</span>
+                    </div>
+                  )}
+                  {t.driverName && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Truck size={9} className="text-amber-400 shrink-0" />
+                      <span className="text-[10px] text-foreground">{t.driverName}</span>
+                    </div>
+                  )}
                 </div>
               </div>
               {/* Completed At */}
