@@ -949,6 +949,7 @@ export default function GroundVehicles({ role }: Props) {
                 { title: "[BH91KL] Sprinter PTV + [BH01RF] LandCruiser — Rego, CTP & Insurance expire 30 Jun 2026 (25 days)", body: "Both Broken Hill vehicles expire simultaneously. Given remote location processing times, renew before 20 Jun to avoid any gap in coverage. CTP Green Slip must be obtained prior to rego renewal (NSW requirement)." },
                 { title: "[EJ42FR] Dubbo PTV + [DU03RF] Dubbo HiLux — Service due within 5–15 days", body: "Two Dubbo vehicles have services due within the fortnight. Book both in the same service cycle where possible to reduce downtime." },
                 { title: "[BH03RF] Broken Hill HiLux — Rego/CTP/Insurance expire 31 Jul 2026 (55 days)", body: "Schedule renewal now to avoid Broken Hill base being short a logistics vehicle." },
+                { title: "5 New Base PTVs (Griffith, Wagga Wagga, Orange, Bourke, Lightning Ridge) — Registration & documentation pending", body: "All five new base vans are operational (Mercedes-Benz Sprinter 519 CDI, 2022) but show rego, VIN, insurance policy numbers and service records as TBA. Fleet manager must action: (1) confirm rego plates and VINs with the dealer/registration authority, (2) obtain QBE policy numbers for each vehicle, (3) schedule initial service inspection, and (4) enter all details into this register before next compliance audit." },
               ].map((f, i) => (
                 <div key={i} className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-3 flex gap-3">
                   <Clock size={13} className="text-amber-400 mt-0.5 flex-shrink-0" />
@@ -964,16 +965,40 @@ export default function GroundVehicles({ role }: Props) {
                 <div>
                   <div className="text-xs font-semibold text-green-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Good Standing — {compliantCnt} of {totalVehicles} vehicles fully compliant</div>
                   <div className="text-xs text-green-300/70 mt-0.5 leading-relaxed">
-                    EJ43FR, BH92KL, BW15QA (PTVs) and DU01RF, DU02RF, BH02RF, BH03RF, BC07 (SA), BK01RF, BK03RF, YRR22F (ACT) all compliant across registration, CTP, insurance and service intervals.
+                    EJ43FR, BH92KL, BW15QA (PTVs) · DU01RF, DU02RF, BH02RF, BH03RF, S441RFD (SA), BK01RF, BK03RF, YRR22F (ACT) and all 5 new base PTVs (Griffith, Wagga Wagga, Orange, Bourke, Lightning Ridge) are compliant across registration, CTP, insurance and service intervals. New base documentation to be completed.
                   </div>
+                </div>
+              </div>
+              {/* Base-by-base notes */}
+              <div className="border border-card-border rounded-xl p-3">
+                <div className="text-xs font-semibold text-foreground mb-2.5" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Base-by-Base Audit Notes</div>
+                <div className="space-y-2 text-xs">
+                  {[
+                    { base: "Dubbo (YSDU)",           color: "text-cyan-400",   note: "5 vehicles + 3 airside buggies. Two PTVs and utility due for service within a fortnight — book together to minimise downtime. Buggies require annual battery and brake inspection; next due Sep 2026." },
+                    { base: "Broken Hill (YBHI)",      color: "text-cyan-400",   note: "5 vehicles including 1 SA-registered LandCruiser for SA clinic routes. BH91KL and BH01RF expire 30 Jun — priority renewal. BH03RF expires 31 Jul — schedule now. Processing delays common in remote areas; allow 2+ weeks." },
+                    { base: "Bankstown (YSBK)",        color: "text-red-400",    note: "5 vehicles. BK02RF (RAV4) has expired rego, CTP and insurance — IMMEDIATE ACTION required before vehicle can be used. BW14QA service overdue 6 days — book this week. ACT-registered YRR22F is compliant; ensure cross-border operating permit is current." },
+                    { base: "Griffith (YGTH)",         color: "text-amber-400",  note: "1 PTV operational. Rego plates, VIN, insurance policy number and service schedule all pending confirmation. Fleet manager to finalise documentation. Regional hub — high patient volume on Wagga Wagga and Sydney corridors; vehicle must be compliance-ready before operational handover." },
+                    { base: "Wagga Wagga (YSWG)",      color: "text-amber-400",  note: "1 PTV operational. Documentation (rego, VIN, QBE policy, service record) pending. Major referral hub for Wagga Base Hospital — ensure vehicle is roadworthy certified and insurance current before commencing patient transfers." },
+                    { base: "Orange (YORG)",           color: "text-amber-400",  note: "1 PTV operational. Documentation pending. Central West hub for Orange Base Hospital connections. Confirm rego plate and obtain CTP Green Slip from Service NSW before first patient transfer run." },
+                    { base: "Bourke (YBKE)",           color: "text-amber-400",  note: "1 PTV operational. Documentation pending. Remote Far West location — nearest authorised service centre is Dubbo (approx. 360 km). Pre-schedule service well in advance and maintain higher stock of consumables on-site." },
+                    { base: "Lightning Ridge (YLRD)",  color: "text-amber-400",  note: "1 PTV operational. Documentation pending. Most remote base — nearest major hospital 100+ km. Rego renewal must be processed online via Service NSW well before expiry; no local registry office. Annual roadworthy inspection required (vehicle >5 years); book nearest authorised inspector in advance." },
+                  ].map(b => (
+                    <div key={b.base} className="flex gap-2 py-1.5 border-b border-card-border last:border-0">
+                      <MapPin size={11} className={`${b.color} mt-0.5 flex-shrink-0`} />
+                      <div>
+                        <span className={`font-semibold ${b.color}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{b.base}: </span>
+                        <span className="text-muted-foreground">{b.note}</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
               {/* State notes */}
               <div className="border border-card-border rounded-xl p-3">
                 <div className="text-xs font-semibold text-foreground mb-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Multi-State Compliance Notes</div>
                 <div className="space-y-1.5 text-xs text-muted-foreground">
-                  <p><span className="text-cyan-400 font-medium">NSW (14 vehicles):</span> CTP Green Slip must be renewed before registration. Service NSW online portal or Transport for NSW. Annual registration includes pink slip (roadworthy) for vehicles over 5 years.</p>
-                  <p><span className="text-red-400 font-medium">SA (1 vehicle — S441RFD):</span> SA registration via SA Dept for Infrastructure. CTP via SGIC or approved insurer. Annual safety inspection required. Operating cross-border into NSW — ensure NSW non-resident permit if operating in NSW for extended periods.</p>
+                  <p><span className="text-cyan-400 font-medium">NSW (19 vehicles across 8 bases):</span> CTP Green Slip must be renewed before registration. Service NSW online portal or Transport for NSW. Annual registration includes pink slip (roadworthy) for vehicles over 5 years. New base PTVs must complete rego and CTP before first patient transfer run.</p>
+                  <p><span className="text-red-400 font-medium">SA (1 vehicle — S441RFD):</span> SA registration via SA Dept for Infrastructure. CTP via SGIC or approved insurer. Annual safety inspection required. Operating cross-border into NSW — ensure NSW non-resident permit is current for extended NSW operations.</p>
                   <p><span className="text-amber-400 font-medium">ACT (1 vehicle — YRR22F):</span> ACT registration via Access Canberra. CTP via NRMA or approved insurer. Annual vehicle inspection required at licensed inspection station.</p>
                 </div>
               </div>
