@@ -1531,7 +1531,7 @@ export default function CheckTraining({ role }: Props) {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse" style={{ minWidth: "1140px", tableLayout: "fixed" }}>
+              <table className="w-full text-xs border-collapse" style={{ minWidth: "1440px", tableLayout: "fixed" }}>
                 <thead>
                   <tr>
                     <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-card-border" style={{ width: "180px", minWidth: "180px" }}>
@@ -1555,7 +1555,7 @@ export default function CheckTraining({ role }: Props) {
                           key={m.id}
                           title={m.title}
                           className={`px-0 py-1.5 border-b border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom ${i === 0 ? "border-l" : ""}`}
-                          style={{ width: "32px", minWidth: "32px", maxWidth: "32px", height: "120px" }}
+                          style={{ width: "48px", minWidth: "48px", maxWidth: "48px", height: "140px" }}
                         >
                           <span style={{
                             display: "block",
@@ -1564,7 +1564,7 @@ export default function CheckTraining({ role }: Props) {
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
-                            maxHeight: "110px",
+                            maxHeight: "130px",
                             lineHeight: 1.2,
                           }}>{m.title}</span>
                         </th>
@@ -1591,7 +1591,7 @@ export default function CheckTraining({ role }: Props) {
                             const status = map[m.id] ?? "not-started";
                             const meta = cellStatusMeta(status);
                             return (
-                              <td key={m.id} className={`p-0.5 ${i === 0 ? "border-l border-card-border" : ""}`} style={{ width: "32px", minWidth: "32px", maxWidth: "32px" }}>
+                              <td key={m.id} className={`p-0.5 ${i === 0 ? "border-l border-card-border" : ""}`} style={{ width: "48px", minWidth: "48px", maxWidth: "48px" }}>
                                 <button
                                   onClick={() => cycleOpsCell(staff.id, m.id)}
                                   title={`${m.title} — ${status}`}
@@ -1635,7 +1635,7 @@ export default function CheckTraining({ role }: Props) {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs border-collapse" style={{ minWidth: "900px", tableLayout: "fixed" }}>
+              <table className="w-full text-xs border-collapse" style={{ minWidth: "1100px", tableLayout: "fixed" }}>
                 <thead>
                   <tr>
                     <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 font-semibold text-muted-foreground uppercase tracking-wider text-[10px] border-b border-card-border" style={{ width: "180px", minWidth: "180px" }}>
@@ -1646,7 +1646,7 @@ export default function CheckTraining({ role }: Props) {
                         key={m.id}
                         title={m.title}
                         className="px-0 py-1.5 border-b border-l border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom"
-                        style={{ width: "48px", minWidth: "48px", maxWidth: "48px", height: "140px" }}
+                        style={{ width: "64px", minWidth: "64px", maxWidth: "64px", height: "160px" }}
                       >
                         <span style={{
                           display: "block",
@@ -1655,7 +1655,7 @@ export default function CheckTraining({ role }: Props) {
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
-                          maxHeight: "130px",
+                          maxHeight: "150px",
                           lineHeight: 1.2,
                         }}>{m.title}</span>
                       </th>
@@ -1675,7 +1675,7 @@ export default function CheckTraining({ role }: Props) {
                           const status = map[m.id] ?? "not-started";
                           const meta = highRiskCellStatusMeta(status);
                           return (
-                            <td key={m.id} className="p-0.5 border-l border-card-border" style={{ width: "48px", minWidth: "48px", maxWidth: "48px" }}>
+                            <td key={m.id} className="p-0.5 border-l border-card-border" style={{ width: "64px", minWidth: "64px", maxWidth: "64px" }}>
                               <button
                                 onClick={() => cycleHighRiskCell(staff.id, m.id)}
                                 title={`${m.title} — ${status} · Last activation review: — (click to record)`}
