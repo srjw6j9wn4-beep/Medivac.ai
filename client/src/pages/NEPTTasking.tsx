@@ -2101,36 +2101,29 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
               </div>
             </div>
 
-            {/* EBA Hard Limits — locked panel */}
-            <div className="rounded-xl border border-rose-500/30 bg-rose-500/6 overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-rose-500/20 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Scale size={12} className="text-rose-400" />
-                  <span className="text-xs font-bold text-rose-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>EBA Hard Limits — Auto-Enforced</span>
-                </div>
-                <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold">LOCKED</span>
-              </div>
-              <div className="divide-y divide-rose-500/10">
-                {[
-                  { label: "Nurse max shift duration", value: "12 hrs", source: "Nurses EBA 2023, Cl. 23.4", icon: "🔴" },
-                  { label: "Nurse min rest between shifts", value: "10 hrs consecutive", source: "Nurses EBA 2023, Cl. 24.3", icon: "🔴" },
-                  { label: "Rest breach penalty rate", value: "200% base hourly rate", source: "Nurses EBA 2023, Cl. 24.4", icon: "🟠" },
-                  { label: "Pilot max flight time (30-day rolling)", value: "100 hrs", source: "Pilots Agreement 2025, Cl. 20.3(a)", icon: "🔴" },
-                  { label: "Min ground time per airport", value: "60 min", source: "RFDS SE Ops Standard", icon: "🔵" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-2 text-[11px]">
-                    <div className="flex items-center gap-2">
-                      <span>{r.icon}</span>
-                      <div>
-                        <span className="text-foreground font-medium">{r.label}</span>
-                        <span className="text-muted-foreground text-[9px] block">{r.source}</span>
-                      </div>
-                    </div>
-                    <span className="font-bold text-rose-200 tabular-nums shrink-0 ml-2">{r.value}</span>
+            {/* EBA limits — only surface if result contains a breach or near-miss */}
+            {result && (() => {
+              const ebaKeywords = /eba|duty limit|rest period|shift.*hour|nurse.*hour|pilot.*hour|100.*hr|12.*hr|10.*hr.*rest|fatigue|breach/i;
+              const breachWarnings = result.warnings?.filter((w: string) => ebaKeywords.test(w)) ?? [];
+              if (!breachWarnings.length) return null;
+              return (
+                <div className="rounded-xl border border-rose-500/40 bg-rose-500/8 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-rose-500/20 flex items-center gap-2">
+                    <Scale size={12} className="text-rose-400" />
+                    <span className="text-xs font-bold text-rose-300">EBA Limit Alert</span>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold ml-auto">ACTION REQUIRED</span>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="p-3 space-y-1.5">
+                    {breachWarnings.map((w: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                        <AlertTriangle size={11} className="text-rose-400 mt-0.5 shrink-0" />
+                        <p className="text-[11px] text-rose-200">{w}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Nurse EBA lunch break — editable window within locked rule */}
             <div>
