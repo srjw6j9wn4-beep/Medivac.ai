@@ -2495,8 +2495,7 @@ export default function NEPTTasking({ role }: Props) {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <Plane size={10} className="text-muted-foreground/40 shrink-0" />
-                            <span className="text-[10px] text-muted-foreground italic">Pilot TBA</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Plane size={8} />Pilot TBA</span>
                           </div>
                         )}
                         {t.nurseName ? (
@@ -2506,8 +2505,7 @@ export default function NEPTTasking({ role }: Props) {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <Shield size={10} className="text-muted-foreground/40 shrink-0" />
-                            <span className="text-[10px] text-muted-foreground italic">Nurse TBA</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Shield size={8} />Nurse TBA</span>
                           </div>
                         )}
                         {t.driverName ? (
@@ -2517,8 +2515,7 @@ export default function NEPTTasking({ role }: Props) {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <Truck size={10} className="text-muted-foreground/40 shrink-0" />
-                            <span className="text-[10px] text-muted-foreground italic">Driver TBA</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Truck size={8} />Driver TBA</span>
                           </div>
                         )}
                       </div>
