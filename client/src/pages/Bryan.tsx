@@ -447,34 +447,50 @@ export default function Bryan({ role }: Props) {
         <div className="space-y-4">
           <div className="bg-card rounded-xl border border-card-border overflow-hidden">
             <div
-              className="relative w-full bg-[#0a1628]"
-              style={{
-                aspectRatio: '16/9',
-                ...(activeVideo.backdropSrc ? {
-                  backgroundImage: `url(${activeVideo.backdropSrc})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                } : {})
-              }}
+              className="relative w-full bg-[#0a1628] overflow-hidden"
+              style={{ aspectRatio: '16/9' }}
             >
-              {/* Video sits in its own layer so screen blend only composites against the backdrop, not the UI overlays */}
-              <div className="absolute inset-0" style={{ isolation: 'isolate' }}>
-                <video
-                  ref={videoRef}
-                  className="w-full h-full object-cover"
-                  style={{ mixBlendMode: "screen" }}
-                  playsInline
-                  preload="auto"
-                  src={activeVideo.videoSrc}
+              {/* Full-bleed subject backdrop */}
+              {activeVideo.backdropSrc && (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${activeVideo.backdropSrc})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
                 />
-              </div>
+              )}
+              {/* Dark gradient overlay — left-side for text legibility */}
+              <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(5,13,26,0.8) 0%, rgba(5,13,26,0.25) 42%, rgba(5,13,26,0.0) 58%)' }} />
+              {/* Jennifer video — hidden when paused (so backdrop shows fully), visible and masked when playing */}
+              <video
+                ref={videoRef}
+                className="absolute"
+                playsInline
+                preload="auto"
+                src={activeVideo.videoSrc}
+                style={{
+                  right: 0,
+                  top: 0,
+                  height: '100%',
+                  width: '60%',
+                  objectFit: 'cover',
+                  objectPosition: '38% top',
+                  display: playing ? 'block' : 'none',
+                  maskImage: 'linear-gradient(to right, transparent 0%, black 20%)',
+                  WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 20%)',
+                }}
+              />
 
               {/* Overlay: shown when not playing, fades out smoothly when playing starts */}
-              <div className={`absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/50 transition-opacity duration-500 ${
+              <div className={`absolute inset-0 flex flex-col items-center justify-center gap-4 transition-opacity duration-500 ${
                 playing ? "opacity-0 pointer-events-none" : "opacity-100"
               }`}>
+                  <div style={{ background: 'rgba(5,13,26,0.45)' }} className="absolute inset-0" />
+                  <div className="relative z-10 flex flex-col items-center gap-4">
                   {activeVideo.thumbnail.startsWith('/') ? (
-                    <img src={activeVideo.thumbnail} alt={activeVideo.title} className="w-20 h-14 object-cover rounded-lg shadow-lg mb-1 opacity-90" />
+                    <img src={activeVideo.thumbnail} alt={activeVideo.title} className="w-24 h-16 object-cover rounded-xl shadow-xl mb-1 opacity-95 border border-white/20" />
                   ) : (
                     <div className="text-4xl mb-1">{activeVideo.thumbnail}</div>
                   )}
@@ -487,6 +503,7 @@ export default function Bryan({ role }: Props) {
                     <Play size={16} className="ml-0.5" />
                     Play — Jennifer Presents
                   </button>
+                  </div>
               </div>
 
               <div className="absolute top-3 left-3 px-2.5 py-1 bg-black/60 rounded-full text-[10px] font-semibold text-cyan-400 border border-cyan-400/20">

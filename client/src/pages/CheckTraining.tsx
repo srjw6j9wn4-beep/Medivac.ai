@@ -2379,6 +2379,25 @@ function TheoryKnowledgeSection() {
             {dedicatedExams.map(exam => {
               const best = bestScores[exam.id];
               const scorePct = best ? pct(best.score, best.total) : null;
+
+              // POH reference links — per exam ID
+              // Links to Textron Aviation King Air product pages (operator POH access via CAMP/Beechcraft)
+              const B200_URL = "https://beechcraft.txtav.com/en/king-air-b200";
+              const B350_URL = "https://beechcraft.txtav.com/en/king-air-350";
+              const POH_REFS: Record<string, { label: string; url: string }> = {
+                "b200-sys-01": { label: "B200 PTM — Ch.7 Flight Controls · Ch.9 Hydraulics & Gear", url: B200_URL },
+                "b200-sys-02": { label: "B200 PTM — Ch.5 Powerplant & Propellers (PT6A-60A)", url: B200_URL },
+                "b200-sys-03": { label: "B200 PTM — Ch.6 Electrical System", url: B200_URL },
+                "b200-sys-04": { label: "B200 PTM — Ch.8 Pressurisation & Environmental", url: B200_URL },
+                "b200-sys-05": { label: "B200 PTM — Ch.4 Fuel · Ch.10 Avionics & Autopilot", url: B200_URL },
+                "b350-sys-01": { label: "B350 PTM — §7 Flight Controls · §9 Hydraulics & Gear", url: B350_URL },
+                "b350-sys-02": { label: "B350 PTM — §5 Powerplant & Propellers (PT6A-60A)", url: B350_URL },
+                "b350-sys-03": { label: "B350 PTM — §6 Electrical System", url: B350_URL },
+                "b350-sys-04": { label: "B350 PTM — §8 Pressurisation & Environmental", url: B350_URL },
+                "b350-sys-05": { label: "B350 PTM — §4 Fuel · §10 Avionics & Autopilot", url: B350_URL },
+              };
+              const ref = POH_REFS[exam.id];
+
               return (
                 <button
                   key={exam.id}
@@ -2422,6 +2441,22 @@ function TheoryKnowledgeSection() {
                     <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                       <CheckSquare size={11} /> <span>20 questions</span>
                       <Timer size={11} className="ml-1" /> <span>30 min</span>
+                    </div>
+                  )}
+
+                  {/* POH reference link */}
+                  {ref && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <a
+                        href={ref.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className={`flex items-center gap-1.5 text-[10px] ${cfg.accent} hover:opacity-70 transition-opacity`}
+                      >
+                        <ExternalLink size={10} className="shrink-0" />
+                        {ref.label}
+                      </a>
                     </div>
                   )}
                 </button>
