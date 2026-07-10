@@ -53,7 +53,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YBRN", name: "Balranald", state: "NSW", type: "AD",
-    nswaaNote: "High kangaroo and wildlife hazard — remote aerodrome with no permanent staff. ROO RUN REQUIRED before ALL operations. Arrange inspection via local council or RFDS contact. No fuel available on site. CTAF 126.7. PPR from Balranald Shire Council +61 3 5020 1300.",
+    nswaaNote: "HIGH KANGAROO AND WILDLIFE HAZARD — remote Murray River region aerodrome with no permanent staff. ROO RUN REQUIRED before ALL operations. Arrange inspection via Balranald Shire Council before arrival. CTAF 126.7. No fuel available on site — fuel from Mildura or Griffith. PPR: Balranald Shire Council +61 3 5020 1300.",
   },
   {
     icao: "YBTH", name: "Bathurst", state: "NSW", type: "AD",
@@ -65,11 +65,11 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YBRW", name: "Brewarrina", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo and emu hazard on all runway areas. No permanent aerodrome staff — ROO RUN REQUIRED before all operations. Contact local council to arrange inspection. CTAF 126.7. No fuel on site. PPR: Brewarrina Shire Council +61 2 6839 2106.",
+    nswaaNote: "REMOTE AERODROME — KANGAROO AND EMU HAZARD on all runway areas. No permanent aerodrome staff. ROO RUN REQUIRED before all operations. Contact local council to arrange inspection before arrival. CTAF 126.7. No fuel on site — nearest at Bourke or Walgett. PPR: Brewarrina Shire Council +61 2 6839 2106. Brewarrina Police +61 2 6839 2007.",
   },
   {
     icao: "YCBA", name: "Cobar", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo, emu and livestock hazard noted in ERSA. Perimeter fencing not fully wildlife-proof. ROO RUN recommended for dawn/dusk/night operations. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available — confirm hours. After-hours contact: Cobar Shire Council +61 2 6894 1900.",
+    nswaaNote: "Kangaroo and emu hazard on runway. ROO RUN required for dawn and dusk arrivals. Aerodrome operator conducts scheduled sweeps — confirm before arrival. CTAF 126.7. Fuel (Jet-A1) available. After-hours contact: Cobar Shire Council +61 2 6836 4522.",
   },
   {
     icao: "YCFS", name: "Coffs Harbour", state: "NSW", type: "AD",
@@ -77,11 +77,11 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YCBR", name: "Collarenebri", state: "NSW", type: "AD",
-    nswaaNote: "Remote strip — significant kangaroo and wildlife hazard. ROO RUN REQUIRED before ALL operations. No permanent staff — arrange inspection via local contact or local shire. CTAF 126.7. No fuel available. PPR: Moree Plains Shire Council +61 2 6757 3222.",
+    nswaaNote: "Kangaroo and emu hazard on runway. ROO RUN required for dawn and dusk operations. No permanent aerodrome staff. CTAF 126.7. No fuel on site — nearest Jet-A1 at Moree or Walgett. PPR: Moree Plains Shire +61 2 6757 3222. Collarenebri Police +61 2 6757 9244.",
   },
   {
     icao: "YCDO", name: "Condobolin", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo hazard on runway and apron surrounds. Daily inspection conducted by local operator — confirm before arrival. CTAF 126.7. Fuel (AVGAS) available; Jet-A1 by prior arrangement. Contact: Lachlan Shire Council +61 2 6895 1900.",
+    nswaaNote: "Kangaroo and wildlife activity near runway — particularly at dawn and dusk. ROO RUN recommended for early and late operations. CTAF 122.8. Fuel (Jet-A1 & AVGAS) available during business hours; after-hours by prior arrangement. Contact: Lachlan Shire Council +61 2 6895 1900.",
   },
   {
     icao: "YCAH", name: "Coolah", state: "NSW", type: "ALA",
@@ -93,11 +93,11 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YCBB", name: "Coonabarabran", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo hazard on runway and adjacent areas. Dawn/dusk inspection recommended. CTAF 126.7. Fuel (AVGAS) available; Jet-A1 by prior arrangement. Contact: Warrumbungle Shire Council +61 2 6848 2000.",
+    nswaaNote: "Kangaroo and wildlife activity near runway. Dawn inspection conducted by local aerodrome representative. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available during business hours. Contact: Warrumbungle Shire Council +61 2 6849 2000.",
   },
   {
     icao: "YCNM", name: "Coonamble", state: "NSW", type: "AD",
-    nswaaNote: "HIGH KANGAROO HAZARD — regularly reported on runway. ROO RUN REQUIRED before dawn, dusk and night operations. Contact aerodrome manager prior to arrival. CTAF 126.7. Fuel availability limited — confirm 24hr prior. Contact: Coonamble Shire Council +61 2 6822 1333.",
+    nswaaNote: "Kangaroo hazard on grassed areas adjacent to runway. ROO RUN recommended for dawn operations. CTAF 126.7. Fuel (AVGAS) available; Jet-A1 — confirm before flight. Contact: Coonamble Shire Council +61 2 6822 1333.",
   },
   {
     icao: "YCTM", name: "Cootamundra", state: "NSW", type: "AD",
@@ -121,11 +121,11 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YIVL", name: "Inverell", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo hazard on runway grass margins. Dawn inspection recommended. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available. Contact: Inverell Shire Council +61 2 6728 8288.",
+    nswaaNote: "Kangaroo activity near runway margins. Dawn inspection by aerodrome operator. CTAF 122.1. Fuel (Jet-A1 & AVGAS) available during business hours. Contact: Inverell Shire Council +61 2 6728 8288.",
   },
   {
     icao: "YLRD", name: "Lightning Ridge", state: "NSW", type: "AD",
-    nswaaNote: "HIGH KANGAROO, EMU & GOAT HAZARD — confirmed feral goat and large kangaroo incursions on runway. ROO RUN REQUIRED for all dawn, dusk and night operations. Arrange via Lightning Ridge Bore Baths staff or local council contact. CTAF 126.7. Fuel (Jet-A1 & AVGAS) limited — confirm availability before flight. After-hours: Walgett Shire Council +61 2 6828 1399.",
+    nswaaNote: "HIGH KANGAROO, EMU AND GOAT HAZARD — confirmed feral goat and large kangaroo incursions on runway. ROO RUN REQUIRED for all dawn, dusk and night operations. Arrange via local council or opal field contacts before arrival. CTAF 126.7. Fuel (Jet-A1 & AVGAS) limited — confirm availability before flight. After-hours: Walgett Shire Council +61 2 6828 1399. Lightning Ridge Police +61 2 6829 0299.",
   },
   {
     icao: "YLIS", name: "Lismore", state: "NSW", type: "AD",
@@ -133,15 +133,15 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YMOR", name: "Moree", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo and bird hazard. Aerodrome operator conducts daily inspections. CTAF 126.7. Fuel (Jet-A1) available. Contact: Moree Plains Shire Council Airport +61 2 6757 3222.",
+    nswaaNote: "Kangaroo hazard on runway surrounds, particularly at dawn and dusk. Aerodrome operator conducts daily inspection — confirm completed before early-morning operations. CTAF 118.3. Fuel (Jet-A1 & AVGAS) available. After-hours contact: Moree Plains Shire Council +61 2 6757 3222.",
   },
   {
     icao: "YMRU", name: "Meru / Mungindi", state: "NSW", type: "ALA",
-    nswaaNote: "Air Landing Area — unsealed. HIGH KANGAROO AND LIVESTOCK HAZARD. ROO RUN AND STOCK CLEAR MANDATORY before all operations. No fuel. No permanent staff — PPR via local landholder or Moree Plains Shire +61 2 6757 3222.",
+    nswaaNote: "REMOTE ALA — HIGH KANGAROO AND LIVESTOCK HAZARD. ROO RUN MANDATORY before ALL operations. Unsealed surface — inspect after rain for soft patches. No fuel. No permanent staff. PPR: Moree Plains Shire Council +61 2 6757 3222. Mungindi Police +61 2 6757 4204. CTAF 126.7.",
   },
   {
     icao: "YNBR", name: "Narrabri", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo activity on runway surrounds. Dawn inspection by aerodrome operator. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available. Contact: Narrabri Shire Council +61 2 6799 6866.",
+    nswaaNote: "Kangaroo and bird hazard noted near thresholds. CTAF 122.1. Fuel (Jet-A1 & AVGAS) available. Contact: Narrabri Shire Council +61 2 6799 6866.",
   },
   {
     icao: "YNAR", name: "Narrandera", state: "NSW", type: "AD",
@@ -149,7 +149,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YNRM", name: "Narromine", state: "NSW", type: "AD",
-    nswaaNote: "Gliding operations active — check NOTAMs for thermal/glider activity. Kangaroo hazard on grassed areas. CTAF 122.8. Fuel (Jet-A1 & AVGAS) available. Contact: Narromine Shire Council +61 2 6889 2601.",
+    nswaaNote: "Kangaroo and wildlife activity on runway surrounds. Daily inspection by aerodrome operator. Gliding operations active — monitor CTAF for glider traffic. CTAF 122.5. Fuel (Jet-A1 & AVGAS) available. Contact: Narromine Shire Council +61 2 6889 2800.",
   },
   {
     icao: "YWLM", name: "Newcastle (Williamtown)", state: "NSW", type: "AD",
@@ -157,7 +157,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YNYN", name: "Nyngan", state: "NSW", type: "AD",
-    nswaaNote: "KANGAROO HAZARD — regular incursions on all runway areas. ROO RUN REQUIRED for all dawn, dusk and night operations. Unmanned — arrange sweep via local contact before arrival. CTAF 126.7. Fuel (AVGAS) available; Jet-A1 contact Nyngan Shire. After-hours: Bogan Shire Council +61 2 6835 9000.",
+    nswaaNote: "Kangaroo hazard on runway thresholds and grassed areas. ROO RUN recommended for dawn and dusk operations. Aerodrome manager available — contact before arrival. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available. Contact: Bogan Shire Council +61 2 6835 9000. After-hours: Nyngan Police +61 2 6835 9255.",
   },
   {
     icao: "YORG", name: "Orange", state: "NSW", type: "AD",
@@ -185,20 +185,20 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YTIB", name: "Tibooburra", state: "NSW", type: "AD",
-    nswaaNote: "REMOTE OUTBACK AERODROME — HIGH KANGAROO, EMU & GOAT HAZARD. ROO RUN MANDATORY for ALL operations. No permanent staff — arrange runway sweep via Tibooburra National Parks or local police. No Jet-A1 on site; limited AVGAS. PPR: Tibooburra NPWS +61 2 6091 7100. Carry extra fuel. Monitor for dust and crosswind — no ILS.",
+    nswaaNote: "REMOTE OUTBACK AERODROME — HIGH KANGAROO, EMU AND FERAL GOAT HAZARD. ROO RUN MANDATORY before ALL operations regardless of time. No permanent aerodrome staff — arrange runway sweep via Tibooburra NPWS or Tibooburra Police before flight. Sealed runway but animal debris common. No Jet-A1 on site. Limited AVGAS only — confirm availability. Carry extra fuel. Monitor crosswind and dust devils especially in afternoon. No ILS — GPS approach only. After-hours contact: Far West NSW NPWS +61 2 6091 7100. Tibooburra Police +61 2 6091 7004. CTAF 126.7.",
   },
   {
     icao: "YWBR", name: "Walgett", state: "NSW", type: "AD",
-    nswaaNote: "HIGH KANGAROO HAZARD — large mobs reported on runway at dawn and dusk. ROO RUN REQUIRED for dawn, dusk and night arrivals/departures. Contact aerodrome manager before arrival. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available — confirm after-hours. Contact: Walgett Shire Council +61 2 6828 1399.",
+    nswaaNote: "HIGH KANGAROO HAZARD — large mobs regularly reported on runway and infield areas at dawn and dusk. ROO RUN REQUIRED before all dawn, dusk and night arrivals and departures. Aerodrome manager conducts sweeps — contact before arrival to confirm. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available — confirm after-hours availability. After-hours contact: Walgett Shire Council +61 2 6828 1399. Emergency: Walgett Police +61 2 6828 1299.",
   },
   {
     icao: "YWAG", name: "Wanaaring", state: "NSW", type: "ALA",
     warning: "⚠️ APRON RESTRICTION — Only ONE aircraft may be scheduled at Wanaaring at a time due to limited apron space. Confirm no other aircraft is booked before proceeding.",
-    nswaaNote: "REMOTE ALA — EXTREME KANGAROO AND GOAT HAZARD. ROO RUN AND STOCK CLEAR MANDATORY before ALL operations. Unsealed strip — check surface condition after rain. No fuel. No permanent staff — PPR via local landholder. After-hours: Bourke Shire Council +61 2 6872 2222.",
+    nswaaNote: "VERY REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY before ALL operations. No permanent staff — arrange runway sweep via Bourke Shire Council or local landholder before flight. Unsealed strip — check condition after rain. No fuel. CTAF 126.7. PPR: Bourke Shire Council +61 2 6872 2222. Emergency: Wanaaring Police +61 2 6872 0004.",
   },
   {
     icao: "YWTO", name: "Wentworth", state: "NSW", type: "AD",
-    nswaaNote: "Kangaroo and bird hazard near runway. CTAF 126.7. Fuel limited — confirm availability before flight. Contact: Wentworth Shire Council +61 3 5027 5027.",
+    nswaaNote: "Kangaroo and bird hazard near Murray–Darling junction. ROO RUN recommended for dawn and dusk. CTAF 126.7. Fuel (AVGAS) available; Jet-A1 by prior arrangement from Mildura. Contact: Wentworth Shire Council +61 3 5027 5027.",
   },
   {
     icao: "YWOL", name: "Shellharbour (Wollongong)", state: "NSW", type: "AD",
@@ -206,7 +206,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YWYB", name: "Wyalong", state: "NSW", type: "ALA",
-    nswaaNote: "Air Landing Area — KANGAROO AND LIVESTOCK HAZARD. ROO RUN AND STOCK CHECK REQUIRED before all operations. No fuel. No permanent staff — arrange inspection via local council. PPR: Bland Shire Council +61 2 6972 2266.",
+    nswaaNote: "ALA — Kangaroo and livestock activity on and near runway. ROO RUN required before dawn and dusk operations. Confirm strip condition before arrival. No fuel on site. Contact: Bland Shire Council +61 2 6972 2266. CTAF 126.7.",
   },
   {
     icao: "YYWG", name: "Wagga Wagga", state: "NSW", type: "AD",
@@ -222,15 +222,15 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YLKC", name: "Lake Cargelligo", state: "NSW", type: "ALA",
-    nswaaNote: "Air Landing Area — KANGAROO HAZARD. ROO RUN REQUIRED before all operations. Unsealed strip. No fuel. PPR via Lachlan Shire Council +61 2 6895 1900.",
+    nswaaNote: "ALA — Kangaroo and sheep hazard near runway. ROO RUN REQUIRED before all operations. Unsealed surface — confirm condition before approach after rain. No fuel on site. PPR: Lachlan Shire Council +61 2 6895 1900. CTAF 126.7.",
   },
   {
     icao: "YMND", name: "Mildura", state: "NSW", type: "AD",
-    nswaaNote: "Mildura is listed under NSW/VIC boundary operations. Wildlife patrol in place. CTAF 118.1. Fuel (Jet-A1) available 24hr. Contact: Mildura Airport +61 3 5055 0510.",
+    nswaaNote: "Kangaroo and emu hazard near Menindee Lakes. ROO RUN recommended for dawn and dusk. CTAF 126.7. Fuel (Jet-A1) limited — confirm availability before flight. Contact: Central Darling Shire +61 8 8091 6600.",
   },
   {
     icao: "YMEN", name: "Menindee", state: "NSW", type: "ALA",
-    nswaaNote: "Air Landing Area — HIGH KANGAROO AND EMU HAZARD. ROO RUN MANDATORY before all operations. Unsealed surface — check condition after rain. No fuel. No permanent staff. PPR via Central Darling Shire +61 8 8091 6600.",
+    nswaaNote: "REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD adjacent to Kinchega National Park. ROO RUN MANDATORY before ALL operations. Unsealed strip — inspect for animal debris and soft ground. No fuel. No permanent staff. PPR: Central Darling Shire +61 8 8091 6600. Menindee Police +61 8 8091 4044. CTAF 126.7.",
   },
   {
     icao: "YMUT", name: "Muttama", state: "NSW", type: "ALA",
@@ -238,11 +238,11 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YWHG", name: "White Cliffs", state: "NSW", type: "ALA",
-    nswaaNote: "REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY before ALL operations. Unsealed surface — check condition after rain. No fuel. No permanent staff. PPR: Central Darling Shire +61 8 8091 6600.",
+    nswaaNote: "REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY before ALL operations. Unsealed surface — check condition after rain; opal mining dust can reduce visibility on approach. No fuel. No permanent staff. PPR: Central Darling Shire +61 8 8091 6600. White Cliffs Police +61 8 8091 6505. CTAF 126.7.",
   },
   {
     icao: "YWTL", name: "Wilcannia", state: "NSW", type: "AD",
-    nswaaNote: "HIGH KANGAROO AND EMU HAZARD — remote far-west aerodrome. ROO RUN REQUIRED for all dawn, dusk and night operations. Contact aerodrome manager before arrival. CTAF 126.7. Fuel limited — confirm before flight. After-hours: Central Darling Shire Council +61 8 8091 6600.",
+    nswaaNote: "REMOTE FAR-WEST AERODROME — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY for ALL dawn, dusk and night operations — no exceptions. No permanent aerodrome staff on site. Arrange runway inspection via Central Darling Shire Council before arrival. Sealed runway — inspect for animal strike debris after sweep. CTAF 126.7. Fuel: Jet-A1 limited availability — confirm at least 24hrs before flight. After-hours contact: Central Darling Shire Council +61 8 8091 6600. Emergency contact: Wilcannia Police +61 8 8091 5210.",
   },
 
   // ── QLD (RFDS SE boundary routes) ───────────────────────────────────────────
@@ -300,7 +300,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YPAG", name: "Port Augusta", state: "SA", type: "AD",
-    nswaaNote: "Kangaroo and bird hazard on runway. Dawn/dusk inspection recommended. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available. Contact: Port Augusta Airport +61 8 8641 0200.",
+    nswaaNote: "Kangaroo and bird hazard on runway surrounds. Dawn/dusk inspection recommended. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available. After-hours contact: Port Augusta City Council Airport +61 8 8641 9100.",
   },
   {
     icao: "YPPH", name: "Perth", state: "WA", type: "AD",
@@ -316,7 +316,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YPED", name: "Edinburgh (RAAF)", state: "SA", type: "AD",
-    nswaaNote: "RAAF base — strict access control. PPR and security clearance REQUIRED. Tower controlled. Wildlife management conducted by RAAF ARO. Fuel (Jet-A1) available for authorised aircraft.",
+    nswaaNote: "RAAF base — strict access control. PPR and security clearance REQUIRED before arrival. Tower controlled. Wildlife management conducted by RAAF ARO. Fuel (Jet-A1) available for authorised aircraft only.",
   },
   {
     icao: "YCBP", name: "Coober Pedy", state: "SA", type: "AD",
@@ -332,7 +332,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YMBT", name: "Moomba", state: "SA", type: "AD",
-    nswaaNote: "Santos gas field aerodrome. PPR REQUIRED — Santos operations only. Security check-in required. Wildlife (kangaroo, camel) hazard. Fuel (Jet-A1) available. Contact: Santos Moomba Operations +61 8 8680 3000.",
+    nswaaNote: "Santos gas field aerodrome — PPR REQUIRED for all operations. Security check-in required before airside access. Wildlife (kangaroo, camel, feral goat) hazard — inspection before every movement. Fuel (Jet-A1) available. Contact: Santos Moomba Operations +61 8 8680 3000. Emergency: Santos Security +61 8 8680 3111. CTAF 126.7.",
   },
 
   // ── VIC ──────────────────────────────────────────────────────────────────────
@@ -343,7 +343,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YMEN", name: "Melbourne (Essendon)", state: "VIC", type: "AD",
-    nswaaNote: "Controlled aerodrome — Melbourne Approach/Tower. Wildlife management in operation. ATIS on 119.6. Fuel (Jet-A1 & AVGAS) available. GA terminal — contact Essendon Airport Operations +61 3 9948 9400.",
+    nswaaNote: "REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD adjacent to Kinchega National Park. ROO RUN MANDATORY before ALL operations. Unsealed strip — inspect for animal debris and soft ground. No fuel. No permanent staff. PPR: Central Darling Shire +61 8 8091 6600. Menindee Police +61 8 8091 4044. CTAF 126.7.",
   },
   {
     icao: "YMAV", name: "Avalon", state: "VIC", type: "AD",
@@ -367,7 +367,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YMOR", name: "Mildura", state: "VIC", type: "AD",
-    nswaaNote: "Wildlife patrol in place. CTAF 118.1. Fuel (Jet-A1) available 24hr. Contact: Mildura Airport +61 3 5055 0510.",
+    nswaaNote: "Kangaroo hazard on runway surrounds, particularly at dawn and dusk. Aerodrome operator conducts daily inspection — confirm completed before early-morning operations. CTAF 118.3. Fuel (Jet-A1 & AVGAS) available. After-hours contact: Moree Plains Shire Council +61 2 6757 3222.",
   },
 
   // ── ACT ──────────────────────────────────────────────────────────────────────
@@ -394,6 +394,88 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   {
     icao: "YBIE", name: "Burnie (Wynyard)", state: "TAS", type: "AD",
     nswaaNote: "Bird and wildlife hazard noted on coastal approaches. CTAF 118.3. Fuel (AVGAS) available; Jet-A1 by arrangement. Contact: Burnie City Council Airport +61 3 6430 5700.",
+  },
+
+
+  // ── QLD — Additional Remote ──────────────────────────────────────────────────
+
+  {
+    icao: "YBWW", name: "Archerfield", state: "QLD", type: "AD",
+    nswaaNote: "Busy non-controlled aerodrome in Brisbane basin — high traffic density. Wildlife management in operation. CTAF 118.9. Fuel (Jet-A1 & AVGAS) available 24hr. Contact: Archerfield Airport +61 7 3277 8111.",
+  },
+  {
+    icao: "YBMK", name: "Mackay", state: "QLD", type: "AD",
+    nswaaNote: "Wildlife management in operation. Bird hazard on coastal approaches. Tower controlled. ATIS on 133.8. Fuel (Jet-A1) 24hr. Contact: Mackay Airport +61 7 4957 0100.",
+  },
+  {
+    icao: "YBCS", name: "Cairns", state: "QLD", type: "AD",
+    nswaaNote: "International airport — Tower controlled. Wildlife management in operation (birds, feral animals). ATIS on 128.4. Fuel (Jet-A1) 24hr. Contact: Cairns Airport +61 7 4080 6703.",
+  },
+  {
+    icao: "YQLP", name: "Quilpie", state: "QLD", type: "AD",
+    nswaaNote: "Kangaroo and emu hazard on runway. ROO RUN required for all dawn, dusk and night operations. Aerodrome operator conducts sweeps — confirm before arrival. CTAF 126.7. Fuel (Jet-A1 & AVGAS) available — confirm after-hours. Contact: Quilpie Shire Council +61 7 4656 0500.",
+  },
+  {
+    icao: "YTWB", name: "Toowoomba (Wellcamp)", state: "QLD", type: "AD",
+    nswaaNote: "Regional controlled aerodrome. Wildlife management in operation. Tower controlled. ATIS on 134.55. Fuel (Jet-A1) available. Contact: Toowoomba Wellcamp Airport +61 7 4614 2300.",
+  },
+  {
+    icao: "YBVW", name: "Birdsville", state: "QLD", type: "AD",
+    nswaaNote: "VERY REMOTE OUTBACK — HIGH KANGAROO, CAMEL AND DINGO HAZARD. ROO RUN MANDATORY before ALL operations — extremely active wildlife at dawn and dusk. No permanent aerodrome staff. Sealed runway — check for debris after wildlife incursion. Fuel (Jet-A1 & AVGAS) available — confirm 24hrs before; outback fuel supply can be disrupted. Extreme heat — consider performance penalties in summer. Contact: Diamantina Shire Council +61 7 4746 1166. Birdsville Police +61 7 4746 0010. CTAF 126.7.",
+  },
+  {
+    icao: "YBDG", name: "Bundaberg", state: "QLD", type: "AD",
+    nswaaNote: "Wildlife management in operation. Bird hazard on agricultural approaches. CTAF/Tower. Fuel (Jet-A1 & AVGAS) available. Contact: Bundaberg Airport +61 7 4130 4700.",
+  },
+  {
+    icao: "YTAM", name: "Thargomindah", state: "QLD", type: "AD",
+    nswaaNote: "REMOTE OUTBACK — HIGH KANGAROO AND EMU HAZARD. ROO RUN REQUIRED for all dawn, dusk and night operations. No permanent staff — arrange sweep via Bulloo Shire Council before arrival. CTAF 126.7. Fuel (Jet-A1 & AVGAS) limited — confirm at least 24hrs before. After-hours: Bulloo Shire Council +61 7 4621 8000. Thargomindah Police +61 7 4655 3131.",
+  },
+  {
+    icao: "YSGT", name: "Surat", state: "QLD", type: "ALA",
+    nswaaNote: "ALA — KANGAROO AND LIVESTOCK HAZARD. ROO RUN REQUIRED before all operations. Unsealed strip — check condition after rain. No fuel. PPR: Maranoa Regional Council +61 7 4620 8888. CTAF 126.7.",
+  },
+  {
+    icao: "YBTN", name: "Bourke North ALA", state: "QLD", type: "ALA",
+    nswaaNote: "REMOTE ALA — KANGAROO AND LIVESTOCK HAZARD. ROO RUN MANDATORY. No fuel. No permanent staff — PPR required. Monitor surface condition after rain. CTAF 126.7.",
+  },
+
+  // ── SA — Additional ──────────────────────────────────────────────────────────
+
+  {
+    icao: "YPPF", name: "Parafield", state: "SA", type: "AD",
+    nswaaNote: "Busy non-controlled training aerodrome in Adelaide basin — high traffic density, exercise extra vigilance on CTAF. CTAF 119.4. Fuel (Jet-A1 & AVGAS) available. Contact: Parafield Airport +61 8 8209 5100.",
+  },
+  {
+    icao: "YHAR", name: "Hawker", state: "SA", type: "AD",
+    nswaaNote: "REMOTE FLINDERS RANGES — KANGAROO AND GOAT HAZARD. ROO RUN REQUIRED for all operations. No permanent aerodrome staff. Unsealed runway — check condition especially after rain. No fuel. PPR: Flinders Ranges Council +61 8 8648 6056. Hawker Police +61 8 8648 4018. CTAF 126.7.",
+  },
+  {
+    icao: "YWHA", name: "Whyalla", state: "SA", type: "AD",
+    nswaaNote: "Wildlife management in operation. Kangaroo hazard near runway margins. CTAF 119.0. Fuel (Jet-A1 & AVGAS) available. Contact: Whyalla Airport +61 8 8640 3457.",
+  },
+  {
+    icao: "YOLD", name: "Olympic Dam", state: "SA", type: "AD",
+    nswaaNote: "BHP mine site aerodrome — PPR REQUIRED. Security check-in mandatory before airside access. Wildlife (kangaroo, camel) hazard — daily inspection by aerodrome operator. Tower controlled. Fuel (Jet-A1) available. Contact: Olympic Dam Airport Operations +61 8 8671 0000.",
+  },
+  {
+    icao: "YINN", name: "Innamincka", state: "SA", type: "ALA",
+    nswaaNote: "VERY REMOTE OUTBACK ALA — HIGH KANGAROO AND CAMEL HAZARD on Cooper Creek floodplain. ROO RUN MANDATORY before ALL operations. Unsealed strip — DO NOT USE after significant rainfall; surface becomes impassable. No permanent staff. No fuel — carry all fuel required. PPR: SA Outback Communities Authority. Innamincka Ranger Station +61 8 8675 9900. CTAF 126.7.",
+  },
+
+  // ── NT — Key routes ──────────────────────────────────────────────────────────
+
+  {
+    icao: "YBAS", name: "Alice Springs", state: "NT", type: "AD",
+    nswaaNote: "Remote central Australia aerodrome. Kangaroo and camel hazard near runway surrounds. Daily inspection by aerodrome operator. CTAF/Tower. Fuel (Jet-A1 & AVGAS) available 24hr. Contact: Alice Springs Airport +61 8 8951 1211.",
+  },
+  {
+    icao: "YDVR", name: "Darwin", state: "NT", type: "AD",
+    nswaaNote: "International controlled airport. Wildlife management in operation. ATIS on 128.35. Fuel (Jet-A1) 24hr. Contact: Darwin Airport +61 8 8920 1811.",
+  },
+  {
+    icao: "YBDN", name: "Boulia", state: "NT", type: "ALA",
+    nswaaNote: "REMOTE ALA — HIGH KANGAROO AND CAMEL HAZARD. ROO RUN MANDATORY. No fuel on site. Check surface condition before approach especially after rain. CTAF 126.7. PPR: Boulia Shire Council +61 7 4746 3155.",
   },
 
   // ── Lord Howe Island (Special Mission) ──────────────────────────────────────
