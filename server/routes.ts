@@ -652,7 +652,7 @@ export async function registerRoutes(
     try {
       const { endpoint, keys, deviceLabel = 'device' } = req.body;
       if (!endpoint || !keys) return res.status(400).json({ error: "Missing endpoint or keys" });
-      storage.savePushSubscription(endpoint, keys, deviceLabel);
+      await storage.savePushSubscription(endpoint, keys, deviceLabel);
       console.log(`[push] Subscribed: ${deviceLabel} @ ${endpoint.slice(0, 60)}...`);
       return res.json({ ok: true });
     } catch (err) {
@@ -664,7 +664,7 @@ export async function registerRoutes(
   app.delete("/api/push/subscribe", async (req: Request, res: Response) => {
     try {
       const { endpoint } = req.body;
-      if (endpoint) storage.deletePushSubscription(endpoint);
+      if (endpoint) await storage.deletePushSubscription(endpoint);
       return res.json({ ok: true });
     } catch {
       return res.json({ ok: true });
@@ -673,7 +673,7 @@ export async function registerRoutes(
 
   // POST /api/push/test  — send a test push to all subscribed devices
   app.post("/api/push/test", async (_req: Request, res: Response) => {
-    const subs = storage.listPushSubscriptions();
+    const subs = await storage.listPushSubscriptions();
     let sent = 0;
     for (const sub of subs) {
       try {
@@ -687,7 +687,7 @@ export async function registerRoutes(
         );
         sent++;
       } catch (err: any) {
-        if (err.statusCode === 410) storage.deletePushSubscription(sub.endpoint);
+        if (err.statusCode === 410) await storage.deletePushSubscription(sub.endpoint);
       }
     }
     return res.json({ sent, total: subs.length });
@@ -700,7 +700,7 @@ export async function registerRoutes(
     try {
       const { missionId, aircraft, airports, pic, missionType, date } = req.body;
       if (!missionId || !airports) return res.status(400).json({ error: "Missing required fields" });
-      storage.upsertActiveMission({ missionId, aircraft, airports, pic, missionType, date });
+      await storage.upsertActiveMission({ missionId, aircraft, airports, pic, missionType, date });
       return res.json({ ok: true });
     } catch (err) {
       return res.status(500).json({ error: "Failed to register mission" });
@@ -710,7 +710,7 @@ export async function registerRoutes(
   // PATCH /api/missions/active/:id/complete  — mark mission completed
   app.patch("/api/missions/active/:id/complete", async (req: Request, res: Response) => {
     try {
-      storage.completeMission(req.params.id);
+      await storage.completeMission(req.params.id);
       return res.json({ ok: true });
     } catch {
       return res.json({ ok: true });
@@ -719,7 +719,7 @@ export async function registerRoutes(
 
   // GET /api/missions/active  — list active missions
   app.get("/api/missions/active", async (_req: Request, res: Response) => {
-    return res.json({ missions: storage.listActiveMissions() });
+    return res.json({ missions: await storage.listActiveMissions() });
   });
 
   // ── NOTAM watcher — called by server-side interval ────────────────────────
@@ -753,7 +753,7 @@ export async function registerRoutes(
       _ = mLabel; // suppress unused
     }
 
-    const subs = storage.listPushSubscriptions();
+    const subs = await storage.listPushSubscriptions();
     if (subs.length === 0) return;
 
     const payload = JSON.stringify({
@@ -770,7 +770,7 @@ export async function registerRoutes(
       try {
         await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, payload);
       } catch (err: any) {
-        if (err.statusCode === 410) storage.deletePushSubscription(sub.endpoint);
+        if (err.statusCode === 410) await storage.deletePushSubscription(sub.endpoint);
       }
     }
     console.log(`[notam-watch] Sent alert for ${flagged.length} flagged NOTAMs to ${subs.length} devices`);
