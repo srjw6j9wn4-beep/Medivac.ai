@@ -52,6 +52,7 @@ const QUICK_QUESTIONS = [
   "Who are the Senior Base Pilots?",
   "Tell me about the Dubbo engineering team",
   "Who are the van drivers across the bases?",
+  "Who is the secretary of Check and Training?",
 ];
 
 function Waveform({ active }: { active: boolean }) {
@@ -113,15 +114,40 @@ export default function BryanLive({ role }: { role: UserRole }) {
   // ── Speak ────────────────────────────────────────────────────────────────────
   // FULL mode: repeat() is permitted and works via WebSocket directly.
   // Fire repeat() only after any in-flight interrupt has cleared (one rAF tick).
+  // Split into sentence chunks so Graham starts speaking on sentence 1
+  // without waiting for the full response to be queued — eliminates buffering.
   function bryanSpeak(text: string) {
     const s = sessionRef.current;
     if (!s) return;
     try { s.interrupt(); } catch {}
+
+    // Split on sentence boundaries
+    const sentences = text
+      .split(/(?<=[.!?])\s+/)
+      .map((t: string) => t.trim())
+      .filter(Boolean);
+
+    if (sentences.length <= 1) {
+      // Short answer — speak directly after interrupt clears
+      setTimeout(() => {
+        try { s.repeat(text.trim()); } catch (e) { console.error("[Bryan] repeat() failed:", e); }
+      }, 200);
+      return;
+    }
+
+    // For multi-sentence answers: speak first sentence immediately,
+    // then queue the rest as a single follow-on chunk after a short delay.
+    // HeyGen queues internally — we just need to not block on the full text.
+    const first = sentences[0];
+    const rest  = sentences.slice(1).join(" ");
+
     setTimeout(() => {
-      try {
-        s.repeat(text);
-      } catch (e) {
-        console.error("[Bryan] repeat() failed:", e);
+      try { s.repeat(first); } catch (e) { console.error("[Bryan] repeat() ch1 failed:", e); }
+      // Queue remainder ~300ms later so HeyGen has time to register the first chunk
+      if (rest) {
+        setTimeout(() => {
+          try { s.repeat(rest); } catch (e) { console.error("[Bryan] repeat() ch2 failed:", e); }
+        }, 300);
       }
     }, 200);
   }
