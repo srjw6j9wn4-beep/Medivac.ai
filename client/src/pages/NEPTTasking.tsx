@@ -7,6 +7,7 @@ import { AirportSearch } from "@/components/AirportSearch";
 import { type Airport } from "@/lib/airportData";
 import { searchFacilities, FACILITY_TYPE_LABELS, FACILITY_TYPE_ICONS, type PatientFacility } from "@/lib/patientFacilities";
 import { getFuelStatus, fuelSummaryForAI } from "@/lib/fuelLookup";
+import { ERSA_AERODROMES, type ERSAAerodrome } from "@/data/ersa-airports";
 import { searchAirports } from "@/lib/airportData";
 import {
   Plus, X, Save, Pencil, Trash2, AlertTriangle, CheckCircle2,
@@ -1630,6 +1631,23 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
     setWaypoints(prev => prev.filter((_, i) => i !== idx));
   }
 
+  // ERSA aerodrome lookup
+  const ersaMap = new Map<string, ERSAAerodrome>(ERSA_AERODROMES.map(a => [a.icao, a]));
+
+  // Parse wildlife hazard and after-hours info from nswaaNote
+  function parseErsaNote(note: string | undefined): { wildlife: string | null; rooRun: boolean; afterHours: string | null; ctaf: string | null } {
+    if (!note) return { wildlife: null, rooRun: false, afterHours: null, ctaf: null };
+    const rooRun = /roo.?run.*(required|mandatory)|mandatory.*roo.?run/i.test(note);
+    const wildlifeMatch = note.match(/^([^.]*(?:kangaroo|emu|wildlife|bird|deer|wombat|livestock)[^.]*\.)/i);
+    const wildlife = wildlifeMatch ? wildlifeMatch[1].trim() : null;
+    const afterHoursMatch = note.match(/(?:after.?hours|after hours)[^.]*contact[^.]*?([+\d\s\-()]{7,})/i) ||
+                            note.match(/contact[^.]*?([+\d\s\-()]{7,})/i);
+    const afterHours = afterHoursMatch ? afterHoursMatch[0].replace(/^.*?(?:contact:|contact)\s*/i, '').trim() : null;
+    const ctafMatch = note.match(/CTAF\s+([\d.]+)/i);
+    const ctaf = ctafMatch ? ctafMatch[1] : null;
+    return { wildlife, rooRun, afterHours, ctaf };
+  }
+
   // Build a route context string to append to job sheet for AI
   function buildRouteContext(): string {
     const filled = waypoints.filter(w => w.airport);
@@ -1895,6 +1913,48 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
                               <CheckCircle2 size={9} /> No active NOTAMs
                             </div>
                           )}
+
+                          {/* ERSA wildlife hazard + after-hours */}
+                          {wp.airport && (() => {
+                            const ersa = ersaMap.get(wp.airport!.icao);
+                            if (!ersa?.nswaaNote) return null;
+                            const { wildlife, rooRun, afterHours, ctaf } = parseErsaNote(ersa.nswaaNote);
+                            if (!wildlife && !rooRun && !afterHours) return null;
+                            return (
+                              <div className="space-y-1 pt-1 border-t border-card-border">
+                                {rooRun && (
+                                  <div className="flex items-start gap-1.5 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                                    <AlertTriangle size={10} className="text-amber-400 shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wide mr-1">Roo Run Required</span>
+                                      {wildlife && <p className="text-[10px] text-amber-200 leading-snug mt-0.5">{wildlife}</p>}
+                                    </div>
+                                  </div>
+                                )}
+                                {!rooRun && wildlife && (
+                                  <div className="flex items-start gap-1.5 p-2 rounded bg-yellow-500/8 border border-yellow-500/20">
+                                    <Wind size={10} className="text-yellow-400 shrink-0 mt-0.5" />
+                                    <p className="text-[10px] text-yellow-200 leading-snug">{wildlife}</p>
+                                  </div>
+                                )}
+                                {afterHours && (
+                                  <div className="flex items-start gap-1.5 px-2 py-1.5 rounded bg-muted/10 border border-card-border">
+                                    <Clock size={9} className="text-muted-foreground shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wide block mb-0.5">After-hours</span>
+                                      <span className="text-[10px] text-foreground">{afterHours}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {ctaf && (
+                                  <div className="flex items-center gap-1.5 px-2 py-1">
+                                    <span className="text-[9px] font-semibold text-muted-foreground uppercase">CTAF</span>
+                                    <span className="text-[10px] font-mono font-bold text-cyan-300">{ctaf} MHz</span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
