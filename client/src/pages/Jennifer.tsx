@@ -15,7 +15,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_01_welcome.png",
     color: "from-cyan-900/60 to-slate-900",
     accent: "border-cyan-400/40",
-    videoSrc: `${API_BASE}/api/video/01_welcome.mp4`,
+    videoSrc: `/video/01_welcome.mp4`,
     backdropSrc: "/bg_01_welcome.png",
   },
   {
@@ -27,7 +27,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_02_dispatch.png",
     color: "from-blue-900/60 to-slate-900",
     accent: "border-blue-400/40",
-    videoSrc: `${API_BASE}/api/video/02_dispatch.mp4`,
+    videoSrc: `/video/02_dispatch.mp4`,
     backdropSrc: "/bg_02_dispatch.png",
   },
   {
@@ -39,7 +39,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_03_compliance.png",
     color: "from-green-900/60 to-slate-900",
     accent: "border-green-400/40",
-    videoSrc: `${API_BASE}/api/video/03_compliance.mp4`,
+    videoSrc: `/video/03_compliance.mp4`,
     backdropSrc: "/bg_03_compliance.png",
   },
   {
@@ -51,7 +51,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_04_ferry.png",
     color: "from-orange-900/60 to-slate-900",
     accent: "border-orange-400/40",
-    videoSrc: `${API_BASE}/api/video/04_ferry.mp4`,
+    videoSrc: `/video/04_ferry.mp4`,
     backdropSrc: "/bg_04_ferry.png",
   },
   {
@@ -63,7 +63,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_05_lordhowe.png",
     color: "from-teal-900/60 to-slate-900",
     accent: "border-teal-400/40",
-    videoSrc: `${API_BASE}/api/video/05_lordhowe.mp4`,
+    videoSrc: `/video/05_lordhowe.mp4`,
     backdropSrc: "/lordhowe_bg.jpg",
   },
   {
@@ -75,7 +75,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_06_nets.png",
     color: "from-purple-900/60 to-slate-900",
     accent: "border-purple-400/40",
-    videoSrc: `${API_BASE}/api/video/06_nets.mp4`,
+    videoSrc: `/video/06_nets.mp4`,
     backdropSrc: "/bg_06_nets.png",
   },
   {
@@ -87,7 +87,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_07_iso.png",
     color: "from-amber-900/60 to-slate-900",
     accent: "border-amber-400/40",
-    videoSrc: `${API_BASE}/api/video/07_iso.mp4`,
+    videoSrc: `/video/07_iso.mp4`,
     backdropSrc: "/bg_07_iso.png",
   },
   {
@@ -99,7 +99,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_08_telehealth.png",
     color: "from-green-900/60 to-slate-900",
     accent: "border-green-400/40",
-    videoSrc: `${API_BASE}/api/video/08_telehealth.mp4`,
+    videoSrc: `/video/08_telehealth.mp4`,
     backdropSrc: "/bg_08_telehealth.png",
   },
   {
@@ -111,7 +111,7 @@ const VIDEOS = [
     thumbSrc: "/thumb_09_isolation.png",
     color: "from-rose-900/60 to-slate-900",
     accent: "border-rose-400/40",
-    videoSrc: `${API_BASE}/api/video/09_isolation.mp4`,
+    videoSrc: `/video/09_isolation.mp4`,
     backdropSrc: "/bg_09_isolation.png",
   },
 ];

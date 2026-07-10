@@ -576,7 +576,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
               <p className="text-xs text-muted-foreground mt-0.5">2:34 · Watch Graham introduce the platform, then go live to ask questions</p>
             </div>
             <div className="relative" style={{ paddingBottom: '56.25%' }}>
-              <video className="absolute inset-0 w-full h-full" src={`${API_BASE}/api/video/jennifer_intro.mp4`} controls playsInline poster="/graham_bg_professional.png" style={{ background: '#050d1a' }} />
+              <video className="absolute inset-0 w-full h-full" src="/video/jennifer_intro.mp4" controls playsInline poster="/graham_bg_professional.png" style={{ background: '#050d1a' }} />
               {/* Simulated blink overlay — only rendered while intro video is showing (!isLive) */}
               {!isLive && (
                 <div
