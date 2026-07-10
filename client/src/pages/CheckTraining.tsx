@@ -1555,9 +1555,18 @@ export default function CheckTraining({ role }: Props) {
                           key={m.id}
                           title={m.title}
                           className={`px-0 py-1.5 border-b border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom ${i === 0 ? "border-l" : ""}`}
-                          style={{ writingMode: "vertical-rl", width: "32px", minWidth: "32px", maxWidth: "32px" }}
+                          style={{ width: "32px", minWidth: "32px", maxWidth: "32px", height: "120px" }}
                         >
-                          <span style={{ display: "inline-block", height: "100px", overflow: "hidden", lineHeight: 1.2 }}>{m.title}</span>
+                          <span style={{
+                            display: "block",
+                            writingMode: "vertical-lr",
+                            transform: "rotate(180deg)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxHeight: "110px",
+                            lineHeight: 1.2,
+                          }}>{m.title}</span>
                         </th>
                       ))
                     ))}
@@ -1637,9 +1646,18 @@ export default function CheckTraining({ role }: Props) {
                         key={m.id}
                         title={m.title}
                         className="px-0 py-1.5 border-b border-l border-card-border font-normal text-[9px] text-muted-foreground text-center align-bottom"
-                        style={{ writingMode: "vertical-rl", width: "48px", minWidth: "48px", maxWidth: "48px" }}
+                        style={{ width: "48px", minWidth: "48px", maxWidth: "48px", height: "140px" }}
                       >
-                        <span style={{ display: "inline-block", height: "140px", overflow: "hidden", lineHeight: 1.2 }}>{m.title}</span>
+                        <span style={{
+                          display: "block",
+                          writingMode: "vertical-lr",
+                          transform: "rotate(180deg)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          maxHeight: "130px",
+                          lineHeight: 1.2,
+                        }}>{m.title}</span>
                       </th>
                     ))}
                   </tr>
