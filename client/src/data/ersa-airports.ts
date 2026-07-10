@@ -65,7 +65,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YBRW", name: "Brewarrina", state: "NSW", type: "AD",
-    nswaaNote: "REMOTE AERODROME — KANGAROO AND EMU HAZARD on all runway areas. No permanent aerodrome staff. ROO RUN REQUIRED before all operations. Contact local council to arrange inspection before arrival. CTAF 126.7. No fuel on site — nearest at Bourke or Walgett. PPR: Brewarrina Shire Council +61 2 6839 2106. Brewarrina Police +61 2 6839 2007.",
+    nswaaNote: "REMOTE AERODROME — KANGAROO AND EMU HAZARD on all runway areas. No permanent aerodrome staff. ROO RUN REQUIRED before all operations. Contact local council to arrange inspection before arrival. CTAF 126.7. No fuel on site — nearest at Bourke or Walgett. PPR: Brewarrina Shire Council +61 2 6839 2106. Emergency: Brewarrina Police +61 2 6839 2007.",
   },
   {
     icao: "YCBA", name: "Cobar", state: "NSW", type: "AD",
@@ -194,7 +194,7 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   {
     icao: "YWAG", name: "Wanaaring", state: "NSW", type: "ALA",
     warning: "⚠️ APRON RESTRICTION — Only ONE aircraft may be scheduled at Wanaaring at a time due to limited apron space. Confirm no other aircraft is booked before proceeding.",
-    nswaaNote: "VERY REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY before ALL operations. No permanent staff — arrange runway sweep via Bourke Shire Council or local landholder before flight. Unsealed strip — check condition after rain. No fuel. CTAF 126.7. PPR: Bourke Shire Council +61 2 6872 2222. Emergency: Wanaaring Police +61 2 6872 0004.",
+    nswaaNote: "VERY REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY before ALL operations. No permanent staff — arrange runway sweep via Bourke Shire Council or local landholder before flight. Unsealed strip — check condition after rain. No fuel. CTAF 126.7. PPR: Bourke Shire Council +61 2 6872 2222. Emergency: Wanaaring Police +61 2 6874 6004.",
   },
   {
     icao: "YWTO", name: "Wentworth", state: "NSW", type: "AD",
