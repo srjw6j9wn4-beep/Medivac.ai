@@ -449,13 +449,16 @@ export default function Jennifer({ role }: Props) {
           {/* Avatar card */}
           <div className="bg-card rounded-xl border border-cyan-500/20 p-4">
             <div className="relative mx-auto w-40 h-40 rounded-2xl overflow-hidden mb-4 border border-cyan-500/30 bg-[#0a1628]">
+              {activeVideo.backdropSrc && (
+                <div className="absolute inset-0" style={{ backgroundImage: `url(${activeVideo.backdropSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'brightness(0.5)' }} />
+              )}
               <video
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
                 src={activeVideo.videoSrc}
                 muted={false}
                 playsInline
                 preload="metadata"
-                style={{ pointerEvents: 'none' }}
+                style={{ pointerEvents: 'none', mixBlendMode: 'screen' }}
               />
               <div className="absolute top-2 left-2 px-2 py-0.5 bg-cyan-500/20 border border-cyan-400/30 rounded-full">
                 <span className="text-[8px] font-bold text-cyan-400">RFDS AI</span>
@@ -597,21 +600,27 @@ export default function Jennifer({ role }: Props) {
           <div className="bg-card rounded-xl border border-card-border overflow-hidden">
             <div
               className="relative w-full bg-[#0a1628]"
-              style={{
-                aspectRatio: '16/9',
-                ...(activeVideo.backdropSrc ? {
-                  backgroundImage: `url(${activeVideo.backdropSrc})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                } : {})
-              }}
+              style={{ aspectRatio: '16/9' }}
             >
+              {/* Subject-specific backdrop — darkened slightly so Jennifer composites cleanly */}
+              {activeVideo.backdropSrc && (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundImage: `url(${activeVideo.backdropSrc})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    filter: 'brightness(0.55)',
+                  }}
+                />
+              )}
               <video
                 ref={videoRef}
-                className="w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover"
                 src={activeVideo.videoSrc}
                 playsInline
                 preload="auto"
+                style={{ mixBlendMode: 'screen' }}
               />
 
               {!playing && (
