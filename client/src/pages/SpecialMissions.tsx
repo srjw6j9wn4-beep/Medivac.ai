@@ -7,7 +7,7 @@
  * Every sign-off captures ROLE, not name — consistent regardless of who is on duty.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { type UserRole } from "@/lib/data";
@@ -619,10 +619,27 @@ function SessionWorkflow({
   const mCfg  = MISSION_TYPES.find(m => m.id === session.missionType)!;
   const stage = session.status as WorkflowStage;
 
-  const checklistData: Record<string, CheckState> = useMemo(
-    () => JSON.parse(session.checklistData || "{}"),
-    [session.checklistData]
+  // Local optimistic state — updated instantly on click, synced to server with debounce
+  const [checklistData, setChecklistData] = useState<Record<string, CheckState>>(
+    () => JSON.parse(session.checklistData || "{}")
   );
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onUpdateRef = useRef(onUpdate);
+  useEffect(() => { onUpdateRef.current = onUpdate; }, [onUpdate]);
+
+  // Sync server → local ONLY when switching to a different session or when there is no
+  // pending debounce (i.e. the user is not actively ticking items).
+  // This prevents the server response from overwriting optimistic UI mid-checklist.
+  const prevSessionId = useRef(session.id);
+  useEffect(() => {
+    const switchedSession = session.id !== prevSessionId.current;
+    const noPendingSync   = debounceRef.current === null;
+    if (switchedSession || noPendingSync) {
+      prevSessionId.current = session.id;
+      setChecklistData(JSON.parse(session.checklistData || "{}"));
+    }
+  }, [session.id, session.checklistData]);
+
   const signoffs: SignoffEntry[] = useMemo(
     () => JSON.parse(session.signoffs || "[]"),
     [session.signoffs]
@@ -645,22 +662,37 @@ function SessionWorkflow({
   const blockersOk = blockers.every(b => checklistData[b.id]?.checked);
   const allChecked = items.every(i => checklistData[i.id]?.checked);
 
+  // Debounced server sync — UI updates instantly, API call fires 600ms after last toggle
+  const syncToServer = useCallback((data: Record<string, CheckState>) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onUpdateRef.current({ checklistData: JSON.stringify(data) });
+    }, 600);
+  }, []);
+
   function toggleItem(item: CheckItem) {
     if (stage === "complete") return;
-    const now = checklistData[item.id]?.checked;
-    const newData = {
-      ...checklistData,
-      [item.id]: {
-        checked: !now,
-        role: signingRole,
-        signedAt: new Date().toISOString(),
-      },
-    };
-    onUpdate({ checklistData: JSON.stringify(newData) });
+    setChecklistData(prev => {
+      const newData = {
+        ...prev,
+        [item.id]: {
+          checked: !prev[item.id]?.checked,
+          role: signingRole,
+          signedAt: new Date().toISOString(),
+        },
+      };
+      syncToServer(newData);
+      return newData;
+    });
   }
 
   function advanceStage() {
     if (!blockersOk) return;
+    // Flush any pending checklist debounce before advancing stage
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
     const ns = nextStage(stage);
     const newSignoffs: SignoffEntry[] = [
       ...signoffs,
@@ -672,6 +704,7 @@ function SessionWorkflow({
       },
     ];
     onUpdate({
+      checklistData: JSON.stringify(checklistData),
       status: ns,
       signoffs: JSON.stringify(newSignoffs),
       ...(ns === "complete" ? { completedAt: new Date().toISOString() } : {}),
