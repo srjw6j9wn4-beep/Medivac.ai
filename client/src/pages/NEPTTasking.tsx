@@ -223,7 +223,7 @@ function emptyDraft(ref: string): TaskDraft {
 function StatusBadge({ status }: { status: TaskStatus }) {
   const c = statusConfig(status);
   return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} ${c.border}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[13px] font-semibold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} ${c.border}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
       {status}
     </span>
@@ -233,7 +233,7 @@ function StatusBadge({ status }: { status: TaskStatus }) {
 function PriorityBadge({ priority }: { priority: TaskPriority }) {
   const c = priorityConfig(priority);
   return (
-    <span className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border ${c.bg} ${c.text} ${c.border}`}>
+    <span className={`inline-flex items-center text-xs font-bold px-1.5 py-0.5 rounded border ${c.bg} ${c.text} ${c.border}`}>
       {priority === "Emergency" ? "🔴 " : priority === "Urgent" ? "🟡 " : ""}{priority.toUpperCase()}
     </span>
   );
@@ -823,7 +823,7 @@ function QuickStatus({ task, onUpdate }: { task: NeptTask; onUpdate: (id: number
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} ${c.border} hover:opacity-80 transition-opacity`}
+        className={`inline-flex items-center gap-1.5 text-[13px] font-semibold px-2 py-0.5 rounded-full border ${c.bg} ${c.text} ${c.border} hover:opacity-80 transition-opacity`}
       >
         <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
         {task.status}
@@ -2602,7 +2602,7 @@ export default function NEPTTasking({ role }: Props) {
 
         {/* Desktop table */}
         <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-card-border bg-muted/10">
                 {["Task Ref", "Priority", "Status", "Hospital Pickup → Drop-off", "Patient & Escort", "Pilot / Nurse", "Aircraft"].map(h => (
@@ -2616,7 +2616,7 @@ export default function NEPTTasking({ role }: Props) {
                     title={etaSort === "asc" ? "Sorted: earliest first" : "Sorted: latest first"}
                   >
                     ETA
-                    <span className="text-[10px] transition-colors group-hover:text-cyan-300">
+                    <span className="text-xs transition-colors group-hover:text-cyan-300">
                       {etaSort === "asc" ? "▲" : "▼"}
                     </span>
                   </button>
@@ -2647,11 +2647,11 @@ export default function NEPTTasking({ role }: Props) {
                     <td colSpan={cols} className={`px-4 py-2.5 ${bg} border-y border-card-border`}>
                       <div className="flex items-center gap-3">
                         <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
-                        <span className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${accent}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                        <span className={`text-[13px] font-extrabold uppercase tracking-[0.12em] ${accent}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
                           {label}
                         </span>
-                        <span className={`text-[10px] font-mono ${accent} opacity-50 border border-current/20 px-1.5 py-0.5 rounded`}>{icao}</span>
-                        <span className={`ml-auto text-[10px] font-semibold ${accent} opacity-60`}>{count} task{count !== 1 ? "s" : ""}</span>
+                        <span className={`text-xs font-mono ${accent} opacity-50 border border-current/20 px-1.5 py-0.5 rounded`}>{icao}</span>
+                        <span className={`ml-auto text-xs font-semibold ${accent} opacity-60`}>{count} task{count !== 1 ? "s" : ""}</span>
                       </div>
                     </td>
                   </tr>
@@ -2668,8 +2668,8 @@ export default function NEPTTasking({ role }: Props) {
                   >
                     {/* Task Ref */}
                     <td className="px-3 py-3 whitespace-nowrap">
-                      <div className="font-mono font-bold text-foreground text-[11px]">{t.taskRef}</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">{fmtDT(t.requestTime)}</div>
+                      <div className="font-mono font-bold text-foreground text-[13px]">{t.taskRef}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{fmtDT(t.requestTime)}</div>
                     </td>
                     {/* Priority */}
                     <td className="px-3 py-3"><PriorityBadge priority={t.priority} /></td>
@@ -2687,12 +2687,12 @@ export default function NEPTTasking({ role }: Props) {
                             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wide leading-none mb-0.5">Pickup</div>
-                            <div className="text-[11px] font-semibold text-foreground leading-tight">
+                            <div className="text-xs text-muted-foreground uppercase tracking-wide leading-none mb-0.5">Pickup</div>
+                            <div className="text-[13px] font-semibold text-foreground leading-tight">
                               {t.referringHospital || t.pickupLocation || <span className="text-muted-foreground">—</span>}
                             </div>
                             {t.referringHospital && t.pickupLocation && (
-                              <div className="text-[10px] text-muted-foreground leading-tight">{t.pickupLocation}</div>
+                              <div className="text-xs text-muted-foreground leading-tight">{t.pickupLocation}</div>
                             )}
                           </div>
                         </div>
@@ -2701,12 +2701,12 @@ export default function NEPTTasking({ role }: Props) {
                             <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
                           </div>
                           <div>
-                            <div className="text-[10px] text-muted-foreground uppercase tracking-wide leading-none mb-0.5">Drop-off</div>
-                            <div className="text-[11px] font-semibold text-foreground leading-tight">
+                            <div className="text-xs text-muted-foreground uppercase tracking-wide leading-none mb-0.5">Drop-off</div>
+                            <div className="text-[13px] font-semibold text-foreground leading-tight">
                               {t.receivingHospital || t.destLocation || <span className="text-muted-foreground">—</span>}
                             </div>
                             {t.receivingHospital && t.destLocation && (
-                              <div className="text-[10px] text-muted-foreground leading-tight">{t.destLocation}</div>
+                              <div className="text-xs text-muted-foreground leading-tight">{t.destLocation}</div>
                             )}
                           </div>
                         </div>
@@ -2719,17 +2719,17 @@ export default function NEPTTasking({ role }: Props) {
                           <div className="flex items-center gap-1.5">
                             <User size={10} className="text-rose-400 shrink-0" />
                             <div>
-                              <div className="text-[11px] font-semibold text-foreground">{t.patientName}</div>
-                              {t.patientRef && <div className="text-[10px] font-mono text-muted-foreground">{t.patientRef}</div>}
+                              <div className="text-[13px] font-semibold text-foreground">{t.patientName}</div>
+                              {t.patientRef && <div className="text-xs font-mono text-muted-foreground">{t.patientRef}</div>}
                             </div>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground text-[10px]">No patient</span>
+                          <span className="text-muted-foreground text-xs">No patient</span>
                         )}
                         {t.escortName && (
                           <div className="flex items-center gap-1.5">
                             <Users size={10} className="text-blue-400 shrink-0" />
-                            <div className="text-[10px] text-blue-300">{t.escortName}</div>
+                            <div className="text-xs text-blue-300">{t.escortName}</div>
                           </div>
                         )}
                       </div>
@@ -2740,31 +2740,31 @@ export default function NEPTTasking({ role }: Props) {
                         {t.pilotName ? (
                           <div className="flex items-center gap-1.5">
                             <Plane size={10} className="text-cyan-400 shrink-0" />
-                            <span className="text-[11px] font-medium text-foreground">{t.pilotName}</span>
+                            <span className="text-[13px] font-medium text-foreground">{t.pilotName}</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Plane size={8} />Pilot TBA</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Plane size={9} />Pilot TBA</span>
                           </div>
                         )}
                         {t.nurseName ? (
                           <div className="flex items-center gap-1.5">
                             <Shield size={10} className="text-rose-400 shrink-0" />
-                            <span className="text-[11px] font-medium text-foreground">{t.nurseName}</span>
+                            <span className="text-[13px] font-medium text-foreground">{t.nurseName}</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Shield size={8} />Nurse TBA</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Shield size={9} />Nurse TBA</span>
                           </div>
                         )}
                         {t.driverName ? (
                           <div className="flex items-center gap-1.5">
                             <Truck size={10} className="text-amber-400 shrink-0" />
-                            <span className="text-[11px] font-medium text-foreground">{t.driverName}</span>
+                            <span className="text-[13px] font-medium text-foreground">{t.driverName}</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Truck size={8} />Driver TBA</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Truck size={9} />Driver TBA</span>
                           </div>
                         )}
                       </div>
@@ -2772,8 +2772,8 @@ export default function NEPTTasking({ role }: Props) {
                     {/* Aircraft */}
                     <td className="px-3 py-3 whitespace-nowrap">
                       {t.aircraftReg
-                        ? <div className="font-bold text-foreground font-mono text-[11px] tracking-wide">{t.aircraftReg}</div>
-                        : <span className="text-muted-foreground text-[10px]">Unassigned</span>}
+                        ? <div className="font-bold text-foreground font-mono text-[13px] tracking-wide">{t.aircraftReg}</div>
+                        : <span className="text-muted-foreground text-xs">Unassigned</span>}
                     </td>
                     <td className="px-3 py-3">
                       {t.estimatedEta ? (
@@ -2932,9 +2932,9 @@ export default function NEPTTasking({ role }: Props) {
             const MobileBaseHeader = ({ label, icao, count, accent, bg, dot }: { label: string; icao: string; count: number; accent: string; bg: string; dot: string }) => (
               <div className={`flex items-center gap-3 px-4 py-2.5 ${bg} border-y border-card-border`}>
                 <div className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
-                <span className={`text-[11px] font-extrabold uppercase tracking-[0.12em] ${accent}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{label}</span>
-                <span className={`text-[10px] font-mono ${accent} opacity-50 border border-current/20 px-1.5 py-0.5 rounded`}>{icao}</span>
-                <span className={`ml-auto text-[10px] font-semibold ${accent} opacity-60`}>{count} task{count !== 1 ? "s" : ""}</span>
+                <span className={`text-[13px] font-extrabold uppercase tracking-[0.12em] ${accent}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{label}</span>
+                <span className={`text-xs font-mono ${accent} opacity-50 border border-current/20 px-1.5 py-0.5 rounded`}>{icao}</span>
+                <span className={`ml-auto text-xs font-semibold ${accent} opacity-60`}>{count} task{count !== 1 ? "s" : ""}</span>
               </div>
             );
 
@@ -2980,7 +2980,7 @@ export default function NEPTTasking({ role }: Props) {
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-0.5">Patient</div>
                   <div className="text-foreground">{t.patientName ?? "—"}</div>
-                  {t.patientRef && <div className="text-[10px] font-mono text-muted-foreground">{t.patientRef}</div>}
+                  {t.patientRef && <div className="text-xs font-mono text-muted-foreground">{t.patientRef}</div>}
                 </div>
                 <div>
                   <div className="text-[10px] text-muted-foreground mb-0.5">Aircraft / Crew</div>

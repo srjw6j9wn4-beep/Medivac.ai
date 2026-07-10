@@ -238,7 +238,15 @@ export const ERSA_AERODROMES: ERSAAerodrome[] = [
   },
   {
     icao: "YWHG", name: "White Cliffs", state: "NSW", type: "ALA",
-    nswaaNote: "REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY before ALL operations. Unsealed surface — check condition after rain; opal mining dust can reduce visibility on approach. No fuel. No permanent staff. PPR: Central Darling Shire +61 8 8091 6600. White Cliffs Police +61 8 8091 6505. CTAF 126.7.",
+    nswaaNote: "REMOTE ALA — HIGH KANGAROO, EMU AND GOAT HAZARD. ROO RUN MANDATORY before ALL operations. Unsealed opal-country strip — inspect surface carefully after rain; loose gravel and dust can cause poor braking. Opal mining dust may reduce visibility on approach and departure. No fuel. No permanent aerodrome staff. PPR required: Central Darling Shire Council +61 8 8091 6600. CTAF 126.7. Emergency: White Cliffs Police +61 8 8091 6505.",
+  },
+  {
+    icao: "YIVO", name: "Ivanhoe", state: "NSW", type: "AD",
+    nswaaNote: "REMOTE FAR-WEST AERODROME — HIGH KANGAROO AND EMU HAZARD. ROO RUN MANDATORY for all dawn, dusk and night operations. No permanent aerodrome staff — arrange runway inspection via Central Darling Shire Council before arrival. Sealed runway. No Jet-A1 on site — nearest fuel at Broken Hill or Cobar. Confirm fuel plan before departure. CTAF 126.7. PPR: Central Darling Shire Council +61 8 8091 6600. Emergency: Ivanhoe Police +61 8 8091 7004.",
+  },
+  {
+    icao: "YTLP", name: "Tilpa", state: "NSW", type: "ALA",
+    nswaaNote: "VERY REMOTE ALA on the Darling River — HIGH KANGAROO, EMU AND LIVESTOCK HAZARD. ROO RUN MANDATORY before ALL operations — no permanent staff on site. Unsealed dirt strip — check condition carefully after rain; Darling River flooding can make surface unusable. No fuel. No CTAF monitoring guaranteed — announce intentions on 126.7. PPR: Wilcannia Shire (Central Darling Shire Council) +61 8 8091 6600. Emergency: Wilcannia Police +61 8 8091 5210.",
   },
   {
     icao: "YWCA", name: "Wilcannia", state: "NSW", type: "AD",
