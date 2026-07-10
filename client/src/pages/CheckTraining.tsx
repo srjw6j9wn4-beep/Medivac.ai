@@ -12,6 +12,10 @@ import {
 import { generatePDF } from "@/lib/generatePDF";
 import { EXAMS, PASS_MARK, EXAM_DURATION_MINUTES, type Exam, type ExamQuestion } from "@/data/theoryExams";
 import { EXAMS_B350 } from "@/data/theoryExamsB350";
+import { EXAMS_OPS } from "@/data/theoryExamsOps";
+import { EXAMS_B200_SYSTEMS } from "@/data/theoryExamsB200Systems";
+import { EXAMS_B350_SYSTEMS } from "@/data/theoryExamsB350Systems";
+import { EXAMS_IFR } from "@/data/theoryExamsIFR";
 
 interface Props { role: UserRole; }
 
@@ -1939,8 +1943,96 @@ interface ExamResult {
 // Best result keyed by examId
 type BestScores = Record<string, { score: number; total: number; passed: boolean; date: string }>;
 
+type ExamMode = "b200" | "b350" | "ops-staff" | "ifr-sim" | "b200-systems" | "b350-systems";
+
+const EXAM_MODE_CONFIG: Record<ExamMode, {
+  label: string;
+  description: string;
+  accent: string;        // tailwind text colour
+  accentBg: string;      // tailwind bg colour
+  accentBorder: string;  // tailwind border colour
+  accentBar: string;     // tailwind bg for progress bar
+  accentCard: string;    // hover card border+bg
+  exams: Exam[];
+  dedicatedLabel: string;
+  mixedLabel: string;
+}> = {
+  b200: {
+    label: "King Air B200",
+    description: "B200 POH, QRH, Flash Cards & Training Manual",
+    accent: "text-emerald-400",
+    accentBg: "bg-emerald-500/5",
+    accentBorder: "border-emerald-500/20",
+    accentBar: "bg-emerald-500",
+    accentCard: "hover:border-emerald-500/40 hover:bg-emerald-500/5",
+    exams: EXAMS,
+    dedicatedLabel: "Dedicated Exams — One Manual Per Exam",
+    mixedLabel: "Combined Exams — Mixed Across All Manuals",
+  },
+  b350: {
+    label: "King Air B350",
+    description: "B350 POH, QRH & Differences Training",
+    accent: "text-blue-400",
+    accentBg: "bg-blue-500/5",
+    accentBorder: "border-blue-500/20",
+    accentBar: "bg-blue-500",
+    accentCard: "hover:border-blue-500/40 hover:bg-blue-500/5",
+    exams: EXAMS_B350,
+    dedicatedLabel: "B350 Dedicated Exams — One Subject Per Exam",
+    mixedLabel: "B350 Combined Exams — Mixed Across All Subject Areas",
+  },
+  "ops-staff": {
+    label: "Ops Staff",
+    description: "Emergency, NEPT & Invoicing — 3 tiers",
+    accent: "text-amber-400",
+    accentBg: "bg-amber-500/5",
+    accentBorder: "border-amber-500/20",
+    accentBar: "bg-amber-500",
+    accentCard: "hover:border-amber-500/40 hover:bg-amber-500/5",
+    exams: EXAMS_OPS,
+    dedicatedLabel: "Ops Staff Exams by Tier",
+    mixedLabel: "Mixed Ops Exams",
+  },
+  "ifr-sim": {
+    label: "IFR / Sim (CASA)",
+    description: "CASA Form 61-1503 — 17 ground theory topics",
+    accent: "text-sky-400",
+    accentBg: "bg-sky-500/5",
+    accentBorder: "border-sky-500/20",
+    accentBar: "bg-sky-500",
+    accentCard: "hover:border-sky-500/40 hover:bg-sky-500/5",
+    exams: EXAMS_IFR,
+    dedicatedLabel: "CASA Form 61-1503 — Ground Theory Topics (a)–(q)",
+    mixedLabel: "Mixed IFR Topics",
+  },
+  "b200-systems": {
+    label: "B200 Systems",
+    description: "Flight Controls, Powerplant, Electrical, Pressurisation, Fuel",
+    accent: "text-teal-400",
+    accentBg: "bg-teal-500/5",
+    accentBorder: "border-teal-500/20",
+    accentBar: "bg-teal-500",
+    accentCard: "hover:border-teal-500/40 hover:bg-teal-500/5",
+    exams: EXAMS_B200_SYSTEMS,
+    dedicatedLabel: "B200 System Exams — One System Per Exam",
+    mixedLabel: "B200 Systems Mixed",
+  },
+  "b350-systems": {
+    label: "B350 Systems",
+    description: "PT6A-60A, Hydraulics, Electrical, Pressurisation, Avionics",
+    accent: "text-violet-400",
+    accentBg: "bg-violet-500/5",
+    accentBorder: "border-violet-500/20",
+    accentBar: "bg-violet-500",
+    accentCard: "hover:border-violet-500/40 hover:bg-violet-500/5",
+    exams: EXAMS_B350_SYSTEMS,
+    dedicatedLabel: "B350 System Exams — One System Per Exam",
+    mixedLabel: "B350 Systems Mixed",
+  },
+};
+
 function TheoryKnowledgeSection() {
-  const [aircraftType, setAircraftType] = useState<"B200" | "B350">("B200");
+  const [examMode, setExamMode]         = useState<ExamMode>("b200");
   const [phase, setPhase]               = useState<ExamPhase>("select");
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [questions, setQuestions]       = useState<ExamQuestion[]>([]);
@@ -1955,8 +2047,9 @@ function TheoryKnowledgeSection() {
   const timerRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
   const answersRef                      = useRef<(number | null)[]>([]);
 
-  // Active exam bank — switches between B200 and B350
-  const ACTIVE_EXAMS = aircraftType === "B350" ? EXAMS_B350 : EXAMS;
+  const cfg = EXAM_MODE_CONFIG[examMode];
+  // Active exam bank — driven by mode config
+  const ACTIVE_EXAMS = cfg.exams;
   const questionsRef                    = useRef<ExamQuestion[]>([]);
 
   useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -2064,36 +2157,30 @@ function TheoryKnowledgeSection() {
     return (
       <div className="p-4 space-y-6">
 
-        {/* ── AIRCRAFT TYPE SWITCHER ── */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider mr-1">Aircraft:</span>
-          {(["B200", "B350"] as const).map(type => (
-            <button
-              key={type}
-              onClick={() => { setAircraftType(type); setBestScores(prev => ({ ...prev })); }}
-              data-testid={`button-aircraft-${type.toLowerCase()}`}
-              className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all border ${
-                aircraftType === type
-                  ? type === "B350"
-                    ? "bg-blue-500/20 border-blue-400/60 text-blue-300"
-                    : "bg-emerald-500/20 border-emerald-400/60 text-emerald-300"
-                  : "bg-muted/30 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-              }`}
-            >
-              {type === "B200" ? "✈ King Air B200" : "✈ King Air B350"}
-            </button>
-          ))}
-          {aircraftType === "B350" && (
-            <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-400/30">DIFFERENCES TRAINING</span>
-          )}
+        {/* ── EXAM MODE SWITCHER ── */}
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Exam Category:</p>
+          <div className="flex flex-wrap gap-2">
+            {(Object.entries(EXAM_MODE_CONFIG) as [ExamMode, typeof EXAM_MODE_CONFIG[ExamMode]][]).map(([mode, c]) => (
+              <button
+                key={mode}
+                onClick={() => { setExamMode(mode); }}
+                data-testid={`button-exam-mode-${mode}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  examMode === mode
+                    ? `${c.accentBg} border-opacity-60 ${c.accent} border-current`
+                    : "bg-muted/30 border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">{cfg.description}</p>
         </div>
 
         {/* ── PROGRESS TRACKER CARD ── */}
-        <div className={`rounded-xl border p-5 ${
-          aircraftType === "B350"
-            ? "border-blue-500/20 bg-blue-500/5"
-            : "border-emerald-500/20 bg-emerald-500/5"
-        }`}>
+        <div className={`rounded-xl border p-5 ${cfg.accentBorder} ${cfg.accentBg}`}>
 
           {/* Reset confirmation overlay */}
           {showResetConfirm && (
@@ -2160,18 +2247,18 @@ function TheoryKnowledgeSection() {
             <div className="flex justify-between text-xs">
               <span className="text-muted-foreground">{passedCount} of {totalExams} exams passed</span>
               <span className={`font-bold ${
-                overallPct === 100 ? (aircraftType === "B350" ? "text-blue-400" : "text-emerald-400") :
+                overallPct === 100 ? cfg.accent :
                 overallPct >= 50  ? "text-amber-400"   : "text-muted-foreground"
               }`}>{overallPct}%</span>
             </div>
             <div className="h-2.5 rounded-full bg-border overflow-hidden">
               <div
-                className={`h-2.5 rounded-full transition-all duration-500 ${aircraftType === "B350" ? "bg-blue-500" : "bg-emerald-500"}`}
+                className={`h-2.5 rounded-full transition-all duration-500 ${cfg.accentBar}`}
                 style={{ width: `${overallPct}%` }}
               />
             </div>
             {overallPct === 100 && (
-              <p className={`text-xs font-semibold text-center pt-1 ${aircraftType === "B350" ? "text-blue-400" : "text-emerald-400"}`}>🏖 All {aircraftType} exams passed — well done!</p>
+              <p className={`text-xs font-semibold text-center pt-1 ${cfg.accent}`}>🏖 All {cfg.label} exams passed — well done!</p>
             )}
           </div>
 
@@ -2182,7 +2269,7 @@ function TheoryKnowledgeSection() {
                 const best = bestScores[exam.id];
                 const isMixed = exam.title.includes("Mixed");
                 let bg = "bg-border/50"; // not attempted
-                if (best?.passed)       bg = aircraftType === "B350" ? "bg-blue-500" : "bg-emerald-500";
+                if (best?.passed)       bg = cfg.accentBar;
                 else if (best)          bg = "bg-red-500/70";
                 return (
                   <div
@@ -2205,7 +2292,7 @@ function TheoryKnowledgeSection() {
 
         {/* ── DEDICATED EXAMS ── */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{aircraftType === "B350" ? "B350 Dedicated Exams — One Subject Per Exam" : "Dedicated Exams — One Manual Per Exam"}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{cfg.dedicatedLabel}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {dedicatedExams.map(exam => {
               const best = bestScores[exam.id];
@@ -2214,13 +2301,13 @@ function TheoryKnowledgeSection() {
                 <button
                   key={exam.id}
                   onClick={() => startExam(exam)}
-                  className={`text-left rounded-xl border border-border bg-card transition-all p-4 group ${aircraftType === "B350" ? "hover:border-blue-500/40 hover:bg-blue-500/5" : "hover:border-emerald-500/40 hover:bg-emerald-500/5"}`}
+                  className={`text-left rounded-xl border border-border bg-card transition-all p-4 group ${cfg.accentCard}`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <BookMarked size={16} className={`shrink-0 mt-0.5 ${aircraftType === "B350" ? "text-blue-400" : "text-emerald-400"}`} />
+                    <BookMarked size={16} className={`shrink-0 mt-0.5 ${cfg.accent}`} />
                     {best ? (
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        best.passed ? (aircraftType === "B350" ? "bg-blue-500/20 text-blue-300" : "bg-emerald-500/20 text-emerald-300") : "bg-red-500/20 text-red-300"
+                        best.passed ? `${cfg.accentBg} ${cfg.accent}` : "bg-red-500/20 text-red-300"
                       }`}>
                         {best.passed ? "PASS" : "FAIL"} · {scorePct}%
                       </span>
@@ -2228,7 +2315,7 @@ function TheoryKnowledgeSection() {
                       <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/40">Not attempted</span>
                     )}
                   </div>
-                  <p className={`font-semibold text-sm mt-2 transition-colors ${aircraftType === "B350" ? "group-hover:text-blue-300" : "group-hover:text-emerald-300"}`}>{exam.title}</p>
+                  <p className={`font-semibold text-sm mt-2 transition-colors ${cfg.accent}`}>{exam.title}</p>
                   <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
 
                   {/* Score bar */}
@@ -2237,7 +2324,7 @@ function TheoryKnowledgeSection() {
                       <div className="h-1.5 rounded-full bg-border overflow-hidden">
                         <div
                           className={`h-1.5 rounded-full transition-all ${
-                            best.passed ? (aircraftType === "B350" ? "bg-blue-500" : "bg-emerald-500") : "bg-red-500/70"
+                            best.passed ? cfg.accentBar : "bg-red-500/70"
                           }`}
                           style={{ width: `${scorePct}%` }}
                         />
@@ -2263,7 +2350,7 @@ function TheoryKnowledgeSection() {
 
         {/* ── MIXED EXAMS ── */}
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{aircraftType === "B350" ? "B350 Combined Exams — Mixed Across All Subject Areas" : "Combined Exams — Mixed Across All Manuals"}</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{cfg.mixedLabel}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {mixedExams.map(exam => {
               const best = bestScores[exam.id];
