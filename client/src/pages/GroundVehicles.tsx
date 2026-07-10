@@ -4,7 +4,7 @@ import {
   AlertTriangle, CheckCircle, Clock, Download, Filter,
   Search, ShieldCheck, Sparkles, RefreshCw, Calendar,
   FileText, ChevronDown, ChevronRight, MapPin, Truck,
-  Car, Activity, BarChart3, Info, Plus, Wrench, Star
+  Car, Activity, BarChart3, Info, Wrench, Star
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
 
@@ -689,9 +689,10 @@ export default function GroundVehicles({ role }: Props) {
           </div>
 
           {/* Fleet by base */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {["Dubbo (YSDU)", "Broken Hill (YBHI)", "Bankstown (YSBK)"].map(base => {
-              const bv = VEHICLES.filter(v => v.base.includes(base.split(" ")[0]));
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {["Dubbo (YSDU)", "Broken Hill (YBHI)", "Bankstown (YSBK)", "Griffith (YGTH)", "Wagga Wagga (YSWG)", "Orange (YORG)", "Bourke (YBKE)", "Lightning Ridge (YLRD)"].map(base => {
+              const icao = base.match(/\(([A-Z]{4})\)/)?.[1] ?? "";
+              const bv = VEHICLES.filter(v => v.base.includes(icao));
               const bo = bv.filter(v => v.overallStatus === "overdue").length;
               const bd = bv.filter(v => v.overallStatus === "due_soon").length;
               return (
@@ -718,39 +719,6 @@ export default function GroundVehicles({ role }: Props) {
                 </div>
               );
             })}
-          </div>
-
-          {/* Extra bases required */}
-          <div className="bg-card border border-card-border rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Plus size={13} className="text-amber-400" />
-              <span className="text-sm font-semibold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Extra Bases Required — Van Allocation</span>
-              <span className="ml-auto text-xs bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded px-2 py-0.5">Pending Assignment</span>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">The following locations have been identified as requiring a dedicated patient transfer van to support NEPT operations. No vehicle is currently assigned.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {[
-                { town: "Griffith",         state: "NSW", icao: "YGTH", note: "Regional hub — high patient volume to Wagga & Sydney" },
-                { town: "Wagga Wagga",      state: "NSW", icao: "YSWG", note: "Major referral point — Base Wagga hospital transfers" },
-                { town: "Orange",           state: "NSW", icao: "YORG", note: "Central West hub — Orange Base Hospital connections" },
-                { town: "Bourke",           state: "NSW", icao: "YBKE", note: "Remote Far West — limited transport alternatives" },
-                { town: "Lightning Ridge",  state: "NSW", icao: "YLRD", note: "Outback remote — nearest major hospital 100+ km" },
-              ].map(loc => (
-                <div key={loc.town} className="flex items-start gap-2.5 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
-                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center shrink-0 mt-0.5">
-                    <Truck size={13} className="text-amber-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-foreground" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{loc.town}</span>
-                      <span className="text-[10px] font-mono text-muted-foreground">{loc.icao}</span>
-                    </div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5 leading-relaxed">{loc.note}</div>
-                    <div className="mt-1.5 text-[10px] bg-amber-500/10 text-amber-400 rounded px-1.5 py-0.5 inline-block font-semibold">Van Required</div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Upcoming renewals */}
