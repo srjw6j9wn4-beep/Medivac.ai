@@ -6,6 +6,8 @@ import { type UserRole } from "@/lib/data";
 import { AirportSearch } from "@/components/AirportSearch";
 import { type Airport } from "@/lib/airportData";
 import { searchFacilities, FACILITY_TYPE_LABELS, FACILITY_TYPE_ICONS, type PatientFacility } from "@/lib/patientFacilities";
+import { getFuelStatus, fuelSummaryForAI } from "@/lib/fuelLookup";
+import { searchAirports } from "@/lib/airportData";
 import {
   Plus, X, Save, Pencil, Trash2, AlertTriangle, CheckCircle2,
   Clock, Plane, User, MapPin, ChevronDown, Filter, Search,
@@ -13,6 +15,7 @@ import {
   FileText, CheckSquare, ChevronRight, Calendar, BarChart3,
   Shield, Printer, Send, RotateCcw, AlertCircle, Check, ExternalLink, Receipt, Monitor,
   Sparkles, Bot, Upload, Mail, Zap, ChevronUp, Info, Users, Loader2, Scale, Truck,
+  Fuel, Navigation, Wind, AlertOctagon, ChevronLeft, Droplets,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -1594,13 +1597,70 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
   const [error, setError]             = useState("");
   const [result, setResult]           = useState<AutoTaskResult | null>(null);
 
+  // Route planning — ICAO waypoints with fuel + NOTAM data
+  type Waypoint = { airport: Airport | null; notams: any[]; notamLoading: boolean; };
+  const [waypoints, setWaypoints]     = useState<Waypoint[]>([
+    { airport: null, notams: [], notamLoading: false },
+    { airport: null, notams: [], notamLoading: false },
+  ]);
+  const [showRouteBuilder, setShowRouteBuilder] = useState(false);
+
+  async function fetchNotamsForWaypoint(idx: number, icao: string) {
+    setWaypoints(prev => prev.map((w, i) => i === idx ? { ...w, notamLoading: true } : w));
+    try {
+      const res = await fetch(`/api/notams/${icao}`);
+      const json = await res.json() as { notams: any[] };
+      setWaypoints(prev => prev.map((w, i) => i === idx ? { ...w, notams: json.notams ?? [], notamLoading: false } : w));
+    } catch {
+      setWaypoints(prev => prev.map((w, i) => i === idx ? { ...w, notams: [], notamLoading: false } : w));
+    }
+  }
+
+  function setWaypointAirport(idx: number, airport: Airport | null) {
+    setWaypoints(prev => prev.map((w, i) => i === idx ? { ...w, airport, notams: [], notamLoading: false } : w));
+    if (airport?.icao) fetchNotamsForWaypoint(idx, airport.icao);
+  }
+
+  function addWaypoint() {
+    setWaypoints(prev => [...prev, { airport: null, notams: [], notamLoading: false }]);
+  }
+
+  function removeWaypoint(idx: number) {
+    if (waypoints.length <= 2) return;
+    setWaypoints(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  // Build a route context string to append to job sheet for AI
+  function buildRouteContext(): string {
+    const filled = waypoints.filter(w => w.airport);
+    if (!filled.length) return "";
+    const lines: string[] = ["\n--- ROUTE CONTEXT (pre-planned by dispatcher) ---"];
+    const chain = filled.map(w => w.airport!.icao).join(" → ");
+    lines.push(`Route: ${chain}`);
+    lines.push("\nFuel availability:");
+    filled.forEach(w => {
+      const ap = w.airport!;
+      lines.push(`  ${fuelSummaryForAI(ap.icao, ap.city || ap.name)}`);
+    });
+    const critical = filled.flatMap(w =>
+      w.notams.filter((n: any) => n.severity === "CRITICAL" || n.severity === "HIGH").map((n: any) => `  [${n.severity}] ${n.icao}: ${n.plain}`)
+    );
+    if (critical.length) {
+      lines.push("\nActive NOTAMs — planning impact:");
+      lines.push(...critical);
+    }
+    lines.push("---");
+    return lines.join("\n");
+  }
+
   async function runOptimiser() {
     setLoading(true);
     setError("");
     try {
       const availableAircraft = aircraft.filter(a => a.available);
+      const routeCtx = buildRouteContext();
       const payload = {
-        jobSheet: inputMode === "paste" ? jobSheet : `[Email inbox source: ${emailAddress}]`,
+        jobSheet: (inputMode === "paste" ? jobSheet : `[Email inbox source: ${emailAddress}]`) + routeCtx,
         opDate,
         availableAircraft,
         crewNotes,
@@ -1719,6 +1779,140 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Operations Date</label>
               <input type="date" value={opDate} onChange={e => setOpDate(e.target.value)}
                 className="bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground w-full focus:outline-none focus:border-cyan-400/60" />
+            </div>
+
+            {/* ── Route Builder — ICAO waypoints, fuel & NOTAMs ── */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowRouteBuilder(r => !r)}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-muted/20 border border-card-border hover:border-cyan-400/40 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Navigation size={13} className="text-cyan-400" />
+                  <span className="text-xs font-semibold text-foreground">Route Planner — ICAO / Fuel / NOTAMs</span>
+                  {waypoints.some(w => w.airport) && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                      {waypoints.filter(w => w.airport).length} waypts
+                    </span>
+                  )}
+                  {waypoints.some(w => w.notams.some((n: any) => n.severity === "CRITICAL" || n.severity === "HIGH")) && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-red-500/20 text-red-300 border border-red-400/30 animate-pulse">
+                      NOTAM
+                    </span>
+                  )}
+                </div>
+                {showRouteBuilder ? <ChevronUp size={13} className="text-muted-foreground" /> : <ChevronDown size={13} className="text-muted-foreground" />}
+              </button>
+
+              {showRouteBuilder && (
+                <div className="mt-2 space-y-2 p-3 rounded-xl bg-muted/10 border border-card-border">
+                  <p className="text-[10px] text-muted-foreground">Search ERSA/ICAO — type city, ICAO code or aerodrome name. Fuel availability and live NOTAMs load automatically.</p>
+
+                  {waypoints.map((wp, idx) => {
+                    const fuel = wp.airport ? getFuelStatus(wp.airport.icao) : null;
+                    const critNotams = wp.notams.filter((n: any) => n.severity === "CRITICAL");
+                    const highNotams = wp.notams.filter((n: any) => n.severity === "HIGH");
+                    const medNotams  = wp.notams.filter((n: any) => n.severity === "MEDIUM");
+
+                    return (
+                      <div key={idx} className="rounded-lg border border-card-border bg-card overflow-hidden">
+                        {/* Waypoint header */}
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-card-border bg-muted/10">
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                            idx === 0 ? "bg-cyan-500/20 text-cyan-300" :
+                            idx === waypoints.length - 1 ? "bg-green-500/20 text-green-300" :
+                            "bg-amber-500/20 text-amber-300"
+                          }`}>
+                            {idx === 0 ? "DEP" : idx === waypoints.length - 1 ? "ARR" : idx}
+                          </div>
+                          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                            {idx === 0 ? "Departure" : idx === waypoints.length - 1 ? "Arrival" : `Waypoint ${idx}`}
+                          </span>
+                          {waypoints.length > 2 && (
+                            <button type="button" onClick={() => removeWaypoint(idx)} className="ml-auto text-muted-foreground hover:text-red-400 transition-colors">
+                              <X size={11} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Airport search */}
+                        <div className="p-2.5 space-y-2">
+                          <AirportSearch
+                            value={wp.airport}
+                            onChange={ap => setWaypointAirport(idx, ap)}
+                            placeholder="Search ICAO, city or aerodrome name…"
+                          />
+
+                          {/* Fuel badge */}
+                          {wp.airport && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {wp.notamLoading ? (
+                                <span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Loader2 size={9} className="animate-spin" /> Loading NOTAMs…</span>
+                              ) : null}
+                              {fuel?.jetA1 && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-bold bg-green-500/15 text-green-400 border border-green-500/30">
+                                  <Droplets size={8} /> Jet-A1{fuel.hours ? ` · ${fuel.hours}` : ""}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* NOTAMs */}
+                          {wp.airport && !wp.notamLoading && wp.notams.length > 0 && (
+                            <div className="space-y-1">
+                              {critNotams.map((n: any, ni: number) => (
+                                <div key={ni} className="flex items-start gap-1.5 p-2 rounded bg-red-500/10 border border-red-500/30">
+                                  <AlertOctagon size={10} className="text-red-400 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="text-[9px] font-bold text-red-400 uppercase mr-1">CRITICAL</span>
+                                    <span className="text-[10px] text-red-200">{n.plain}</span>
+                                  </div>
+                                </div>
+                              ))}
+                              {highNotams.map((n: any, ni: number) => (
+                                <div key={ni} className="flex items-start gap-1.5 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                                  <AlertTriangle size={10} className="text-amber-400 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="text-[9px] font-bold text-amber-400 uppercase mr-1">HIGH</span>
+                                    <span className="text-[10px] text-amber-200">{n.plain}</span>
+                                  </div>
+                                </div>
+                              ))}
+                              {medNotams.map((n: any, ni: number) => (
+                                <div key={ni} className="flex items-start gap-1.5 p-2 rounded bg-blue-500/10 border border-blue-500/30">
+                                  <Info size={10} className="text-blue-400 shrink-0 mt-0.5" />
+                                  <div>
+                                    <span className="text-[9px] font-bold text-blue-400 uppercase mr-1">MEDIUM</span>
+                                    <span className="text-[10px] text-blue-200">{n.plain}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {wp.airport && !wp.notamLoading && wp.notams.length === 0 && (
+                            <div className="flex items-center gap-1.5 text-[9px] text-green-400/70">
+                              <CheckCircle2 size={9} /> No active NOTAMs
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex gap-2 pt-1">
+                    <button type="button" onClick={addWaypoint}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold rounded-lg border border-card-border text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40 transition-colors">
+                      <Plus size={10} /> Add Waypoint
+                    </button>
+                    {waypoints.some(w => w.airport) && (
+                      <span className="flex items-center gap-1 text-[10px] text-muted-foreground/70">
+                        <CheckCircle2 size={9} className="text-cyan-400" /> Route context will be included in the AI briefing
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
