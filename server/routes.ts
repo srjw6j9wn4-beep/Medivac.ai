@@ -719,7 +719,8 @@ export async function registerRoutes(
 
   // GET /api/missions/active  — list active missions
   app.get("/api/missions/active", async (_req: Request, res: Response) => {
-    return res.json({ missions: await storage.listActiveMissions() });
+    try { return res.json({ missions: await storage.listActiveMissions() }); }
+    catch (err) { return res.status(500).json({ error: String(err) }); }
   });
 
   // ── NOTAM watcher — called by server-side interval ────────────────────────
@@ -1334,53 +1335,69 @@ export async function registerRoutes(
 
 // ── Client Rates ────────────────────────────────────────────────────────────
   app.get("/api/client-rates", async (_req: Request, res: Response) => {
-    res.json(await storage.listClientRates());
+    try { res.json(await storage.listClientRates()); }
+    catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.post("/api/client-rates", async (req: Request, res: Response) => {
-    const now = new Date().toISOString();
-    const rate = await storage.createClientRate({ ...req.body, createdAt: now, updatedAt: now });
-    await storage.logAudit("client_rate", String(rate.id), "created", req.body.createdBy ?? "ops", JSON.stringify(req.body));
-    res.status(201).json(rate);
+    try {
+      const now = new Date().toISOString();
+      const rate = await storage.createClientRate({ ...req.body, createdAt: now, updatedAt: now });
+      await storage.logAudit("client_rate", String(rate.id), "created", req.body.createdBy ?? "ops", JSON.stringify(req.body));
+      res.status(201).json(rate);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.patch("/api/client-rates/:id", async (req: Request, res: Response) => {
-    const rate = await storage.updateClientRate(parseInt(req.params.id), req.body);
-    if (!rate) return res.status(404).json({ error: "Not found" });
-    await storage.logAudit("client_rate", req.params.id, "edited", req.body.updatedBy ?? "ops", JSON.stringify(req.body));
-    res.json(rate);
+    try {
+      const rate = await storage.updateClientRate(parseInt(req.params.id), req.body);
+      if (!rate) return res.status(404).json({ error: "Not found" });
+      await storage.logAudit("client_rate", req.params.id, "edited", req.body.updatedBy ?? "ops", JSON.stringify(req.body));
+      res.json(rate);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.delete("/api/client-rates/:id", async (req: Request, res: Response) => {
-    await storage.deleteClientRate(parseInt(req.params.id));
-    await storage.logAudit("client_rate", req.params.id, "deleted", "ops");
-    res.json({ ok: true });
+    try {
+      await storage.deleteClientRate(parseInt(req.params.id));
+      await storage.logAudit("client_rate", req.params.id, "deleted", "ops");
+      res.json({ ok: true });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
   // ── Invoice Lines ────────────────────────────────────────────────────────────
   app.get("/api/invoice-lines", async (req: Request, res: Response) => {
-    const { batchId, orgCode, status, dateFrom, dateTo } = req.query as Record<string, string>;
-    res.json(await storage.listInvoiceLines({ batchId, orgCode, status, dateFrom, dateTo }));
+    try {
+      const { batchId, orgCode, status, dateFrom, dateTo } = req.query as Record<string, string>;
+      res.json(await storage.listInvoiceLines({ batchId, orgCode, status, dateFrom, dateTo }));
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.post("/api/invoice-lines", async (req: Request, res: Response) => {
-    const now = new Date().toISOString();
-    const line = await storage.createInvoiceLine({ ...req.body, createdAt: now, updatedAt: now });
-    await storage.logAudit("invoice_line", String(line.id), "created", req.body.createdBy ?? "system", JSON.stringify(req.body));
-    res.status(201).json(line);
+    try {
+      const now = new Date().toISOString();
+      const line = await storage.createInvoiceLine({ ...req.body, createdAt: now, updatedAt: now });
+      await storage.logAudit("invoice_line", String(line.id), "created", req.body.createdBy ?? "system", JSON.stringify(req.body));
+      res.status(201).json(line);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.patch("/api/invoice-lines/:id", async (req: Request, res: Response) => {
-    const before = await storage.listInvoiceLines();
-    const prev = before.find(l => l.id === parseInt(req.params.id));
-    const line = await storage.updateInvoiceLine(parseInt(req.params.id), req.body);
-    if (!line) return res.status(404).json({ error: "Not found" });
-    await storage.logAudit("invoice_line", req.params.id, req.body.status === "approved" ? "approved" : req.body.status === "disputed" ? "disputed" : "edited", req.body.updatedBy ?? "ops", JSON.stringify({ before: prev, after: req.body }));
-    res.json(line);
+    try {
+      const before = await storage.listInvoiceLines();
+      const prev = before.find(l => l.id === parseInt(req.params.id));
+      const line = await storage.updateInvoiceLine(parseInt(req.params.id), req.body);
+      if (!line) return res.status(404).json({ error: "Not found" });
+      await storage.logAudit("invoice_line", req.params.id, req.body.status === "approved" ? "approved" : req.body.status === "disputed" ? "disputed" : "edited", req.body.updatedBy ?? "ops", JSON.stringify({ before: prev, after: req.body }));
+      res.json(line);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.delete("/api/invoice-lines/:id", async (req: Request, res: Response) => {
-    await storage.deleteInvoiceLine(parseInt(req.params.id));
-    await storage.logAudit("invoice_line", req.params.id, "deleted", "ops");
-    res.json({ ok: true });
+    try {
+      await storage.deleteInvoiceLine(parseInt(req.params.id));
+      await storage.logAudit("invoice_line", req.params.id, "deleted", "ops");
+      res.json({ ok: true });
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
   // ── Auto-populate invoice line from dispatch ─────────────────────────────────
   app.post("/api/invoice-lines/auto-populate", async (req: Request, res: Response) => {
+    try {
     // Called when a mission is dispatched — auto-creates a pending invoice line
     const { missionType, taskRef, aircraftReg, fromIcao, toIcao, serviceDate, paxCount, orgCode, orgName, flightTimeMins, afterHours } = req.body;
     const now = new Date().toISOString();
@@ -1415,50 +1432,62 @@ export async function registerRoutes(
     await storage.updateInvoiceBatch(batchId, { totalLines: allLines.length, totalAmountCents: batchTotal, flaggedCount: flagCount });
     await storage.logAudit("invoice_line", String(line.id), "auto_populated", "system", JSON.stringify({ taskRef, missionType, orgCode, rateAmount, total }));
     res.status(201).json(line);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
   // ── Invoice Batches ──────────────────────────────────────────────────────────
   app.get("/api/invoice-batches", async (_req: Request, res: Response) => {
-    res.json(await storage.listInvoiceBatches());
+    try { res.json(await storage.listInvoiceBatches()); }
+    catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.get("/api/invoice-batches/:batchId", async (req: Request, res: Response) => {
-    const batch = await storage.getInvoiceBatch(req.params.batchId);
-    if (!batch) return res.status(404).json({ error: "Not found" });
-    res.json(batch);
+    try {
+      const batch = await storage.getInvoiceBatch(req.params.batchId);
+      if (!batch) return res.status(404).json({ error: "Not found" });
+      res.json(batch);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.post("/api/invoice-batches", async (req: Request, res: Response) => {
-    const now = new Date().toISOString();
-    const batch = await storage.createInvoiceBatch({ ...req.body, createdAt: now, updatedAt: now });
-    await storage.logAudit("invoice_batch", batch.batchId, "created", req.body.createdBy ?? "ops");
-    res.status(201).json(batch);
+    try {
+      const now = new Date().toISOString();
+      const batch = await storage.createInvoiceBatch({ ...req.body, createdAt: now, updatedAt: now });
+      await storage.logAudit("invoice_batch", batch.batchId, "created", req.body.createdBy ?? "ops");
+      res.status(201).json(batch);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.patch("/api/invoice-batches/:batchId/approve", async (req: Request, res: Response) => {
-    const now = new Date().toISOString();
-    const batch = await storage.updateInvoiceBatch(req.params.batchId, { status: "approved", approvedBy: req.body.approvedBy ?? "ops", approvedAt: now });
-    // Mark all pending lines as approved
-    const lines = await storage.listInvoiceLines({ batchId: req.params.batchId, status: "pending" });
-    for (const line of lines) await storage.updateInvoiceLine(line.id, { status: "approved" });
-    await storage.logAudit("invoice_batch", req.params.batchId, "approved", req.body.approvedBy ?? "ops", `${lines.length} lines approved`);
-    res.json(batch);
+    try {
+      const now = new Date().toISOString();
+      const batch = await storage.updateInvoiceBatch(req.params.batchId, { status: "approved", approvedBy: req.body.approvedBy ?? "ops", approvedAt: now });
+      const lines = await storage.listInvoiceLines({ batchId: req.params.batchId, status: "pending" });
+      for (const line of lines) await storage.updateInvoiceLine(line.id, { status: "approved" });
+      await storage.logAudit("invoice_batch", req.params.batchId, "approved", req.body.approvedBy ?? "ops", `${lines.length} lines approved`);
+      res.json(batch);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.patch("/api/invoice-batches/:batchId/send", async (req: Request, res: Response) => {
-    const now = new Date().toISOString();
-    const batch = await storage.updateInvoiceBatch(req.params.batchId, { status: "sent", sentAt: now });
-    // Mark approved lines as invoiced
-    const lines = await storage.listInvoiceLines({ batchId: req.params.batchId, status: "approved" });
-    for (const line of lines) await storage.updateInvoiceLine(line.id, { status: "invoiced" });
-    await storage.logAudit("invoice_batch", req.params.batchId, "sent", req.body.sentBy ?? "ops", `Sent to clients — placeholder (email not yet wired)`);
-    res.json(batch);
+    try {
+      const now = new Date().toISOString();
+      const batch = await storage.updateInvoiceBatch(req.params.batchId, { status: "sent", sentAt: now });
+      const lines = await storage.listInvoiceLines({ batchId: req.params.batchId, status: "approved" });
+      for (const line of lines) await storage.updateInvoiceLine(line.id, { status: "invoiced" });
+      await storage.logAudit("invoice_batch", req.params.batchId, "sent", req.body.sentBy ?? "ops", `Sent to clients — placeholder (email not yet wired)`);
+      res.json(batch);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
   app.patch("/api/invoice-batches/:batchId", async (req: Request, res: Response) => {
-    const batch = await storage.updateInvoiceBatch(req.params.batchId, req.body);
-    res.json(batch);
+    try {
+      const batch = await storage.updateInvoiceBatch(req.params.batchId, req.body);
+      res.json(batch);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
   // ── Invoice Audit Trail ──────────────────────────────────────────────────────
   app.get("/api/invoice-audit", async (req: Request, res: Response) => {
-    const { entityType, entityId } = req.query as Record<string, string>;
-    res.json(await storage.listAudit(entityType, entityId));
+    try {
+      const { entityType, entityId } = req.query as Record<string, string>;
+      res.json(await storage.listAudit(entityType, entityId));
+    } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
   return httpServer;
