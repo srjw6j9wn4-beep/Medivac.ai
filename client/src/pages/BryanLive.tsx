@@ -46,6 +46,12 @@ const QUICK_QUESTIONS = [
   "How does the ISO compliance tracking work?",
   "How does AeroRoster connect with Medivac.ai?",
   "How does the Flight Tech Log feed into dispatch?",
+  "Who is the Executive General Manager of Aviation?",
+  "Who is the Chief Medical Officer?",
+  "Who manages Operations?",
+  "Who are the Senior Base Pilots?",
+  "Tell me about the Dubbo engineering team",
+  "Who are the van drivers across the bases?",
 ];
 
 function Waveform({ active }: { active: boolean }) {
