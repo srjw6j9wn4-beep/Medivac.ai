@@ -221,6 +221,9 @@ export default function Jennifer({ role }: Props) {
   // Other
   const [videoError, setVideoError] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const miniCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const backdropImgRef = useRef<HTMLImageElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   function fmtTime(s: number): string {
@@ -233,6 +236,56 @@ export default function Jennifer({ role }: Props) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLog, thinking]);
+
+  // Preload backdrop image whenever active video changes
+  useEffect(() => {
+    const img = new Image();
+    img.src = activeVideo.backdropSrc;
+    img.onload = () => { backdropImgRef.current = img; };
+    backdropImgRef.current = null; // clear while loading
+  }, [activeVideo.backdropSrc]);
+
+  // Canvas compositing loop — draw backdrop then screen-blend video on top
+  useEffect(() => {
+    let animId = 0;
+    function draw() {
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const mini = miniCanvasRef.current;
+      if (!canvas || !video || video.readyState < 2) {
+        animId = requestAnimationFrame(draw);
+        return;
+      }
+      const w = video.videoWidth  || canvas.clientWidth  || 1280;
+      const h = video.videoHeight || canvas.clientHeight || 720;
+      if (canvas.width !== w)  canvas.width  = w;
+      if (canvas.height !== h) canvas.height = h;
+      const ctx = canvas.getContext('2d')!;
+      // 1. Draw darkened backdrop
+      if (backdropImgRef.current) {
+        ctx.filter = 'brightness(0.55)';
+        ctx.drawImage(backdropImgRef.current, 0, 0, w, h);
+        ctx.filter = 'none';
+      } else {
+        ctx.fillStyle = '#0a1628';
+        ctx.fillRect(0, 0, w, h);
+      }
+      // 2. Screen-blend video on top — dark HeyGen bg vanishes, Jennifer shows
+      ctx.globalCompositeOperation = 'screen';
+      ctx.drawImage(video, 0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+      // Mirror to mini avatar canvas
+      if (mini) {
+        if (mini.width !== w)  mini.width  = w;
+        if (mini.height !== h) mini.height = h;
+        const mCtx = mini.getContext('2d')!;
+        mCtx.drawImage(canvas, 0, 0, w, h);
+      }
+      animId = requestAnimationFrame(draw);
+    }
+    animId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(animId);
+  }, []);
 
   // When active video changes, reload
   useEffect(() => {
@@ -449,16 +502,10 @@ export default function Jennifer({ role }: Props) {
           {/* Avatar card */}
           <div className="bg-card rounded-xl border border-cyan-500/20 p-4">
             <div className="relative mx-auto w-40 h-40 rounded-2xl overflow-hidden mb-4 border border-cyan-500/30 bg-[#0a1628]">
-              {activeVideo.backdropSrc && (
-                <div className="absolute inset-0" style={{ backgroundImage: `url(${activeVideo.backdropSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'brightness(0.5)' }} />
-              )}
-              <video
+              {/* Mini canvas — mirrors the main composited canvas output */}
+              <canvas
+                ref={miniCanvasRef}
                 className="absolute inset-0 w-full h-full object-cover"
-                src={activeVideo.videoSrc}
-                muted={false}
-                playsInline
-                preload="metadata"
-                style={{ pointerEvents: 'none', mixBlendMode: 'screen' }}
               />
               <div className="absolute top-2 left-2 px-2 py-0.5 bg-cyan-500/20 border border-cyan-400/30 rounded-full">
                 <span className="text-[8px] font-bold text-cyan-400">RFDS AI</span>
@@ -602,25 +649,19 @@ export default function Jennifer({ role }: Props) {
               className="relative w-full bg-[#0a1628]"
               style={{ aspectRatio: '16/9' }}
             >
-              {/* Subject-specific backdrop — darkened slightly so Jennifer composites cleanly */}
-              {activeVideo.backdropSrc && (
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    backgroundImage: `url(${activeVideo.backdropSrc})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    filter: 'brightness(0.55)',
-                  }}
-                />
-              )}
+              {/* Hidden video element — canvas composites backdrop + screen-blend video */}
               <video
                 ref={videoRef}
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full"
                 src={activeVideo.videoSrc}
                 playsInline
                 preload="auto"
-                style={{ mixBlendMode: 'screen' }}
+                style={{ opacity: 0, pointerEvents: 'none' }}
+              />
+              {/* Canvas output: backdrop at 55% brightness, Jennifer screen-blended over */}
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 w-full h-full object-cover"
               />
 
               {!playing && (
