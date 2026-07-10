@@ -576,7 +576,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
               <p className="text-xs text-muted-foreground mt-0.5">2:34 · Watch Graham introduce the platform, then go live to ask questions</p>
             </div>
             <div className="relative" style={{ paddingBottom: '56.25%' }}>
-              <video className="absolute inset-0 w-full h-full" src={`${API_BASE}/api/video/jennifer_intro.mp4`} controls playsInline poster="/jennifer_bg.jpg" style={{ background: '#050d1a' }} />
+              <video className="absolute inset-0 w-full h-full" src={`${API_BASE}/api/video/jennifer_intro.mp4`} controls playsInline poster="/graham_bg_professional.png" style={{ background: '#050d1a' }} />
               {/* Simulated blink overlay — only rendered while intro video is showing (!isLive) */}
               {!isLive && (
                 <div
@@ -618,10 +618,10 @@ export default function BryanLive({ role }: { role: UserRole }) {
               {statusMsg || "Connecting to Graham…"}
             </div>
           )}
-          <div className="rounded-2xl border border-card-border overflow-hidden relative" style={{ background: 'url(/medivac_comms_bg.jpg) center/cover no-repeat' }}>
+          <div className="rounded-2xl border border-card-border overflow-hidden relative" style={{ background: 'url(/graham_bg_portrait.png) center/cover no-repeat' }}>
 
             {/* Portrait video — 9:16 aspect ratio, fills frame */}
-            <div className="relative w-full" style={{ aspectRatio: '9/16', minHeight: 420, maxHeight: 640, background: 'url(/medivac_comms_bg.jpg) center/cover no-repeat' }}>
+            <div className="relative w-full" style={{ aspectRatio: '9/16', minHeight: 420, maxHeight: 640, background: 'url(/graham_bg_portrait.png) center/cover no-repeat' }}>
 
               {/* Video — visible so attach() works, but hidden behind the canvas */}
               <video
@@ -782,7 +782,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
           )}
 
           {/* Quick questions */}
-          <div className="space-y-2 p-3 rounded-2xl border border-card-border backdrop-blur-sm" style={{ background: 'linear-gradient(rgba(5,13,26,0.78), rgba(5,13,26,0.85)), url(/jennifer_bg.jpg) center bottom/cover no-repeat' }}>
+          <div className="space-y-2 p-3 rounded-2xl border border-card-border backdrop-blur-sm" style={{ background: 'linear-gradient(rgba(5,13,26,0.78), rgba(5,13,26,0.85)), url(/graham_bg_professional.png) center top/cover no-repeat' }}>
             <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Quick Questions</div>
             <div className="flex flex-wrap gap-1.5">
               {QUICK_QUESTIONS.map(q => (
@@ -796,7 +796,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
         </div>
 
         {/* ── RIGHT: Chat ────────────────────────────────────────── */}
-        <div className="xl:col-span-3 flex flex-col rounded-2xl border border-card-border overflow-hidden relative" style={{ minHeight: 580, background: 'linear-gradient(rgba(5,13,26,0.82), rgba(5,13,26,0.88)), url(/jennifer_bg.jpg) center/cover no-repeat' }}>
+        <div className="xl:col-span-3 flex flex-col rounded-2xl border border-card-border overflow-hidden relative" style={{ minHeight: 580, background: 'linear-gradient(rgba(5,13,26,0.82), rgba(5,13,26,0.88)), url(/graham_bg_professional.png) center/cover no-repeat' }}>
 
           <div className="px-4 py-3 border-b border-card-border flex items-center gap-2 flex-wrap backdrop-blur-sm" style={{ background: 'rgba(5,13,26,0.70)' }}>
             <MessageCircle size={14} className="text-cyan-400 shrink-0" />
