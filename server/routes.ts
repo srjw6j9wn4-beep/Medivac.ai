@@ -726,7 +726,7 @@ export async function registerRoutes(
   // Checks every active mission's airports for new NOTAM flags, fires push alerts
 
   async function runNotamWatch() {
-    const missions = storage.listActiveMissions();
+    const missions = await storage.listActiveMissions();
     if (missions.length === 0) return;
 
     const allIcaos = [...new Set(missions.flatMap((m: any) => m.airports as string[]))];

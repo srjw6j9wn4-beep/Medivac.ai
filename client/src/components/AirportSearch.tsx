@@ -21,10 +21,12 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
   const containerRef = useRef<HTMLDivElement>(null);
   const autoSelectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear query when value selected externally
+  // Clear query when value is selected (but only if we aren't currently editing)
+  // Use icao as stable dependency to avoid clearing on reference changes
+  const valueIcao = value?.icao ?? null;
   useEffect(() => {
-    if (value) { setQuery(""); setAutoFilled(false); }
-  }, [value]);
+    if (valueIcao) { setQuery(""); setAutoFilled(false); }
+  }, [valueIcao]);
 
   // Clear autofill flash after 2s
   useEffect(() => {

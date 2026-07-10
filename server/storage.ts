@@ -307,8 +307,37 @@ class DatabaseStorage {
     return data ? mapNeptTask(data) : undefined;
   }
   async createNeptTask(d: Omit<NeptTask, 'id'>): Promise<NeptTask> {
-    const row = { task_ref: d.taskRef, status: d.status, priority: d.priority, request_time: d.requestTime, required_by: d.requiredBy, pickup_location: d.pickupLocation, pickup_icao: d.pickupIcao, dest_location: d.destLocation, dest_icao: d.destIcao, sectors: d.sectors, patient_name: d.patientName, patient_ref: d.patientRef, escort_name: d.escortName, referring_hospital: d.referringHospital, receiving_hospital: d.receivingHospital, aircraft_reg: d.aircraftReg, pilot_name: d.pilotName, nurse_name: d.nurseName, dispatched_by: d.dispatchedBy, estimated_eta: d.estimatedEta, actual_depart: d.actualDepart, actual_arrive: d.actualArrive, completed_at: d.completedAt, notes: d.notes, ground_transport_cost: d.groundTransportCost, created_at: d.createdAt, updated_at: d.updatedAt };
-    const { data } = await supabase.from('nept_tasks').insert(row).select().single();
+    const row = {
+      task_ref: d.taskRef || `NEPT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+      status: d.status || 'Pending',
+      priority: d.priority || 'Routine',
+      request_time: d.requestTime ?? new Date().toISOString().slice(0, 16),
+      required_by: d.requiredBy ?? null,
+      pickup_location: d.pickupLocation || 'TBD',
+      pickup_icao: d.pickupIcao ?? null,
+      dest_location: d.destLocation || 'TBD',
+      dest_icao: d.destIcao ?? null,
+      sectors: d.sectors ?? null,
+      patient_name: d.patientName ?? null,
+      patient_ref: d.patientRef ?? null,
+      escort_name: d.escortName ?? null,
+      referring_hospital: d.referringHospital ?? null,
+      receiving_hospital: d.receivingHospital ?? null,
+      aircraft_reg: d.aircraftReg ?? null,
+      pilot_name: d.pilotName ?? null,
+      nurse_name: d.nurseName ?? null,
+      dispatched_by: d.dispatchedBy ?? null,
+      estimated_eta: d.estimatedEta ?? null,
+      actual_depart: d.actualDepart ?? null,
+      actual_arrive: d.actualArrive ?? null,
+      completed_at: d.completedAt ?? null,
+      notes: d.notes ?? null,
+      ground_transport_cost: d.groundTransportCost ?? null,
+      created_at: d.createdAt || new Date().toISOString(),
+      updated_at: d.updatedAt || new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from('nept_tasks').insert(row).select().single();
+    if (error) throw new Error(`Failed to create NEPT task: ${error.message}`);
     return mapNeptTask(data);
   }
   async updateNeptTask(id: number, u: Partial<NeptTask>): Promise<NeptTask> {
