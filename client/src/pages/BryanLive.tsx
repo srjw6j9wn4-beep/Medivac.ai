@@ -259,39 +259,66 @@ export default function BryanLive({ role }: { role: UserRole }) {
 
       const fw = v.videoWidth;
       const fh = v.videoHeight;
-      const sw = fw >> 1;   // 50% width  (bit-shift = fast floor divide by 2)
-      const sh = fh >> 1;   // 50% height
 
-      // Sync display canvas size to full frame
+      // Process at full resolution for sharp edges — no downscale blurring
       if (c.width !== fw)  c.width  = fw;
       if (c.height !== fh) c.height = fh;
+      if (scratch.width  !== fw) scratch.width  = fw;
+      if (scratch.height !== fh) scratch.height = fh;
 
-      // Sync scratch canvas to half-res
-      if (scratch.width  !== sw) scratch.width  = sw;
-      if (scratch.height !== sh) scratch.height = sh;
+      // Draw full-res frame into scratch
+      sCtx.drawImage(v, 0, 0, fw, fh);
 
-      // Draw video at 50% scale into scratch
-      sCtx.drawImage(v, 0, 0, sw, sh);
-
-      // Reuse ImageData buffer — allocate only when dimensions change
-      if (!imgDataRef.current || imgDataRef.current.width !== sw || imgDataRef.current.height !== sh) {
-        imgDataRef.current = sCtx.getImageData(0, 0, sw, sh);
+      // Reuse ImageData buffer
+      if (!imgDataRef.current || imgDataRef.current.width !== fw || imgDataRef.current.height !== fh) {
+        imgDataRef.current = sCtx.getImageData(0, 0, fw, fh);
       } else {
-        imgDataRef.current = sCtx.getImageData(0, 0, sw, sh);
+        imgDataRef.current = sCtx.getImageData(0, 0, fw, fh);
       }
 
       const d = imgDataRef.current.data;
       const len = d.length;
 
-      // Chroma-key: remove #00d804 green-screen
-      // Threshold: G > 150, R < 80, B < 80  — tuned to live stream colour
+      // ── Improved chroma key with edge feathering + spill suppression ──────
+      // HeyGen green-screen: key colour approx #00d804 (R≈0, G≈216, B≈4)
+      //
+      // Three zones:
+      //   1. Hard-key zone  — clearly green → alpha = 0 (fully transparent)
+      //   2. Soft-key zone  — near-green edge → partial alpha (feathered)
+      //   3. Spill zone     — green tint on skin/hair → reduce G channel
+      //
+      // Uses "green difference" = G - max(R,B) as the key signal.
+      // Values tuned empirically for HeyGen studio green.
       for (let i = 0; i < len; i += 4) {
-        if (d[i+1] > 150 && d[i] < 80 && d[i+2] < 80) d[i+3] = 0;
+        const r = d[i];
+        const g = d[i+1];
+        const b = d[i+2];
+
+        // Green difference signal: how much greener than the other channels
+        const diff = g - Math.max(r, b);
+
+        if (diff > 90) {
+          // Hard key — core green screen → fully transparent
+          d[i+3] = 0;
+        } else if (diff > 40) {
+          // Soft key — edge feathering: linear ramp from 0→255 alpha
+          const alpha = Math.round(255 * (1 - (diff - 40) / 50));
+          d[i+3] = alpha;
+          // Spill suppression on edge pixels: bring G down toward avg(R,B)
+          const spillRemove = Math.round((diff - 40) / 50 * 40);
+          d[i+1] = Math.max(0, g - spillRemove);
+        } else if (diff > 15) {
+          // Spill suppression only — keep fully opaque but remove green tint
+          // Reduce green channel so skin tones near the key look natural
+          const spillRemove = Math.round((diff - 15) / 25 * 25);
+          d[i+1] = Math.max(0, g - spillRemove);
+        }
+        // else: normal pixel — leave untouched
       }
 
       sCtx.putImageData(imgDataRef.current, 0, 0);
 
-      // Scale keyed half-res result back up to full display canvas
+      // Composite to display canvas at full resolution
       dCtx.clearRect(0, 0, fw, fh);
       dCtx.drawImage(scratch, 0, 0, fw, fh);
 
