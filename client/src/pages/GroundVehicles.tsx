@@ -750,6 +750,22 @@ export default function GroundVehicles({ role }: Props) {
                   </div>
                 ))
               }
+              {/* New base PTVs — documentation pending */}
+              {[
+                { rego: "TBA", base: "Griffith (YGTH)" },
+                { rego: "TBA", base: "Wagga Wagga (YSWG)" },
+                { rego: "TBA", base: "Orange (YORG)" },
+                { rego: "TBA", base: "Bourke (YBKE)" },
+                { rego: "TBA", base: "Lightning Ridge (YLRD)" },
+              ].map(p => (
+                <div key={p.base} className="flex items-center justify-between text-xs py-1.5 border-b border-card-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-foreground">[{p.base}]</span>
+                    <span className="text-muted-foreground">Rego · CTP · Insurance · Service — all details TBA</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/15 text-blue-400 border border-blue-500/30">Pending</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
