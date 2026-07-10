@@ -2101,41 +2101,17 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
               </div>
             </div>
 
-            {/* EBA limits — only surface if result contains a breach or near-miss */}
-            {result && (() => {
-              const ebaKeywords = /eba|duty limit|rest period|shift.*hour|nurse.*hour|pilot.*hour|100.*hr|12.*hr|10.*hr.*rest|fatigue|breach/i;
-              const breachWarnings = result.warnings?.filter((w: string) => ebaKeywords.test(w)) ?? [];
-              if (!breachWarnings.length) return null;
-              return (
-                <div className="rounded-xl border border-rose-500/40 bg-rose-500/8 overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-rose-500/20 flex items-center gap-2">
-                    <Scale size={12} className="text-rose-400" />
-                    <span className="text-xs font-bold text-rose-300">EBA Limit Alert</span>
-                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold ml-auto">ACTION REQUIRED</span>
-                  </div>
-                  <div className="p-3 space-y-1.5">
-                    {breachWarnings.map((w: string, i: number) => (
-                      <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
-                        <AlertTriangle size={11} className="text-rose-400 mt-0.5 shrink-0" />
-                        <p className="text-[11px] text-rose-200">{w}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Nurse EBA lunch break — editable window within locked rule */}
+            {/* Nurse lunch break — editable window used by the AI; EBA limits are only surfaced in the results if a task hits or risks one */}
             <div>
               <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                <Clock size={11} className="inline mr-1" /> Nurse Lunch Break Window <span className="text-[9px] text-rose-400 ml-1 font-bold">EBA Cl. 25.2 — required</span>
+                <Clock size={11} className="inline mr-1" /> Nurse Lunch Break Window
               </label>
               <input
                 value={nurseEba}
                 onChange={e => setNurseEba(e.target.value)}
-                className="w-full bg-muted/20 border border-rose-500/30 rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-rose-400/60"
+                className="w-full bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-cyan-400/60"
               />
-              <p className="text-[10px] text-muted-foreground mt-1">30–60 min unpaid break in the 4th–6th hour of shift (Cl. 25.2). AI will protect this window — no patient legs during lunch.</p>
+              <p className="text-[10px] text-muted-foreground mt-1">AI will protect this window — no patient legs scheduled during lunch.</p>
             </div>
 
             {/* Ground time */}
@@ -2180,17 +2156,43 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
               </div>
             </div>
 
-            {/* Warnings */}
-            {result.warnings.length > 0 && (
-              <div className="space-y-1.5">
-                {result.warnings.map((w, i) => (
-                  <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                    <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
-                    <p className="text-[11px] text-amber-300">{w}</p>
+            {/* EBA limit alerts — only shown when a task actually hits or risks breaching a limit */}
+            {(() => {
+              const ebaKeywords = /eba|duty limit|rest period|shift.*hour|nurse.*hour|pilot.*hour|100.*hr|12.*hr|10.*hr.*rest|fatigue|breach/i;
+              const ebaWarnings   = result.warnings.filter(w => ebaKeywords.test(w));
+              const otherWarnings = result.warnings.filter(w => !ebaKeywords.test(w));
+              return (<>
+                {ebaWarnings.length > 0 && (
+                  <div className="rounded-xl border border-rose-500/40 bg-rose-500/8 overflow-hidden">
+                    <div className="px-4 py-2.5 border-b border-rose-500/20 flex items-center gap-2">
+                      <Scale size={12} className="text-rose-400" />
+                      <span className="text-xs font-bold text-rose-300">EBA Limit Alert</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-semibold ml-auto">ACTION REQUIRED</span>
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                      {ebaWarnings.map((w, i) => (
+                        <div key={i} className="flex items-start gap-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20">
+                          <AlertTriangle size={11} className="text-rose-400 mt-0.5 shrink-0" />
+                          <p className="text-[11px] text-rose-200">{w}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
+                )}
+
+                {/* General warnings */}
+                {otherWarnings.length > 0 && (
+                  <div className="space-y-1.5">
+                    {otherWarnings.map((w, i) => (
+                      <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                        <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
+                        <p className="text-[11px] text-amber-300">{w}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>);
+            })()}
 
             {/* Tasks */}
             <div className="space-y-4">

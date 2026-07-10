@@ -887,11 +887,13 @@ You must return a JSON object ONLY — no prose, no markdown, no code block mark
       "dutyStart": "07:00",
       "dutyEnd": "17:00",
       "totalFlightTime": "4:20",
-      "notes": "Lunch break protected 12:30–13:00 at Dubbo per EBA Cl.25.2. Nurse shift ends 17:30 — within 12hr EBA max."
+      "notes": "Positioned via Broken Hill to minimise deadhead; return leg combined with afternoon transfer."
     }
   ],
   "warnings": ["EBA breach alerts go here — e.g. Nurse duty approaches 12hr EBA max, or Nurse rest gap is less than 10hr EBA minimum — as short strings"]
-}`;
+}
+
+IMPORTANT — EBA mentions in output: keep "notes" plain and operational (routing, timing, positioning) by default. Only reference a specific EBA clause number or limit value inside "notes" for a task when that task is actually at, near (e.g. within 30 min of a duty/rest cap), or in breach of the limit. If every EBA rule is comfortably satisfied with margin, do not mention EBA in the notes at all — leave "warnings" empty and keep notes purely operational. Never restate the full set of EBA limits as boilerplate.`;
 
     const userMsg = `Operations Date: ${opDate}
 Duty Start: ${dutyStart}
