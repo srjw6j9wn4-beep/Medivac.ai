@@ -114,6 +114,42 @@ const VIDEOS = [
     videoSrc: `/video/09_isolation.mp4`,
     backdropSrc: "/bg_09_isolation.png",
   },
+  {
+    id: 10,
+    title: "NEPT Tasking Board",
+    duration: "1:05",
+    section: "Mission Operations",
+    desc: "Jennifer demonstrates the NEPT Tasking Board — creating a task, assigning crew and aircraft, running the AI auto-tasker, reviewing the route planner with live NOTAMs and fuel status, and tracking mission progress from dispatch to completion.",
+    thumbnail: "/thumb_10_nept.png",
+    color: "from-cyan-900/60 to-slate-900",
+    accent: "border-cyan-400/40",
+    videoSrc: `/video/10_nept.mp4`,
+    backdropSrc: "/medivac_comms_bg.jpg",
+  },
+  {
+    id: 11,
+    title: "Mission Optimiser",
+    duration: "1:00",
+    section: "Mission Operations",
+    desc: "Jennifer explains how the Mission Optimiser sequences multiple tasks for maximum efficiency — balancing crew duty limits, minimising repositioning, and surfacing scheduling conflicts before they occur.",
+    thumbnail: "/thumb_11_optimiser.png",
+    color: "from-violet-900/60 to-slate-900",
+    accent: "border-violet-400/40",
+    videoSrc: `/video/11_optimiser.mp4`,
+    backdropSrc: "/medivac_comms_bg.jpg",
+  },
+  {
+    id: 12,
+    title: "AI Mission Analyst",
+    duration: "1:00",
+    section: "Clinical Intelligence",
+    desc: "Jennifer walks through the AI Mission Analyst — pre-dispatch clinical review, crew qualification cross-check, real-time in-flight monitoring, and post-mission compliance debriefing.",
+    thumbnail: "/thumb_12_analyst.png",
+    color: "from-emerald-900/60 to-slate-900",
+    accent: "border-emerald-400/40",
+    videoSrc: `/video/12_analyst.mp4`,
+    backdropSrc: "/medivac_comms_bg.jpg",
+  },
 ];
 
 const STARTERS = [
@@ -438,7 +474,7 @@ export default function Bryan({ role }: Props) {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Jennifer — AI Presenter</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Real voice narration · 8 narrated modules · HeyGen AI voice</p>
+        <p className="text-sm text-muted-foreground mt-0.5">Real voice narration · {VIDEOS.length} narrated modules · HeyGen AI voice</p>
       </div>
 
       <div className="space-y-4">
