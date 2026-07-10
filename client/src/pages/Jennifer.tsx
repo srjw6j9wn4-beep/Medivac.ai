@@ -12,11 +12,11 @@ const VIDEOS = [
     duration: "0:32",
     section: "Introduction",
     desc: "Jennifer introduces Medivac.ai — the end-to-end aeromedical operations platform built for King Air B200/B300 RFDS-style operators.",
-    thumbnail: "🛩",
+    thumbSrc: "/thumb_01_welcome.png",
     color: "from-cyan-900/60 to-slate-900",
     accent: "border-cyan-400/40",
     videoSrc: `${API_BASE}/api/video/01_welcome.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_01_welcome.png",
   },
   {
     id: 2,
@@ -24,11 +24,11 @@ const VIDEOS = [
     duration: "0:36",
     section: "Mission Operations",
     desc: "Jennifer walks through how Medivac.ai handles a mission from initial NEPT call through to dispatch release and airborne confirmation.",
-    thumbnail: "📡",
+    thumbSrc: "/thumb_02_dispatch.png",
     color: "from-blue-900/60 to-slate-900",
     accent: "border-blue-400/40",
     videoSrc: `${API_BASE}/api/video/02_dispatch.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_02_dispatch.png",
   },
   {
     id: 3,
@@ -36,11 +36,11 @@ const VIDEOS = [
     duration: "0:35",
     section: "Compliance",
     desc: "A full walkthrough of each dispatch release gate — flight plan, W&B, APG release, maintenance release, and crew sign-off.",
-    thumbnail: "✅",
+    thumbSrc: "/thumb_03_compliance.png",
     color: "from-green-900/60 to-slate-900",
     accent: "border-green-400/40",
     videoSrc: `${API_BASE}/api/video/03_compliance.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_03_compliance.png",
   },
   {
     id: 4,
@@ -48,11 +48,11 @@ const VIDEOS = [
     duration: "0:30",
     section: "Ferry Flights",
     desc: "How Medivac.ai tracks equipment removed and reinstalled during aircraft repositioning, with photo evidence and return-to-service controls.",
-    thumbnail: "🔧",
+    thumbSrc: "/thumb_04_ferry.png",
     color: "from-orange-900/60 to-slate-900",
     accent: "border-orange-400/40",
     videoSrc: `${API_BASE}/api/video/04_ferry.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_04_ferry.png",
   },
   {
     id: 5,
@@ -60,7 +60,7 @@ const VIDEOS = [
     duration: "0:34",
     section: "Special Missions",
     desc: "Detailed walkthrough of YLHI over-water dispatch — life raft, survival equipment, EPIRBs, SARTIME lodgement and dispatch block logic.",
-    thumbnail: "🌊",
+    thumbSrc: "/thumb_05_lordhowe.png",
     color: "from-teal-900/60 to-slate-900",
     accent: "border-teal-400/40",
     videoSrc: `${API_BASE}/api/video/05_lordhowe.mp4`,
@@ -72,11 +72,11 @@ const VIDEOS = [
     duration: "0:27",
     section: "Special Missions",
     desc: "Jennifer explains neonatal and ECMO transport configurations — required equipment, specialist crew, and receiving facility confirmation gates.",
-    thumbnail: "🏥",
+    thumbSrc: "/thumb_06_nets.png",
     color: "from-purple-900/60 to-slate-900",
     accent: "border-purple-400/40",
     videoSrc: `${API_BASE}/api/video/06_nets.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_06_nets.png",
   },
   {
     id: 7,
@@ -84,11 +84,11 @@ const VIDEOS = [
     duration: "1:16",
     section: "Compliance",
     desc: "Jennifer walks through the ISO 9001:2015 and ISO 13485:2016 certification readiness dashboard — clause scoring, CAPA register, evidence packs, and the four-phase critical path to dual certification by November 2026.",
-    thumbnail: "🏅",
+    thumbSrc: "/thumb_07_iso.png",
     color: "from-amber-900/60 to-slate-900",
     accent: "border-amber-400/40",
     videoSrc: `${API_BASE}/api/video/07_iso.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_07_iso.png",
   },
   {
     id: 8,
@@ -96,11 +96,11 @@ const VIDEOS = [
     duration: "0:29",
     section: "Clinical",
     desc: "How the Telehealth Portal and AI Mission Analyst work together to support in-flight clinical decision making.",
-    thumbnail: "📱",
+    thumbSrc: "/thumb_08_telehealth.png",
     color: "from-green-900/60 to-slate-900",
     accent: "border-green-400/40",
     videoSrc: `${API_BASE}/api/video/08_telehealth.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_08_telehealth.png",
   },
   {
     id: 9,
@@ -108,11 +108,11 @@ const VIDEOS = [
     duration: "0:37",
     section: "Clinical",
     desc: "Isolation flight procedures — patient containment, cabin airflow management, and crew PPE protocols for infectious disease transport.",
-    thumbnail: "🧪",
+    thumbSrc: "/thumb_09_isolation.png",
     color: "from-rose-900/60 to-slate-900",
     accent: "border-rose-400/40",
     videoSrc: `${API_BASE}/api/video/09_isolation.mp4`,
-    backdropSrc: "/aeromedical_bg.png",
+    backdropSrc: "/bg_09_isolation.png",
   },
 ];
 
@@ -155,30 +155,40 @@ function VideoThumb({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left flex items-start gap-3 p-3 rounded-xl border transition-all ${
-        active ? `bg-cyan-400/10 border-cyan-400/40` : "bg-card border-card-border hover:border-cyan-400/30"
+      className={`w-full text-left rounded-xl border transition-all overflow-hidden ${
+        active ? `border-cyan-400/60 ring-1 ring-cyan-400/30` : "border-card-border hover:border-cyan-400/30"
       }`}
     >
-      <div
-        className={`shrink-0 w-14 h-10 rounded-lg border ${video.accent} flex items-center justify-center relative overflow-hidden`}
-        style={video.backdropSrc
-          ? { backgroundImage: `url(${video.backdropSrc})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-          : { background: `linear-gradient(to bottom right, var(--tw-gradient-stops))` }
-        }
-      >
-        {!video.backdropSrc && <span className="text-xl">{video.thumbnail}</span>}
-        <div className={`absolute inset-0 ${video.backdropSrc ? 'bg-black/20' : `bg-gradient-to-br ${video.color}`}`} />
+      {/* Thumbnail image — full width, 16:9 */}
+      <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
+        <img
+          src={video.thumbSrc}
+          alt={video.title}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+        {/* Dark gradient overlay at bottom for text legibility */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        {/* Duration badge */}
+        <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 bg-black/70 rounded text-[9px] font-mono text-white">
+          {video.duration}
+        </div>
+        {/* Section badge */}
+        <div className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/60 border border-white/10 rounded text-[9px] text-white/80">
+          {video.section}
+        </div>
+        {/* Active play indicator */}
         {active && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-            <div className="w-4 h-4 rounded-full bg-cyan-400 flex items-center justify-center">
-              <div className="w-0 h-0 border-t-[4px] border-b-[4px] border-l-[6px] border-transparent border-l-white ml-0.5" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-cyan-400/90 flex items-center justify-center shadow-lg shadow-cyan-400/40">
+              <div className="w-0 h-0 border-t-[7px] border-b-[7px] border-l-[11px] border-transparent border-l-black ml-1" />
             </div>
           </div>
         )}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className={`text-xs font-semibold truncate ${active ? "text-cyan-400" : ""}`}>{video.title}</div>
-        <div className="text-[10px] text-muted-foreground">{video.section} · {video.duration}</div>
+      {/* Text below thumbnail */}
+      <div className={`px-3 py-2 ${ active ? 'bg-cyan-400/10' : 'bg-card' }`}>
+        <div className={`text-xs font-semibold leading-tight ${ active ? 'text-cyan-400' : 'text-foreground' }`}>{video.title}</div>
       </div>
     </button>
   );
@@ -599,7 +609,6 @@ export default function Jennifer({ role }: Props) {
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
-                style={{ mixBlendMode: "screen" }}
                 src={activeVideo.videoSrc}
                 playsInline
                 preload="auto"
@@ -607,7 +616,7 @@ export default function Jennifer({ role }: Props) {
 
               {!playing && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/40">
-                  <div className="text-4xl mb-1">{activeVideo.thumbnail}</div>
+
                   <div className="text-lg font-bold text-white text-center px-6" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
                     {activeVideo.title}
                   </div>

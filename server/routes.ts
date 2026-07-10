@@ -175,28 +175,33 @@ export async function registerRoutes(
     }
 
     try {
-      // Resolve Anthropic endpoint + key from injected env vars.
-      // Priority order:
-      //  1. Custom credential (published sandbox): CUSTOM_CRED_API_ANTHROPIC_COM_URL / TOKEN
-      //  2. llm-api:website proxy (dev sandbox):   ANTHROPIC_BASE_URL / ANTHROPIC_API_KEY
-      //  3. Plain ANTHROPIC_API_KEY only
-      const customToken = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN;
-      const customUrl   = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL || "https://api.anthropic.com";
-      const proxyKey    = process.env.ANTHROPIC_API_KEY;
-      const proxyBase   = process.env.ANTHROPIC_BASE_URL || "https://api.anthropic.com";
+      // Credential resolution — four paths in priority order:
+      //  1. Published sandbox (HTTPS_PROXY set by publish_website credentials param)
+      //     → proxy intercepts the fetch and injects the real key; use placeholder
+      //  2. Custom credential env vars (CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN)
+      //  3. llm-api:website proxy (ANTHROPIC_BASE_URL + ANTHROPIC_API_KEY)
+      //  4. Plain ANTHROPIC_API_KEY
+      const httpsProxy    = process.env.HTTPS_PROXY;
+      const customToken   = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN;
+      const customUrl     = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL;
+      const proxyKey      = process.env.ANTHROPIC_API_KEY;
+      const proxyBase     = process.env.ANTHROPIC_BASE_URL;
 
-      const apiKey  = customToken || proxyKey;
-      const baseUrl = customToken ? customUrl : proxyBase;
+      // When HTTPS_PROXY is active the proxy injects auth — no explicit key needed
+      const usingProxySandbox = !!httpsProxy && httpsProxy.includes("agent-proxy.perplexity.ai");
 
-      console.log("[Bryan chat] apiKey present:", !!apiKey, "baseUrl:", baseUrl);
+      const apiKey  = usingProxySandbox ? "proxy-injected" : (customToken || proxyKey);
+      const baseUrl = customUrl || proxyBase || "https://api.anthropic.com";
+
+      console.log("[Bryan chat] mode:", usingProxySandbox ? "pplx-proxy" : "direct", "| apiKey present:", !!apiKey, "| baseUrl:", baseUrl);
 
       if (!apiKey) {
-        return res.status(503).json({ error: "Bryan's AI brain is not configured yet. Please add an Anthropic API key to enable live answers." });
+        return res.status(503).json({ error: "Anthropic API key not configured. Please add ANTHROPIC_API_KEY to Railway environment variables." });
       }
 
       const body = {
         model: "claude-haiku-4-5",
-        max_tokens: 200,
+        max_tokens: 250,
         system: JENNIFER_SYSTEM_PROMPT,
         messages: messages.map((m: { role: string; content: string }) => ({
           role: m.role,
@@ -204,20 +209,23 @@ export async function registerRoutes(
         })),
       };
 
-      // When using custom-cred proxy: URL is the proxy endpoint, token is the session key
-      // When using llm-api:website proxy: URL already has the path, key is the Anthropic key
-      // The proxy URL from custom-cred already includes the host path — append /v1/messages
       const messagesUrl = baseUrl.endsWith("/v1/messages")
         ? baseUrl
         : `${baseUrl}/v1/messages`;
 
+      // Build headers — when proxy is active it rewrites x-api-key automatically
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+      };
+      if (!usingProxySandbox) {
+        // Only set x-api-key when not relying on the HTTPS proxy to inject it
+        headers["x-api-key"] = apiKey;
+      }
+
       const apiRes = await fetch(messagesUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
+        headers,
         body: JSON.stringify(body),
       });
 
