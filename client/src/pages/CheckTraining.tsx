@@ -2311,6 +2311,57 @@ function TheoryKnowledgeSection() {
         {/* ── DEDICATED EXAMS ── */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{cfg.dedicatedLabel}</p>
+          {examMode === "ifr-sim" ? (
+            /* IFR mode — lettered A–Q layout */
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {ACTIVE_EXAMS.map(exam => {
+                const letter = exam.id.split("-")[1]?.toUpperCase() ?? "";
+                const best = bestScores[exam.id];
+                const scorePct = best ? pct(best.score, best.total) : null;
+                return (
+                  <button
+                    key={exam.id}
+                    onClick={() => startExam(exam)}
+                    className={`text-left rounded-xl border border-border bg-card transition-all p-4 group ${cfg.accentCard}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      {/* CASA topic letter badge */}
+                      <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-black border ${cfg.accentBorder} ${cfg.accentBg} ${cfg.accent}`}>
+                        {letter}
+                      </div>
+                      {best ? (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                          best.passed ? `${cfg.accentBg} ${cfg.accent}` : "bg-red-500/20 text-red-300"
+                        }`}>
+                          {best.passed ? "PASS" : "FAIL"} · {scorePct}%
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/40">Not attempted</span>
+                      )}
+                    </div>
+                    <p className={`font-semibold text-sm mt-2 transition-colors ${cfg.accent}`}>{exam.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{exam.subtitle}</p>
+                    {best ? (
+                      <div className="mt-3 space-y-1">
+                        <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                          <div className={`h-1.5 rounded-full transition-all ${best.passed ? cfg.accentBar : "bg-red-500/70"}`} style={{ width: `${scorePct}%` }} />
+                        </div>
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                          <span>Best: {best.score}/{best.total}</span>
+                          <span>{best.date}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                        <CheckSquare size={11} /> <span>15 questions</span>
+                        <Timer size={11} className="ml-1" /> <span>25 min</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {dedicatedExams.map(exam => {
               const best = bestScores[exam.id];
@@ -2364,9 +2415,11 @@ function TheoryKnowledgeSection() {
               );
             })}
           </div>
+          )} {/* end ternary */}
         </div>
 
-        {/* ── MIXED EXAMS ── */}
+        {/* ── MIXED EXAMS — hidden in IFR mode (all exams are dedicated) ── */}
+        {examMode !== "ifr-sim" && (
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">{cfg.mixedLabel}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2423,6 +2476,7 @@ function TheoryKnowledgeSection() {
             })}
           </div>
         </div>
+        )} {/* end examMode !== ifr-sim */}
 
       </div>
     );
