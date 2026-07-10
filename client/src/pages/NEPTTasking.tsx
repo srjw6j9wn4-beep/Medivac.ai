@@ -22,6 +22,7 @@ type TaskPriority = "Routine" | "Urgent" | "Emergency";
 
 /** A single flight leg within a multi-sector task */
 interface Sector {
+  id:          string;           // stable identity for React key (never changes after creation)
   from:        string;           // location / hospital name
   fromIcao:    string;           // ICAO code
   to:          string;
@@ -79,7 +80,7 @@ const NURSE_OPTIONS = ["S. Mitchell RN", "Dr. K. Patel", "J. O'Brien RN"];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 function emptySector(): Sector {
-  return { from: "", fromIcao: "", to: "", toIcao: "", eta: null, fromAirport: null, toAirport: null };
+  return { id: crypto.randomUUID(), from: "", fromIcao: "", to: "", toIcao: "", eta: null, fromAirport: null, toAirport: null };
 }
 
 function nextRef(tasks: NeptTask[]): string {
@@ -365,6 +366,7 @@ function SectorEditor({
     // Pre-fill new sector's "from" with previous sector's "to"
     const prev = sectors[sectors.length - 1];
     const newSec: Sector = {
+      id:          crypto.randomUUID(),
       from:        prev ? prev.to : "",
       fromIcao:    prev ? prev.toIcao : "",
       to:          "",
@@ -424,7 +426,7 @@ function SectorEditor({
       {/* Sector rows */}
       <div className="space-y-2">
         {sectors.map((s, i) => (
-          <div key={i} className="bg-muted/10 border border-card-border rounded-xl p-3 space-y-2">
+          <div key={s.id} className="bg-muted/10 border border-card-border rounded-xl p-3 space-y-2">
             {/* Sector header */}
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-cyan-400/70 uppercase tracking-widest">
@@ -510,6 +512,7 @@ function TaskModal({
     // Ensure sectors is always at least one empty sector
     if (!base.sectors || base.sectors.length === 0) {
       base.sectors = [{
+        id:          crypto.randomUUID(),
         from:        base.pickupLocation ?? "",
         fromIcao:    base.pickupIcao ?? "",
         to:          base.destLocation ?? "",
@@ -522,6 +525,7 @@ function TaskModal({
       // Ensure airport objects exist on sectors loaded from DB (they only store strings)
       base.sectors = base.sectors.map(s => ({
         ...s,
+        id:          (s as any).id ?? crypto.randomUUID(),
         fromAirport: (s as any).fromAirport ?? null,
         toAirport:   (s as any).toAirport   ?? null,
       }));

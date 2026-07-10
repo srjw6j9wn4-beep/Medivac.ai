@@ -21,11 +21,28 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
   const containerRef = useRef<HTMLDivElement>(null);
   const autoSelectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear query when value is selected (but only if we aren't currently editing)
-  // Use icao as stable dependency to avoid clearing on reference changes
+  // Keep onChange in a ref so the stale-closure inside search() always calls the latest version
+  const onChangeRef = useRef(onChange);
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+  // When the value is cleared externally (value goes null→null or icao changes), reset local state
+  // but ONLY clear query if the field is not actively being typed into by the user
   const valueIcao = value?.icao ?? null;
+  const prevValueIcao = useRef<string | null>(valueIcao);
   useEffect(() => {
-    if (valueIcao) { setQuery(""); setAutoFilled(false); }
+    const prev = prevValueIcao.current;
+    prevValueIcao.current = valueIcao;
+    // If the ICAO changed and a value was just set, close dropdown — don't clear query
+    // (query is already "" because autoSelect/select called setQuery("") directly)
+    if (valueIcao && valueIcao !== prev) {
+      setResults([]);
+      setOpen(false);
+    }
+    // If cleared externally, reset everything
+    if (!valueIcao && prev) {
+      setQuery("");
+      setAutoFilled(false);
+    }
   }, [valueIcao]);
 
   // Clear autofill flash after 2s
@@ -86,7 +103,7 @@ export function AirportSearch({ value, onChange, placeholder = "Search ICAO, cit
   }
 
   function autoSelect(ap: Airport) {
-    onChange(ap);
+    onChangeRef.current(ap);
     setQuery("");
     setResults([]);
     setOpen(false);
