@@ -2723,223 +2723,457 @@ function TheoryKnowledgeSection() {
 
       {/* ═══════════════ EBA TAB ═══════════════ */}
       {activeTab === "eba" && (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-8">
 
           {/* Header */}
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>EBA Reference — Duty Rules & Entitlements</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Extracted from the approved Fair Work enterprise agreements. Used to monitor duty compliance in NEPT Auto Tasking.
-              </p>
-            </div>
+          <div>
+            <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>EBA Reference — Duty Rules &amp; Entitlements</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Extracted from approved Fair Work enterprise agreements. Rules are used to monitor duty compliance in NEPT Auto Tasking.
+            </p>
           </div>
 
-          {/* EBA Documents status */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl border border-green-500/30 bg-green-500/8">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 size={14} className="text-green-400" />
-                <span className="text-sm font-bold text-green-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Pilots Agreement 2025</span>
+          {/* EBA status cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { title: "Pilots Agreement 2025", detail: "Approved 5 Nov 2025 · Expiry 30 Jun 2028", status: "loaded", note: "✓ Duty rules active in AI Auto Tasking" },
+              { title: "Nurses EBA 2023", detail: "RFDSSE Nurses Enterprise Agreement 2023", status: "loaded", note: "✓ Shift & fatigue rules extracted" },
+              { title: "Engineering EA 2025", detail: "RFDSSE Engineering Enterprise Agreement 2025", status: "loaded", note: "✓ LAME on-call & overtime rules extracted" },
+            ].map((e, i) => (
+              <div key={i} className="p-3.5 rounded-xl border border-green-500/30 bg-green-500/8">
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle2 size={13} className="text-green-400 shrink-0" />
+                  <span className="text-sm font-bold text-green-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{e.title}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">{e.detail}</p>
+                <p className="text-[10px] text-green-400 mt-1">{e.note}</p>
               </div>
-              <p className="text-[11px] text-muted-foreground">RFDSSE Pilots Agreement 2025 · Approved 5 Nov 2025 · Nominal expiry 30 Jun 2028</p>
-              <p className="text-[10px] text-green-400 mt-1">✓ Loaded — duty rules active in AI Auto Tasking</p>
-            </div>
-            <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/8">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle size={14} className="text-amber-400" />
-                <span className="text-sm font-bold text-amber-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Nurses / Medical Staff EBA</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground">Not yet uploaded — upload the Nurses EBA PDF to enable full nurse duty monitoring.</p>
-              <p className="text-[10px] text-amber-400 mt-1">⚠ Using default lunch break rule until EBA is uploaded</p>
-            </div>
+            ))}
           </div>
 
-          {/* Pilots EBA — Key Rules */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-bold text-foreground flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-              <Plane size={13} className="text-cyan-400" /> Pilots Agreement 2025 — Key Duty Rules
+          {/* ── PILOTS ── */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              <Plane size={13} className="text-cyan-400" /> Pilots Agreement 2025
             </h3>
 
             {/* Flight time limits */}
-            <div className="rounded-xl border border-card-border overflow-hidden">
-              <div className="px-4 py-2.5 bg-muted/20 border-b border-card-border">
-                <span className="text-xs font-bold text-foreground">Flight Time Limits (Clause 20.3)</span>
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Flight Time Limits (Cl. 20.3)</span>
               </div>
-              <div className="divide-y divide-card-border">
-                {[
-                  { rule: "Max flight time — 30 consecutive days", limit: "100 hours", ref: "Cl. 20.3(a)", severity: "hard" },
-                  { rule: "Max flight time — 365 consecutive days", limit: "900 hours", ref: "Cl. 20.3(b)", severity: "hard" },
-                  { rule: "Max instructional flight time per tour of duty", limit: "6 hours", ref: "Cl. 20.3(c)", severity: "hard" },
-                  { rule: "Extension permitted — up to CAO 48.1 maximum", limit: "Allowed", ref: "Cl. 20.3(d)", severity: "info" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.severity === "hard" ? "bg-red-400" : "bg-blue-400"}`} />
-                      <span className="text-foreground">{r.rule}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className={`font-bold tabular-nums ${r.severity === "hard" ? "text-red-300" : "text-blue-300"}`}>{r.limit}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
-                    </div>
+              {[
+                { rule: "Max flight time — 30 consecutive days", limit: "100 hrs", ref: "Cl. 20.3(a)", col: "text-red-300" },
+                { rule: "Max flight time — 365 consecutive days", limit: "900 hrs", ref: "Cl. 20.3(b)", col: "text-red-300" },
+                { rule: "Max instructional flight time per tour", limit: "6 hrs", ref: "Cl. 20.3(c)", col: "text-red-300" },
+                { rule: "Extension to CAO 48.1 max permitted", limit: "Allowed", ref: "Cl. 20.3(d)", col: "text-blue-300" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "text-red-300" ? "bg-red-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Rest requirements after extension */}
-            <div className="rounded-xl border border-card-border overflow-hidden">
-              <div className="px-4 py-2.5 bg-muted/20 border-b border-card-border">
-                <span className="text-xs font-bold text-foreground">Rest Requirements After Extension (Clause 20.3(e))</span>
-              </div>
-              <div className="divide-y divide-card-border">
-                {[
-                  { rule: "Min rest (Option 1) — includes 2200–0600 window", limit: "9 hrs consecutive + 1 hr per 15 min over 8 hrs flight", ref: "Cl. 20.3(e)(i)", severity: "hard" },
-                  { rule: "Min rest (Option 2) — flat rest period", limit: "10 hrs consecutive + 1 hr per 15 min over 8 hrs flight", ref: "Cl. 20.3(e)(ii)", severity: "hard" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-400" />
-                      <span className="text-foreground">{r.rule}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-bold text-red-300 text-right max-w-[200px]">{r.limit}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
-                    </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold tabular-nums ${r.col}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Rostering limits */}
-            <div className="rounded-xl border border-card-border overflow-hidden">
-              <div className="px-4 py-2.5 bg-muted/20 border-b border-card-border">
-                <span className="text-xs font-bold text-foreground">Rostering Limits (Clause 21)</span>
-              </div>
-              <div className="divide-y divide-card-border">
-                {[
-                  { rule: "Max rostered availability per 28-day cycle", limit: "168 hours", ref: "Cl. 21.5", severity: "hard" },
-                  { rule: "Max rostered availability (attrition / growth — one occasion per year)", limit: "192 hours / 28 days", ref: "Cl. 21.7", severity: "amber" },
-                  { rule: "168 hr cap averaging period", limit: "Up to 3 roster cycles", ref: "Cl. 21.5", severity: "info" },
-                  { rule: "Min rostered days off per 56-day period", limit: "16 days off", ref: "Cl. 21.8", severity: "hard" },
-                  { rule: "Min consecutive days off (at least 4 times per 56 days)", limit: "2 consecutive RDOs", ref: "Cl. 21.8", severity: "hard" },
-                  { rule: "Hours of work (ordinary)", limit: "38 hrs/week averaged over 12 months", ref: "Cl. 20.2", severity: "info" },
-                  { rule: "Additional required hours (included in base salary)", limit: "+4 hrs/week", ref: "Cl. 20.2", severity: "info" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.severity === "hard" ? "bg-red-400" : r.severity === "amber" ? "bg-amber-400" : "bg-blue-400"}`} />
-                      <span className="text-foreground">{r.rule}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className={`font-bold tabular-nums ${r.severity === "hard" ? "text-red-300" : r.severity === "amber" ? "text-amber-300" : "text-blue-300"}`}>{r.limit}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Breaks */}
-            <div className="rounded-xl border border-card-border overflow-hidden">
-              <div className="px-4 py-2.5 bg-muted/20 border-b border-card-border">
-                <span className="text-xs font-bold text-foreground">Meal Breaks (Clause 22)</span>
-              </div>
-              <div className="divide-y divide-card-border">
-                {[
-                  { rule: "Meal break entitlement during work hours", limit: "Up to 30 min", ref: "Cl. 22.1", severity: "info" },
-                  { rule: "Break timing — flexible, operational needs take priority", limit: "Any time", ref: "Cl. 22.2", severity: "info" },
-                  { rule: "Nature of aeromedical ops — breaks may be earlier or later than 5 hrs after start", limit: "Unstructured", ref: "Cl. 22.3", severity: "info" },
-                  { rule: "Meal allowances — averaged and included in base salary", limit: "Included in salary", ref: "Cl. 22.4", severity: "info" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-400" />
-                      <span className="text-foreground">{r.rule}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-bold text-blue-300">{r.limit}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Travel meal reimbursements */}
-            <div className="rounded-xl border border-card-border overflow-hidden">
-              <div className="px-4 py-2.5 bg-muted/20 border-b border-card-border">
-                <span className="text-xs font-bold text-foreground">Travel Meal Reimbursements (Clause 26.8)</span>
-              </div>
-              <div className="divide-y divide-card-border">
-                {[
-                  { rule: "Breakfast", limit: "$25.00", ref: "Cl. 26.8(b)(i)", severity: "info" },
-                  { rule: "Lunch", limit: "$25.00", ref: "Cl. 26.8(b)(i)", severity: "info" },
-                  { rule: "Dinner", limit: "$50.00", ref: "Cl. 26.8(b)(i)", severity: "info" },
-                  { rule: "Whole day", limit: "$100.00", ref: "Cl. 26.8(b)(i)", severity: "info" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-400" />
-                      <span className="text-foreground">{r.rule}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-bold text-blue-300 tabular-nums">{r.limit}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Overtime */}
-            <div className="rounded-xl border border-card-border overflow-hidden">
-              <div className="px-4 py-2.5 bg-muted/20 border-b border-card-border">
-                <span className="text-xs font-bold text-foreground">Overtime Triggers (Clause 20.3(g))</span>
-              </div>
-              <div className="divide-y divide-card-border">
-                {[
-                  { rule: "Working a rostered day off (with agreement)", limit: "Overtime Payment or substitute RDO within 1 month", ref: "Cl. 20.3(g)(i)", severity: "amber" },
-                  { rule: "Exceeding max rostered availability (168 hrs / 28 days)", limit: "Overtime Payment per additional shift", ref: "Cl. 20.3(g)(ii)", severity: "amber" },
-                  { rule: "Duty extending 30+ min past end of rostered shift", limit: "1/12th of Overtime Payment per additional hour", ref: "Cl. 20.3(g)(iii)", severity: "amber" },
-                ].map((r, i) => (
-                  <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
-                      <span className="text-foreground">{r.rule}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-bold text-amber-300 text-right max-w-[220px]">{r.limit}</span>
-                      <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* CASA references */}
-            <div className="p-4 rounded-xl bg-blue-500/8 border border-blue-500/25">
-              <div className="flex items-start gap-2">
-                <Info size={13} className="text-blue-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs font-semibold text-blue-300 mb-1">CASA Regulatory References</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Flight and duty time limits are governed by <strong className="text-foreground">CAO 48.1</strong> (Civil Aviation Order) and <strong className="text-foreground">CAAP 235-1</strong>. The Pilots Agreement defers to these orders and any FRMS approved by CASA. Refer to CASA for current CAO 48.1 values — the EBA extends, not replaces, those limits where specified.
-                  </p>
                 </div>
+              ))}
+            </div>
+
+            {/* Rest after extension */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Rest After Duty Extension (Cl. 20.3(e))</span>
+              </div>
+              {[
+                { rule: "Option 1 — must include 2200–0600 window", limit: "9 hrs + 1 hr per 15 min over 8 hrs flight", ref: "Cl. 20.3(e)(i)" },
+                { rule: "Option 2 — flat rest period", limit: "10 hrs + 1 hr per 15 min over 8 hrs flight", ref: "Cl. 20.3(e)(ii)" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs gap-4 border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-400" />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-red-300 text-right">{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Rostering */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Rostering Limits (Cl. 21)</span>
+              </div>
+              {[
+                { rule: "Max rostered availability per 28-day cycle", limit: "168 hrs", ref: "Cl. 21.5", col: "red" },
+                { rule: "Max rostered availability (attrition / growth — once per year)", limit: "192 hrs / 28 days", ref: "Cl. 21.7", col: "amber" },
+                { rule: "Averaging period for 168 hr cap", limit: "Up to 3 cycles", ref: "Cl. 21.5", col: "blue" },
+                { rule: "Min rostered days off per 56-day period", limit: "16 RDOs", ref: "Cl. 21.8", col: "red" },
+                { rule: "Min consecutive RDOs (at least 4× per 56 days)", limit: "2 consecutive", ref: "Cl. 21.8", col: "red" },
+                { rule: "Ordinary hours per week (averaged over 12 months)", limit: "38 hrs + 4 hrs", ref: "Cl. 20.2", col: "blue" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "red" ? "bg-red-400" : r.col === "amber" ? "bg-amber-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold tabular-nums ${r.col === "red" ? "text-red-300" : r.col === "amber" ? "text-amber-300" : "text-blue-300"}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pilots breaks */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Meal Breaks (Cl. 22)</span>
+              </div>
+              {[
+                { rule: "Meal break entitlement during work hours", limit: "Up to 30 min", ref: "Cl. 22.1" },
+                { rule: "Break timing — flexible, operational needs take priority", limit: "Any time", ref: "Cl. 22.2" },
+                { rule: "Aeromedical ops — breaks may be earlier or later than 5 hrs after start", limit: "Unstructured", ref: "Cl. 22.3" },
+                { rule: "Meal allowances — included in base salary", limit: "In salary", ref: "Cl. 22.4" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-400" />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-blue-300">{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pilots overtime */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <AlertTriangle size={11} className="text-amber-400" />
+                <span className="text-xs font-semibold">Overtime Triggers (Cl. 20.3(g))</span>
+              </div>
+              {[
+                { rule: "Working a rostered day off (with agreement)", limit: "OT payment or substitute RDO within 1 month", ref: "Cl. 20.3(g)(i)" },
+                { rule: "Exceeding 168 hr max rostered availability", limit: "OT payment per additional shift", ref: "Cl. 20.3(g)(ii)" },
+                { rule: "Duty extending 30+ min past end of rostered shift", limit: "1/12 OT payment per additional hour", ref: "Cl. 20.3(g)(iii)" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs gap-4 border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-amber-300 text-right max-w-[200px]">{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Travel meals */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Info size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Travel Meal Reimbursements (Cl. 26.8)</span>
+              </div>
+              {[
+                { rule: "Breakfast", limit: "$25.00", ref: "Cl. 26.8(b)(i)" },
+                { rule: "Lunch", limit: "$25.00", ref: "Cl. 26.8(b)(i)" },
+                { rule: "Dinner", limit: "$50.00", ref: "Cl. 26.8(b)(i)" },
+                { rule: "Whole day", limit: "$100.00", ref: "Cl. 26.8(b)(i)" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-400" />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-blue-300 tabular-nums">{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── NURSES ── */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              <Shield size={13} className="text-rose-400" /> Nurses EBA 2023
+            </h3>
+
+            {/* Nurses hours */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Hours of Work (Cl. 22–23)</span>
+              </div>
+              {[
+                { rule: "Day Workers — ordinary hours window", limit: "7:00am – 7:00pm Mon–Fri", ref: "Cl. 22.1", col: "blue" },
+                { rule: "Max ordinary hours per day (Day Workers)", limit: "10 hrs excl. meal breaks", ref: "Cl. 22.2", col: "red" },
+                { rule: "Full-time Day Worker hours", limit: "38 hrs/week or 152 hrs/28 days", ref: "Cl. 22.3", col: "blue" },
+                { rule: "Shift Workers — roster basis", limit: "24/7 operations", ref: "Cl. 23.1", col: "blue" },
+                { rule: "Full-time Shift Worker ordinary hours", limit: "Avg 38 hrs/week over 56 days", ref: "Cl. 23.2", col: "blue" },
+                { rule: "Max ordinary hours per day (Shift Workers)", limit: "12 hrs excl. meal breaks", ref: "Cl. 23.4", col: "red" },
+                { rule: "Min days free from duty per 56-day cycle (Shift Workers)", limit: "28 days off", ref: "Cl. 23.3", col: "red" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "red" ? "bg-red-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold tabular-nums ${r.col === "red" ? "text-red-300" : "text-blue-300"}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Nurses fatigue */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <AlertTriangle size={11} className="text-rose-400" />
+                <span className="text-xs font-semibold">Fatigue Management (Cl. 24)</span>
+              </div>
+              {[
+                { rule: "Min rest between shifts", limit: "10 hrs (or 8 hrs by agreement)", ref: "Cl. 24.3(a)", col: "red" },
+                { rule: "If insufficient rest — late start without loss of pay", limit: "Allowed", ref: "Cl. 24.3(a)(i)", col: "blue" },
+                { rule: "OT rate if shift starts before rest period expires", limit: "200% of Base Hourly Rate", ref: "Cl. 24.4", col: "amber" },
+                { rule: "Away from home — suitable sleeping accommodation provided by RFDSSE", limit: "Single room preferred", ref: "Cl. 24.6", col: "blue" },
+                { rule: "Medical Transport Specialists — CASA regulations apply and may override", limit: "CASA overrides", ref: "Cl. 24.8", col: "amber" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "red" ? "bg-red-400" : r.col === "amber" ? "bg-amber-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold ${r.col === "red" ? "text-red-300" : r.col === "amber" ? "text-amber-300" : "text-blue-300"}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Nurses breaks */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Breaks (Cl. 25)</span>
+              </div>
+              {[
+                { rule: "Meal break — Day Workers (shifts over 5 hrs)", limit: "30–60 min unpaid", ref: "Cl. 25.1(a)", col: "blue" },
+                { rule: "Meal break window — Day Workers", limit: "4th–6th hour after start (where practicable)", ref: "Cl. 25.1(a)(i)", col: "blue" },
+                { rule: "Meal break — Shift Workers (shifts over 5 hrs)", limit: "30–60 min unpaid", ref: "Cl. 25.2(a)", col: "blue" },
+                { rule: "Meal break window — Shift Workers", limit: "4th–6th hour after start (where practicable)", ref: "Cl. 25.2(b)", col: "blue" },
+                { rule: "If required to remain available during meal break", limit: "Paid 30 min at Hourly Rate", ref: "Cl. 25.1(c)/25.2(d)", col: "amber" },
+                { rule: "Paid tea breaks", limit: "10 min per 4 hrs worked", ref: "Cl. 25.3(a)", col: "blue" },
+                { rule: "Tea break — combined option", limit: "2 × 10 min = 20 min combined (by agreement)", ref: "Cl. 25.3(b)", col: "blue" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "amber" ? "bg-amber-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold ${r.col === "amber" ? "text-amber-300" : "text-blue-300"}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Nurses OT */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <AlertTriangle size={11} className="text-amber-400" />
+                <span className="text-xs font-semibold">Overtime Rates (Cl. 35–38)</span>
+              </div>
+              {[
+                { rule: "Day Workers — Mon–Sat, first 2 hrs OT", limit: "150% of Base Hourly Rate", ref: "Cl. 35.2" },
+                { rule: "Day Workers — Mon–Sat, after 2 hrs OT", limit: "200% of Base Hourly Rate", ref: "Cl. 35.2" },
+                { rule: "Day Workers — Sunday all time", limit: "200% of Base Hourly Rate", ref: "Cl. 35.2" },
+                { rule: "Day Workers — Public Holidays all time", limit: "250% of Base Hourly Rate", ref: "Cl. 35.2" },
+                { rule: "Shift Workers — first 2 hrs OT", limit: "150% of Base Hourly Rate", ref: "Cl. 38.2" },
+                { rule: "Shift Workers — after first 2 hrs OT", limit: "200% of Base Hourly Rate", ref: "Cl. 38.2" },
+                { rule: "Callout — min payment per occasion (Day Workers)", limit: "3 hrs at OT rate incl. travel", ref: "Cl. 37.1" },
+                { rule: "TOIL — must be taken within 6 months", limit: "1 hr off per OT hour at 150% = 1.5 hrs off", ref: "Cl. 40.2" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-amber-300">{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Consolidated loadings */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Info size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Consolidated Loadings (Cl. 26.2–26.3)</span>
+              </div>
+              {[
+                { rule: "Day Workers — consolidated loading on base salary (incl. penalty rates, laundry, leave loading)", limit: "+5.00%", ref: "Cl. 26.2", col: "blue" },
+                { rule: "Shift Workers — consolidated loading on base salary (incl. weekend/PH penalties, shift loadings up to 320 night hrs)", limit: "+32.00%", ref: "Cl. 26.3", col: "blue" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-400" />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-blue-300 tabular-nums">{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── ENGINEERING ── */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold flex items-center gap-2" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+              <Zap size={13} className="text-yellow-400" /> Engineering Enterprise Agreement 2025
+            </h3>
+
+            {/* Eng hours */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Ordinary Hours of Work (Cl. 18–19)</span>
+              </div>
+              {[
+                { rule: "Ordinary hours per week / per 28-day cycle", limit: "38 hrs avg / max 152 hrs", ref: "Cl. 18.2(a)", col: "blue" },
+                { rule: "Max ordinary hours in a day", limit: "16 hrs", ref: "Cl. 18.2(b)", col: "red" },
+                { rule: "Ordinary hours spread", limit: "Mon–Fri, 5:00am–7:00pm", ref: "Cl. 18.2(d)", col: "blue" },
+                { rule: "Min rest period between shifts", limit: "10 hrs duty-free", ref: "Cl. 19.3(a)", col: "red" },
+                { rule: "Min rest — reduction by agreement", limit: "May be reduced", ref: "Cl. 19.3(b)", col: "amber" },
+                { rule: "Work outside ordinary hours spread", limit: "Paid at overtime rates", ref: "Cl. 18.2(f)", col: "amber" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "red" ? "bg-red-400" : r.col === "amber" ? "bg-amber-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold ${r.col === "red" ? "text-red-300" : r.col === "amber" ? "text-amber-300" : "text-blue-300"}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Eng breaks */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <Clock size={11} className="text-muted-foreground" />
+                <span className="text-xs font-semibold">Breaks (Cl. 20)</span>
+              </div>
+              {[
+                { rule: "Meal break (unpaid) + 1 paid tea break (15 min)", limit: "30–60 min unpaid + 15 min paid", ref: "Cl. 20.1(a)", col: "blue" },
+                { rule: "Max continuous work before meal break required", limit: "5 hrs (or 6 by agreement)", ref: "Cl. 20.1(b)", col: "red" },
+                { rule: "If break missed past 5 hrs — OT rate applies until break", limit: "OT rate", ref: "Cl. 20.1(c)", col: "amber" },
+                { rule: "Overtime meal break — if OT > 1 hr before/after shift", limit: "20 min paid at OT rate", ref: "Cl. 20.2(a)", col: "amber" },
+                { rule: "Further OT breaks per 4 hrs of overtime worked", limit: "30 min paid at OT rate", ref: "Cl. 20.2(b)", col: "amber" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "red" ? "bg-red-400" : r.col === "amber" ? "bg-amber-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold ${r.col === "red" ? "text-red-300" : r.col === "amber" ? "text-amber-300" : "text-blue-300"}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* LAME on-call */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <AlertTriangle size={11} className="text-yellow-400" />
+                <span className="text-xs font-semibold">LAME On-Call (Cl. 29)</span>
+              </div>
+              {[
+                { rule: "LAME on-call loading — included in base salary", limit: "14.06% of salary + licence payments", ref: "Cl. 29.2", col: "blue" },
+                { rule: "On-call allowance — base with 5+ LAMEs", limit: "$45 / day", ref: "Cl. 29.3(b)", col: "amber" },
+                { rule: "On-call allowance — base with fewer than 5 LAMEs", limit: "$75 / day + additional leave", ref: "Cl. 29.3(b)", col: "amber" },
+                { rule: "Backfilling at base with <5 LAMEs", limit: "Higher rate ($75/day)", ref: "Cl. 29.3(c)", col: "amber" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.col === "amber" ? "bg-amber-400" : "bg-blue-400"}`} />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`font-bold ${r.col === "amber" ? "text-amber-300" : "text-blue-300"}`}>{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Eng OT */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-4 py-2 bg-muted/20 border-b border-border flex items-center gap-2">
+                <AlertTriangle size={11} className="text-amber-400" />
+                <span className="text-xs font-semibold">Overtime Rates (Cl. 30)</span>
+              </div>
+              {[
+                { rule: "Full/part-time — first 2 hrs OT (weekdays/Sat)", limit: "150% ordinary hourly rate", ref: "Cl. 30.1(a)" },
+                { rule: "Full/part-time — after 2 hrs OT", limit: "200% ordinary hourly rate", ref: "Cl. 30.1(a)" },
+                { rule: "Sunday — all OT time", limit: "200% — min 4 hrs payment", ref: "Cl. 30.1(b)" },
+                { rule: "Casual — first 2 hrs OT", limit: "175% casual hourly rate", ref: "Cl. 30.1(c)" },
+                { rule: "Casual — after 2 hrs OT", limit: "225% casual hourly rate", ref: "Cl. 30.1(c)" },
+                { rule: "Recall to work — min payment per occasion", limit: "4 hrs at OT rate", ref: "Cl. 30.3(a)" },
+                { rule: "Resume work without 10 hr break — penalty rate applies until break given", limit: "200% (full/PT) / 225% (casual)", ref: "Cl. 30.2(b)" },
+              ].map((r, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-2.5 text-xs border-b border-border last:border-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-amber-400" />
+                    <span>{r.rule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="font-bold text-amber-300">{r.limit}</span>
+                    <span className="text-[10px] text-muted-foreground bg-muted/30 px-1.5 py-0.5 rounded">{r.ref}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* CASA note */}
+          <div className="p-4 rounded-xl bg-blue-500/8 border border-blue-500/25">
+            <div className="flex items-start gap-2">
+              <Info size={13} className="text-blue-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-blue-300 mb-1">CASA Regulatory References</p>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Pilot flight and duty time limits are governed by <strong className="text-foreground">CAO 48.1</strong> and <strong className="text-foreground">CAAP 235-1</strong>. The Pilots Agreement defers to these orders — EBA provisions extend, not replace, statutory limits. Medical Transport Specialists (nurses) are subject to CASA regulations which may override the Nurses EBA (Cl. 24.8).
+                </p>
               </div>
             </div>
-
-            {/* Nurses placeholder */}
-            <div className="rounded-xl border border-dashed border-amber-500/40 p-5 text-center space-y-2">
-              <AlertTriangle size={20} className="text-amber-400 mx-auto" />
-              <p className="text-sm font-semibold text-amber-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Nurses / Medical Staff EBA — Not Yet Loaded</p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Upload the RFDSSE Nurses (or Allied Health) EBA PDF in a new message and I'll extract all duty limits, break entitlements, and on-call provisions and add them here.
-              </p>
-            </div>
-
           </div>
+
         </div>
       )}
 
