@@ -12,6 +12,7 @@ import {
   RefreshCw, ClipboardList, ArrowRight, Ambulance, GripVertical, ChevronsRight,
   FileText, CheckSquare, ChevronRight, Calendar, BarChart3,
   Shield, Printer, Send, RotateCcw, AlertCircle, Check, ExternalLink, Receipt, Monitor,
+  Sparkles, Bot, Upload, Mail, Zap, ChevronUp, Info, Users, Loader2,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -1538,6 +1539,500 @@ function NoticeOfOps({ tasks, month, year, setMonth, setYear }: {
   );
 }
 
+
+// ─── Auto Tasking Modal ──────────────────────────────────────────────────
+
+const BASE_AIRCRAFT: { base: string; reg: string; type: string; available: boolean }[] = [
+  { base: "Dubbo",      reg: "VH-LTQ", type: "B200", available: true },
+  { base: "Dubbo",      reg: "VH-MVW", type: "B200", available: true },
+  { base: "Dubbo",      reg: "VH-MVX", type: "B200", available: false },
+  { base: "Bankstown",  reg: "VH-MWH", type: "B200", available: true },
+  { base: "Bankstown",  reg: "VH-MWK", type: "B200", available: true },
+  { base: "Bankstown",  reg: "VH-RFD", type: "B200", available: false },
+];
+
+interface AutoTaskResult {
+  summary: string;
+  tasks: Array<{
+    aircraft: string;
+    base: string;
+    pilot: string;
+    nurse: string;
+    sectors: Array<{ from: string; fromIcao: string; to: string; toIcao: string; etd: string; eta: string; groundTime: string }>;
+    dutyStart: string;
+    dutyEnd: string;
+    totalFlightTime: string;
+    notes: string;
+  }>;
+  warnings: string[];
+}
+
+function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
+  onClose: () => void;
+  onSaveTasks: (tasks: TaskDraft[]) => void;
+  existingTasks: NeptTask[];
+}) {
+  const [step, setStep]               = useState<"input" | "assets" | "result">("input");
+  const [inputMode, setInputMode]     = useState<"paste" | "email">("paste");
+  const [jobSheet, setJobSheet]       = useState("");
+  const [emailAddress, setEmailAddress] = useState("");
+  const [opDate, setOpDate]           = useState(() => new Date().toISOString().slice(0, 10));
+  const [aircraft, setAircraft]       = useState(BASE_AIRCRAFT.map(a => ({ ...a })));
+  const [crewNotes, setCrewNotes]     = useState("Vic crew available at Bankstown for both aircraft.");
+  const [nurseEba, setNurseEba]       = useState("30 min lunch break between 12:00–14:00. No split permitted.");
+  const [dutyStart, setDutyStart]     = useState("07:00");
+  const [maxDuty, setMaxDuty]         = useState("10");
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState("");
+  const [result, setResult]           = useState<AutoTaskResult | null>(null);
+
+  async function runOptimiser() {
+    setLoading(true);
+    setError("");
+    try {
+      const availableAircraft = aircraft.filter(a => a.available);
+      const payload = {
+        jobSheet: inputMode === "paste" ? jobSheet : `[Email inbox source: ${emailAddress}]`,
+        opDate,
+        availableAircraft,
+        crewNotes,
+        nurseEbaRule: nurseEba,
+        dutyStart,
+        maxDutyHours: Number(maxDuty),
+      };
+      const res  = await apiRequest("POST", "/api/nept/auto-task", payload);
+      const json = await res.json() as AutoTaskResult & { error?: string };
+      if (json.error) throw new Error(json.error);
+      setResult(json);
+      setStep("result");
+    } catch (e: any) {
+      setError(e.message ?? "Optimisation failed — please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function buildDrafts(): TaskDraft[] {
+    if (!result) return [];
+    const ref = nextRef(existingTasks);
+    const year = new Date().getFullYear();
+    let counter = existingTasks.length + 1;
+    return result.tasks.map(t => {
+      const taskRef = `NEPT-${year}-${String(counter++).padStart(4, "0")}`;
+      const sectors: Sector[] = t.sectors.map(s => ({
+        id: crypto.randomUUID(),
+        from: s.from,
+        fromIcao: s.fromIcao,
+        to: s.to,
+        toIcao: s.toIcao,
+        eta: `${opDate}T${s.eta}`,
+        fromAirport: null,
+        toAirport: null,
+      }));
+      return {
+        taskRef,
+        status: "Pending" as TaskStatus,
+        priority: "Routine" as TaskPriority,
+        requestTime: new Date().toISOString(),
+        requiredBy: null,
+        pickupLocation: sectors[0]?.from ?? "",
+        pickupIcao: sectors[0]?.fromIcao ?? null,
+        destLocation: sectors[sectors.length - 1]?.to ?? "",
+        destIcao: sectors[sectors.length - 1]?.toIcao ?? null,
+        patientName: null,
+        patientRef: null,
+        escortName: null,
+        referringHospital: null,
+        receivingHospital: null,
+        aircraftReg: t.aircraft,
+        pilotName: t.pilot,
+        nurseName: t.nurse,
+        dispatchedBy: null,
+        estimatedEta: null,
+        actualDepart: null,
+        actualArrive: null,
+        completedAt: null,
+        notes: t.notes,
+        groundTransportCost: null,
+        sectors,
+      };
+    });
+  }
+
+  const toggleAircraft = (i: number) =>
+    setAircraft(prev => prev.map((a, idx) => idx === i ? { ...a, available: !a.available } : a));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-card border border-card-border rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+
+        {/* Header */}
+        <div className="sticky top-0 bg-card z-10 flex items-center justify-between p-5 border-b border-card-border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-400/30">
+              <Sparkles size={16} className="text-cyan-400" />
+            </div>
+            <div>
+              <h2 className="font-bold text-base" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                AI Auto Tasking
+              </h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Optimise the day's NEPT run across Dubbo & Bankstown
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted/30 text-muted-foreground hover:text-foreground transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Step indicator */}
+        <div className="flex items-center gap-0 px-5 pt-4 pb-2">
+          {(["input","assets","result"] as const).map((s, i) => (
+            <div key={s} className="flex items-center gap-0">
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                step === s ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/40" :
+                (["input","assets","result"].indexOf(step) > i) ? "bg-green-500/15 text-green-400 border border-green-500/30" :
+                "bg-muted/20 text-muted-foreground border border-transparent"
+              }`}>
+                {(["input","assets","result"].indexOf(step) > i) ? <Check size={10} /> : <span>{i+1}</span>}
+                {s === "input" ? "Job Sheet" : s === "assets" ? "Assets & Rules" : "Optimised Plan"}
+              </div>
+              {i < 2 && <div className="w-6 h-px bg-card-border mx-1" />}
+            </div>
+          ))}
+        </div>
+
+        <div className="p-5 space-y-5">
+
+          {/* ── STEP 1: Job Sheet Input ── */}
+          {step === "input" && (<>
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Operations Date</label>
+              <input type="date" value={opDate} onChange={e => setOpDate(e.target.value)}
+                className="bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground w-full focus:outline-none focus:border-cyan-400/60" />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Job Sheet Source</label>
+              <div className="flex gap-2 mb-3">
+                <button onClick={() => setInputMode("paste")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                    inputMode === "paste" ? "bg-cyan-500/20 border-cyan-400/40 text-cyan-300" : "bg-muted/20 border-card-border text-muted-foreground hover:text-foreground"
+                  }`}>
+                  <Upload size={13} /> Paste / Type
+                </button>
+                <button onClick={() => setInputMode("email")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                    inputMode === "email" ? "bg-cyan-500/20 border-cyan-400/40 text-cyan-300" : "bg-muted/20 border-card-border text-muted-foreground hover:text-foreground"
+                  }`}>
+                  <Mail size={13} /> Email Inbox
+                </button>
+              </div>
+
+              {inputMode === "paste" ? (
+                <div>
+                  <textarea
+                    value={jobSheet}
+                    onChange={e => setJobSheet(e.target.value)}
+                    placeholder={"Paste job sheet here — any format works.\n\nExample:\nJob 1: Patient transport YSDU → YSCB, pickup 08:00\nJob 2: YSCB → YSSY return, 13:00\nJob 3: YSDU → YSBK, patient + escort, 15:00\n..."}
+                    rows={12}
+                    className="w-full bg-muted/20 border border-card-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan-400/60 font-mono resize-y"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1.5">
+                    Paste the job list in any format — plain text, table, or copied from email. AI will extract and parse all tasks automatically.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+                    <Info size={13} className="text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-amber-300">
+                      Email access requires your inbox to be connected. Enter the sender address the job sheets arrive from and AI will pull the latest unread sheet for today.
+                    </p>
+                  </div>
+                  <input
+                    type="email"
+                    value={emailAddress}
+                    onChange={e => setEmailAddress(e.target.value)}
+                    placeholder="e.g. nept-jobs@rfds.org.au"
+                    className="w-full bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan-400/60"
+                  />
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setStep("assets")}
+              disabled={inputMode === "paste" ? !jobSheet.trim() : !emailAddress.trim()}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 rounded-xl text-sm font-semibold text-cyan-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next — Set Available Assets <ChevronRight size={15} />
+            </button>
+          </>)}
+
+          {/* ── STEP 2: Assets & Rules ── */}
+          {step === "assets" && (<>
+
+            {/* Aircraft availability */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Aircraft Availability</label>
+              <div className="space-y-2">
+                {["Dubbo", "Bankstown"].map(base => (
+                  <div key={base}>
+                    <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-2">
+                      <MapPin size={10} /> {base}
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {aircraft.filter(a => a.base === base).map((a, i) => {
+                        const idx = aircraft.indexOf(a);
+                        return (
+                          <button key={a.reg} onClick={() => toggleAircraft(idx)}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${
+                              a.available
+                                ? "bg-green-500/15 border-green-500/40 text-green-300"
+                                : "bg-muted/20 border-card-border text-muted-foreground line-through"
+                            }`}>
+                            <Plane size={11} />
+                            {a.reg}
+                            <span className="text-[9px] opacity-60">{a.type}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">Click to toggle aircraft on/off for today's operations.</p>
+            </div>
+
+            {/* Crew notes */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <Users size={11} className="inline mr-1" /> Crew Availability Notes
+              </label>
+              <textarea
+                value={crewNotes}
+                onChange={e => setCrewNotes(e.target.value)}
+                rows={3}
+                placeholder="e.g. Vic crew available at Bankstown. Matt Williams unavailable today. Extra nurse on standby at Dubbo."
+                className="w-full bg-muted/20 border border-card-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-cyan-400/60 resize-none"
+              />
+            </div>
+
+            {/* Duty rules */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  <Clock size={11} className="inline mr-1" /> Duty Start
+                </label>
+                <input type="time" value={dutyStart} onChange={e => setDutyStart(e.target.value)}
+                  className="w-full bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-cyan-400/60" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  <Clock size={11} className="inline mr-1" /> Max Duty (hrs)
+                </label>
+                <input type="number" value={maxDuty} onChange={e => setMaxDuty(e.target.value)}
+                  min="6" max="14" step="0.5"
+                  className="w-full bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-cyan-400/60" />
+              </div>
+            </div>
+
+            {/* Nurse EBA */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                Nurse EBA — Lunch Break Rule
+              </label>
+              <input
+                value={nurseEba}
+                onChange={e => setNurseEba(e.target.value)}
+                className="w-full bg-muted/20 border border-card-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:border-cyan-400/60"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">AI will protect this window — no patient legs scheduled during lunch.</p>
+            </div>
+
+            {/* Ground time */}
+            <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-start gap-2">
+              <Info size={13} className="text-blue-400 mt-0.5 shrink-0" />
+              <p className="text-[11px] text-blue-300">
+                <strong>Ground time:</strong> AI allocates a minimum 60 min turnaround at each airport for patient handling, boarding, and documentation — built in automatically.
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-xs text-red-300">{error}</div>
+            )}
+
+            <div className="flex gap-3">
+              <button onClick={() => setStep("input")}
+                className="flex items-center gap-2 px-4 py-3 bg-muted/20 hover:bg-muted/30 border border-card-border rounded-xl text-sm font-semibold text-muted-foreground transition-colors">
+                <ChevronDown size={14} className="rotate-90" /> Back
+              </button>
+              <button
+                onClick={runOptimiser}
+                disabled={loading || aircraft.filter(a => a.available).length === 0}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 rounded-xl text-sm font-semibold text-cyan-300 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <><Loader2 size={15} className="animate-spin" /> Optimising — AI is working...</>
+                ) : (
+                  <><Zap size={15} /> Run AI Optimiser</>
+                )}
+              </button>
+            </div>
+          </>)}
+
+          {/* ── STEP 3: Optimised Plan ── */}
+          {step === "result" && result && (<>
+
+            {/* Summary */}
+            <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-400/30">
+              <div className="flex items-start gap-2">
+                <Sparkles size={14} className="text-cyan-400 mt-0.5 shrink-0" />
+                <p className="text-sm text-cyan-200">{result.summary}</p>
+              </div>
+            </div>
+
+            {/* Warnings */}
+            {result.warnings.length > 0 && (
+              <div className="space-y-1.5">
+                {result.warnings.map((w, i) => (
+                  <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                    <AlertTriangle size={12} className="text-amber-400 mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-amber-300">{w}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Tasks */}
+            <div className="space-y-4">
+              {result.tasks.map((t, i) => (
+                <div key={i} className="border border-card-border rounded-xl overflow-hidden">
+                  {/* Aircraft header */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border-b border-card-border">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-cyan-500/15 border border-cyan-400/30">
+                        <Plane size={13} className="text-cyan-400" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{t.aircraft}</div>
+                        <div className="text-[10px] text-muted-foreground">{t.base} base</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[11px] text-muted-foreground">Pilot: <span className="text-foreground font-semibold">{t.pilot || "TBA"}</span></div>
+                      <div className="text-[11px] text-muted-foreground">Nurse: <span className="text-foreground font-semibold">{t.nurse || "TBA"}</span></div>
+                    </div>
+                  </div>
+
+                  {/* Sector timeline */}
+                  <div className="p-3 space-y-2">
+                    {t.sectors.map((s, j) => (
+                      <div key={j} className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center gap-1 text-cyan-400 font-mono font-semibold w-10 shrink-0">{s.etd}</div>
+                        <ArrowRight size={11} className="text-muted-foreground shrink-0" />
+                        <div className="flex-1 flex items-center gap-1">
+                          <span className="font-semibold">{s.from}</span>
+                          {s.fromIcao && <span className="text-[9px] text-muted-foreground bg-muted/30 px-1 py-0.5 rounded">{s.fromIcao}</span>}
+                        </div>
+                        <ArrowRight size={11} className="text-muted-foreground shrink-0" />
+                        <div className="flex-1 flex items-center gap-1">
+                          <span className="font-semibold">{s.to}</span>
+                          {s.toIcao && <span className="text-[9px] text-muted-foreground bg-muted/30 px-1 py-0.5 rounded">{s.toIcao}</span>}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground shrink-0">arr {s.eta}</div>
+                        {s.groundTime && <div className="text-[9px] text-amber-400 shrink-0 bg-amber-500/10 px-1.5 py-0.5 rounded">{s.groundTime} gnd</div>}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-3 py-2 border-t border-card-border bg-muted/10 flex items-center justify-between">
+                    <div className="flex gap-4 text-[10px] text-muted-foreground">
+                      <span>Duty: <strong className="text-foreground">{t.dutyStart} – {t.dutyEnd}</strong></span>
+                      <span>Flight time: <strong className="text-foreground">{t.totalFlightTime}</strong></span>
+                    </div>
+                    {t.notes && <div className="text-[10px] text-amber-300 max-w-xs text-right">{t.notes}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => { setStep("assets"); setResult(null); }}
+                className="flex items-center gap-2 px-4 py-3 bg-muted/20 hover:bg-muted/30 border border-card-border rounded-xl text-sm font-semibold text-muted-foreground transition-colors">
+                <RotateCcw size={14} /> Re-run
+              </button>
+              <button
+                onClick={() => { onSaveTasks(buildDrafts()); onClose(); }}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-green-500/15 hover:bg-green-500/25 border border-green-500/40 rounded-xl text-sm font-semibold text-green-300 transition-colors"
+              >
+                <CheckCircle2 size={15} /> Save All Tasks to Board
+              </button>
+            </div>
+          </>)}
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Mode Picker Modal ───────────────────────────────────────────────────────
+function TaskingModePicker({ onManual, onAuto, onClose }: {
+  onManual: () => void;
+  onAuto: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="bg-card border border-card-border rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-5 border-b border-card-border">
+          <h2 className="font-bold text-base" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>New Tasking</h2>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted/30 text-muted-foreground hover:text-foreground transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 grid grid-cols-1 gap-4">
+          <button
+            onClick={onManual}
+            className="group flex items-start gap-4 p-5 rounded-xl border border-card-border hover:border-cyan-400/50 bg-muted/10 hover:bg-cyan-500/5 transition-all text-left"
+          >
+            <div className="p-2.5 rounded-xl bg-slate-500/15 border border-slate-500/30 group-hover:border-cyan-400/30 group-hover:bg-cyan-500/10 transition-colors mt-0.5">
+              <ClipboardList size={18} className="text-slate-300 group-hover:text-cyan-400 transition-colors" />
+            </div>
+            <div>
+              <div className="font-bold text-sm mb-1" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Manual Tasking</div>
+              <div className="text-xs text-muted-foreground leading-relaxed">Enter a single task manually — patient details, sectors, aircraft, and crew. Full control over every field.</div>
+            </div>
+          </button>
+
+          <button
+            onClick={onAuto}
+            className="group flex items-start gap-4 p-5 rounded-xl border border-cyan-400/30 hover:border-cyan-400/60 bg-cyan-500/5 hover:bg-cyan-500/10 transition-all text-left"
+          >
+            <div className="p-2.5 rounded-xl bg-cyan-500/15 border border-cyan-400/30 mt-0.5">
+              <Sparkles size={18} className="text-cyan-400" />
+            </div>
+            <div>
+              <div className="font-bold text-sm mb-1 text-cyan-300" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                AI Auto Tasking
+                <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 border border-cyan-400/30 font-normal text-cyan-400">AI</span>
+              </div>
+              <div className="text-xs text-muted-foreground leading-relaxed">
+                Paste the day's job sheet and AI will optimise the entire run — allocating aircraft across Dubbo and Bankstown, protecting nurse lunch breaks (EBA), enforcing 60 min ground time, and monitoring pilot duty limits.
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────
 export default function NEPTTasking({ role }: Props) {
   const qc = useQueryClient();
@@ -1545,6 +2040,8 @@ export default function NEPTTasking({ role }: Props) {
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "All">("All");
   const [filterPriority, setFilterPriority] = useState<TaskPriority | "All">("All");
   const [showModal, setShowModal]     = useState(false);
+  const [showModePicker, setShowModePicker] = useState(false);
+  const [showAutoModal, setShowAutoModal]   = useState(false);
   const [editTask, setEditTask]       = useState<NeptTask | null>(null);
   const [expandedId, setExpandedId]   = useState<number | null>(null);
   const [etaSort, setEtaSort]         = useState<"asc" | "desc" | null>("asc");
@@ -1698,7 +2195,7 @@ export default function NEPTTasking({ role }: Props) {
           </button>
           {canDispatch && (
             <button
-              onClick={() => { setEditTask(null); setShowModal(true); }}
+              onClick={() => { setEditTask(null); setShowModePicker(true); }}
               className="flex items-center gap-2 px-4 py-2 bg-cyan-500/15 border border-cyan-400/40 rounded-lg text-xs text-cyan-300 font-semibold hover:bg-cyan-500/25 transition-colors"
             >
               <Plus size={14} /> New Task
@@ -1787,7 +2284,7 @@ export default function NEPTTasking({ role }: Props) {
           })}
           {canDispatch && (
             <button
-              onClick={() => { setEditTask(null); setShowModal(true); }}
+              onClick={() => { setEditTask(null); setShowModePicker(true); }}
               className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-cyan-400/50 bg-cyan-500/15 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/25 transition-colors"
             >
               <Plus size={12} /> New Task
@@ -2118,13 +2615,37 @@ export default function NEPTTasking({ role }: Props) {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Mode Picker */}
+      {showModePicker && (
+        <TaskingModePicker
+          onClose={() => setShowModePicker(false)}
+          onManual={() => { setShowModePicker(false); setShowModal(true); }}
+          onAuto={() => { setShowModePicker(false); setShowAutoModal(true); }}
+        />
+      )}
+
+      {/* Manual Task Modal */}
       {showModal && (
         <TaskModal
           task={editTask ?? emptyDraft(nextRef(tasks))}
           isNew={!editTask}
           onClose={() => { setShowModal(false); setEditTask(null); }}
           onSave={handleSave}
+        />
+      )}
+
+      {/* AI Auto Tasking Modal */}
+      {showAutoModal && (
+        <AutoTaskingModal
+          onClose={() => setShowAutoModal(false)}
+          existingTasks={tasks}
+          onSaveTasks={async (drafts) => {
+            for (const draft of drafts) {
+              await apiRequest('POST', '/api/nept-tasks', draft);
+            }
+            qc.invalidateQueries({ queryKey: ['/api/nept-tasks'] });
+            setShowAutoModal(false);
+          }}
         />
       )}
 

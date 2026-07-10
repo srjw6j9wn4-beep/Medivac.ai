@@ -818,6 +818,136 @@ export async function registerRoutes(
     console.log(`[notam-watch] Sent alert for ${flagged.length} flagged NOTAMs to ${subs.length} devices`);
   }
 
+
+  // ── NEPT AI Auto Tasking Optimiser ────────────────────────────────────────
+  app.post("/api/nept/auto-task", async (req: Request, res: Response) => {
+    const { jobSheet, opDate, availableAircraft, crewNotes, nurseEbaRule, dutyStart, maxDutyHours } = req.body;
+
+    if (!jobSheet || !opDate || !availableAircraft?.length) {
+      return res.status(400).json({ error: "jobSheet, opDate and availableAircraft are required." });
+    }
+
+    const httpsProxy  = process.env.HTTPS_PROXY;
+    const customToken = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN;
+    const proxyKey    = process.env.ANTHROPIC_API_KEY;
+    const proxyBase   = process.env.ANTHROPIC_BASE_URL;
+    const usingProxy  = !!httpsProxy && httpsProxy.includes("agent-proxy.perplexity.ai");
+    const apiKey      = usingProxy ? "proxy-injected" : (customToken || proxyKey);
+    const baseUrl     = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL || proxyBase || "https://api.anthropic.com";
+
+    if (!apiKey) {
+      return res.status(503).json({ error: "Anthropic API key not configured." });
+    }
+
+    const systemPrompt = `You are an expert RFDS aeromedical operations scheduler for RFDS SE Section (Royal Flying Doctor Service, South Eastern Section) in Australia.
+
+Your task is to optimise the day's NEPT (Non-Emergency Patient Transport) tasking across the available aircraft and bases.
+
+HARD RULES — never violate these:
+1. Each aircraft has ONE pilot and ONE nurse assigned per day.
+2. Minimum 60 minutes ground time at every airport for patient handling, documentation, and boarding.
+3. Nurse EBA lunch rule: ${nurseEbaRule}. Do not schedule a patient leg during this window.
+4. Pilot and nurse duty must not exceed ${maxDutyHours} hours from ${dutyStart}.
+5. Realistic cruise speeds: B200 = 240 kts TAS, B350 = 270 kts TAS.
+6. Dubbo (YSDU) is the primary base. Bankstown (YSBK) handles Sydney metro tasking.
+7. Each task leg must have correct ICAO codes for Australian aerodromes.
+8. Return each aircraft to its home base unless impossible within duty time.
+9. Always assign the closest available aircraft to minimise positioning.
+
+EFFICIENCY PRINCIPLES:
+- Combine single-direction trips into round trips where clinically safe
+- Position aircraft proactively when it saves overall duty time
+- Avoid deadhead legs unless necessary for patient safety
+- Spread workload evenly across available aircraft
+
+You must return a JSON object ONLY — no prose, no markdown, no code block markers. The JSON must exactly match this schema:
+{
+  "summary": "One paragraph summary of the optimised plan",
+  "tasks": [
+    {
+      "aircraft": "VH-XXX",
+      "base": "Dubbo",
+      "pilot": "TBA",
+      "nurse": "TBA",
+      "sectors": [
+        {
+          "from": "Dubbo",
+          "fromIcao": "YSDU",
+          "to": "Broken Hill",
+          "toIcao": "YBHI",
+          "etd": "07:30",
+          "eta": "09:10",
+          "groundTime": "60 min"
+        }
+      ],
+      "dutyStart": "07:00",
+      "dutyEnd": "17:00",
+      "totalFlightTime": "4:20",
+      "notes": "Lunch break protected 12:30–13:00 at Dubbo"
+    }
+  ],
+  "warnings": ["Any duty limit concerns or scheduling compromises go here as short strings"]
+}`;
+
+    const userMsg = `Operations Date: ${opDate}
+Duty Start: ${dutyStart}
+Max Duty: ${maxDutyHours} hours
+Nurse EBA Rule: ${nurseEbaRule}
+
+Available Aircraft:
+${availableAircraft.map((a: any) => `- ${a.reg} (${a.type}) based at ${a.base}`).join("\n")}
+
+Crew Availability Notes:
+${crewNotes}
+
+JOB SHEET:
+${jobSheet}
+
+Produce the optimised run plan as JSON.`;
+
+    try {
+      const messagesUrl = baseUrl.endsWith("/v1/messages") ? baseUrl : `${baseUrl}/v1/messages`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+      };
+      if (!usingProxy) headers["x-api-key"] = apiKey;
+
+      const apiRes = await fetch(messagesUrl, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: "claude-haiku-4-5",
+          max_tokens: 2500,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userMsg }],
+        }),
+      });
+
+      const data = await apiRes.json() as any;
+      const text = data?.content?.[0]?.text ?? "";
+
+      // Strip any accidental markdown fences
+      const cleaned = text.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/,"").trim();
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        // Try to extract JSON from mixed content
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) parsed = JSON.parse(match[0]);
+        else return res.status(500).json({ error: "AI returned invalid JSON. Please try again." });
+      }
+
+      return res.json(parsed);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[auto-task] error:", msg);
+      return res.status(500).json({ error: msg });
+    }
+  });
+
   // ── NEPT Tasking Board ────────────────────────────────────────────────────
   app.get("/api/nept-tasks", async (_req: Request, res: Response) => {
     try {
