@@ -274,7 +274,7 @@ export default function CharterQuote() {
   const [aircraftType, setAircraftType] = useState<AircraftKey>("B200");
   const [legs, setLegs] = useState<LegInput[]>([emptyLeg()]);
   // Airport objects parallel to legs[] — for autocomplete selection
-  const [legAirports, setLegAirports] = useState<Array<{ from: Airport | null; to: Airport | null }>>([{ from: null, to: null }]);
+  const [legAirports, setLegAirports] = useState<Array<{ id: string; from: Airport | null; to: Airport | null }>>([{ id: crypto.randomUUID(), from: null, to: null }]);
   const [includeReturnLeg, setIncludeReturnLeg] = useState(false);
   const [crew, setCrew] = useState<CrewConfig>({
     captain: true, firstOfficer: false, flightNurse: false, flightParamedic: false, icuDoctor: false, count: 1,
@@ -387,7 +387,7 @@ export default function CharterQuote() {
   }
   function addLeg() {
     setLegs(prev => [...prev, emptyLeg()]);
-    setLegAirports(prev => [...prev, { from: null, to: null }]);
+    setLegAirports(prev => [...prev, { id: crypto.randomUUID(), from: null, to: null }]);
   }
   function removeLeg(idx: number) {
     if (legs.length <= 1) return;
@@ -435,6 +435,7 @@ export default function CharterQuote() {
   function handleStartNew() {
     setClientName(""); setClientContact(""); setPurpose("medevac_charter");
     setDepartureDate(todayISO()); setAircraftType("B200"); setLegs([emptyLeg()]);
+    setLegAirports([{ id: crypto.randomUUID(), from: null, to: null }]);
     setIncludeReturnLeg(false);
     setCrew({ captain: true, firstOfficer: false, flightNurse: false, flightParamedic: false, icuDoctor: false, count: 1 });
     setAccommodationNights(0); setMarginPercent(15); setNotes("");
@@ -623,7 +624,7 @@ export default function CharterQuote() {
             </div>
             <div className="space-y-4">
               {legs.map((leg, idx) => (
-                <div key={idx} className="border border-card-border rounded-lg p-3 relative">
+                <div key={legAirports[idx]?.id ?? idx} className="border border-card-border rounded-lg p-3 relative">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                       <MapPin size={11} /> Leg {idx + 1}
