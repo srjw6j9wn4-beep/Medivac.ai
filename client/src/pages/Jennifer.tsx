@@ -114,6 +114,18 @@ const VIDEOS = [
     videoSrc: `/video/09_isolation.mp4`,
     backdropSrc: "/bg_09_isolation.png",
   },
+  {
+    id: 10,
+    title: "NEPT Tasking Board",
+    duration: "0:36",
+    section: "Mission Operations",
+    desc: "Jennifer demonstrates the NEPT Tasking Board — creating a task, assigning crew and aircraft, running the AI auto-tasker, reviewing the route planner with live NOTAMs and fuel status, and tracking mission progress from dispatch to completion.",
+    thumbSrc: "/thumb_02_dispatch.png",
+    color: "from-cyan-900/60 to-slate-900",
+    accent: "border-cyan-400/40",
+    videoSrc: `/video/02_dispatch.mp4`,
+    backdropSrc: "/bg_02_dispatch.png",
+  },
 ];
 
 const STARTERS = [
