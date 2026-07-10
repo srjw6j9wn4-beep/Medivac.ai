@@ -535,7 +535,7 @@ export default function GroundVehicles({ role }: Props) {
   const canManage = ["senior_management", "dispatcher", "safety", "admin"].includes(role);
 
   const filtered = VEHICLES.filter(v => {
-    if (filterBase  !== "All Bases"   && !v.base.toLowerCase().startsWith(filterBase.split(" (")[0].toLowerCase())) return false;
+    if (filterBase  !== "All Bases"   && !(filterBase.match(/\(([A-Z]{4})\)/)?.[1] ? v.base.includes(filterBase.match(/\(([A-Z]{4})\)/)?.[1] ?? "") : v.base.toLowerCase().startsWith(filterBase.split(" (")[0].toLowerCase()))) return false;
     if (filterState !== "All States"  && v.state !== filterState) return false;
     if (filterType  !== "All Types"   && v.type  !== filterType)  return false;
     if (filterStatus === "Alerts"     && v.overallStatus === "compliant") return false;
@@ -877,7 +877,7 @@ export default function GroundVehicles({ role }: Props) {
                   <tr key={v.id} className={`border-b border-card-border last:border-0 ${i % 2 === 0 ? "" : "bg-sidebar/30"} ${v.overallStatus === "overdue" ? "bg-red-500/5" : ""}`}>
                     <td className="px-3 py-2.5 font-bold text-foreground">{v.rego}</td>
                     <td className="px-3 py-2.5">{stateFlag(v.state)} {v.state}</td>
-                    <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{v.base.split(" ")[0]}</td>
+                    <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{v.base.split(" (")[0]}</td>
                     <td className="px-3 py-2.5"><span className="bg-sidebar rounded px-1.5 py-0.5 text-muted-foreground">{v.type}</span></td>
                     <td className="px-3 py-2.5 text-foreground whitespace-nowrap">{v.make} {v.model}</td>
                     <td className={`px-3 py-2.5 whitespace-nowrap ${daysColor(v.regoDaysLeft)}`}>{v.regoExpiry}</td>
@@ -902,7 +902,7 @@ export default function GroundVehicles({ role }: Props) {
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${statusBg(v.overallStatus)}`}>{statusLabel(v.overallStatus)}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">{v.make} {v.model} · {v.base.split(" ")[0]}</div>
+                <div className="text-xs text-muted-foreground">{v.make} {v.model} · {v.base.split(" (")[0]}</div>
                 <div className="grid grid-cols-2 gap-1 text-xs">
                   <div><span className="text-muted-foreground">Rego: </span><span className={daysColor(v.regoDaysLeft)}>{v.regoExpiry}</span></div>
                   <div><span className="text-muted-foreground">CTP: </span><span className={daysColor(v.ctpDaysLeft)}>{v.ctpExpiry}</span></div>
