@@ -1743,92 +1743,6 @@ const annual24InvoicingQs: ExamQuestion[] = [
 // EXAM BANK — assembled
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const EXAMS_OPS: Exam[] = [
-  // ── ONBOARDING TIER ──────────────────────────────────────────────────────
-  {
-    id: "ops-ob-emg",
-    title: "Emergency Procedures",
-    subtitle: "Onboarding · Initial Competency",
-    questions: onboardEmergencyQs,
-  },
-  {
-    id: "ops-ob-nept",
-    title: "NEPT & Clinic Tasking",
-    subtitle: "Onboarding · Initial Competency",
-    questions: onboardNeptQs,
-  },
-  {
-    id: "ops-ob-inv",
-    title: "Invoicing & Billing",
-    subtitle: "Onboarding · Initial Competency",
-    questions: onboardInvoicingQs,
-  },
-  {
-    id: "ops-ob-drl",
-    title: "Emergency Drill Practice",
-    subtitle: "Onboarding · Initial Competency",
-    questions: onboardDrillQs,
-  },
-
-  // ── 12-MONTH TIER ─────────────────────────────────────────────────────────
-  {
-    id: "ops-12m-emg",
-    title: "Emergency Procedures",
-    subtitle: "12-Month Currency Check",
-    questions: annual12EmergencyQs,
-  },
-  {
-    id: "ops-12m-nept",
-    title: "NEPT & Clinic Tasking",
-    subtitle: "12-Month Currency Check",
-    questions: annual12NeptQs,
-  },
-  {
-    id: "ops-12m-inv",
-    title: "Invoicing & Billing",
-    subtitle: "12-Month Currency Check",
-    questions: annual12InvoicingQs,
-  },
-  {
-    id: "ops-12m-drl",
-    title: "Emergency Drill Practice",
-    subtitle: "12-Month Currency Check",
-    questions: annual12DrillQs,
-  },
-
-  // ── 24-MONTH TIER ─────────────────────────────────────────────────────────
-  {
-    id: "ops-24m-emg",
-    title: "Emergency Procedures",
-    subtitle: "24-Month Advanced Competency",
-    questions: annual24EmergencyQs,
-  },
-  {
-    id: "ops-24m-nept",
-    title: "NEPT & Clinic Tasking",
-    subtitle: "24-Month Advanced Competency",
-    questions: annual24NeptQs,
-  },
-  {
-    id: "ops-24m-inv",
-    title: "Invoicing & Billing",
-    subtitle: "24-Month Advanced Competency",
-    questions: annual24InvoicingQs,
-  },
-  {
-    id: "ops-24m-drl",
-    title: "Emergency Drill Practice",
-    subtitle: "24-Month Advanced Competency",
-    questions: annual24DrillQs,
-  },
-];
-
-export type OpsExamTier = "onboarding" | "12-month" | "24-month";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// EMERGENCY DRILL PRACTICE — ONBOARDING (15 Qs)
-// Scenario-based: basic response steps, call chains, role clarity
-// ─────────────────────────────────────────────────────────────────────────────
 const onboardDrillQs: ExamQuestion[] = [
   {
     id: "ops-ob-drl-01",
@@ -2027,10 +1941,6 @@ const onboardDrillQs: ExamQuestion[] = [
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EMERGENCY DRILL PRACTICE — 12-MONTH (15 Qs)
-// Higher complexity: multi-crew coordination, regulatory detail, time pressure
-// ─────────────────────────────────────────────────────────────────────────────
 const annual12DrillQs: ExamQuestion[] = [
   {
     id: "ops-12m-drl-01",
@@ -2229,10 +2139,6 @@ const annual12DrillQs: ExamQuestion[] = [
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// EMERGENCY DRILL PRACTICE — 24-MONTH (15 Qs)
-// Advanced: command decisions, regulatory depth, multi-agency coordination
-// ─────────────────────────────────────────────────────────────────────────────
 const annual24DrillQs: ExamQuestion[] = [
   {
     id: "ops-24m-drl-01",
@@ -2430,3 +2336,90 @@ const annual24DrillQs: ExamQuestion[] = [
     source: "Transport Safety Investigation Act 2003; Coroners Act 2009 (NSW); RFDS SE Emergency Incident Log Requirements",
   },
 ];
+
+export const EXAMS_OPS: Exam[] = [
+  // ── ONBOARDING TIER ──────────────────────────────────────────────────────
+  {
+    id: "ops-ob-emg",
+    title: "Emergency Procedures",
+    subtitle: "Onboarding · Initial Competency",
+    questions: onboardEmergencyQs,
+  },
+  {
+    id: "ops-ob-nept",
+    title: "NEPT & Clinic Tasking",
+    subtitle: "Onboarding · Initial Competency",
+    questions: onboardNeptQs,
+  },
+  {
+    id: "ops-ob-inv",
+    title: "Invoicing & Billing",
+    subtitle: "Onboarding · Initial Competency",
+    questions: onboardInvoicingQs,
+  },
+  {
+    id: "ops-ob-drl",
+    title: "Emergency Drill Practice",
+    subtitle: "Onboarding · Initial Competency",
+    questions: onboardDrillQs,
+  },
+
+  // ── 12-MONTH TIER ─────────────────────────────────────────────────────────
+  {
+    id: "ops-12m-emg",
+    title: "Emergency Procedures",
+    subtitle: "12-Month Currency Check",
+    questions: annual12EmergencyQs,
+  },
+  {
+    id: "ops-12m-nept",
+    title: "NEPT & Clinic Tasking",
+    subtitle: "12-Month Currency Check",
+    questions: annual12NeptQs,
+  },
+  {
+    id: "ops-12m-inv",
+    title: "Invoicing & Billing",
+    subtitle: "12-Month Currency Check",
+    questions: annual12InvoicingQs,
+  },
+  {
+    id: "ops-12m-drl",
+    title: "Emergency Drill Practice",
+    subtitle: "12-Month Currency Check",
+    questions: annual12DrillQs,
+  },
+
+  // ── 24-MONTH TIER ─────────────────────────────────────────────────────────
+  {
+    id: "ops-24m-emg",
+    title: "Emergency Procedures",
+    subtitle: "24-Month Advanced Competency",
+    questions: annual24EmergencyQs,
+  },
+  {
+    id: "ops-24m-nept",
+    title: "NEPT & Clinic Tasking",
+    subtitle: "24-Month Advanced Competency",
+    questions: annual24NeptQs,
+  },
+  {
+    id: "ops-24m-inv",
+    title: "Invoicing & Billing",
+    subtitle: "24-Month Advanced Competency",
+    questions: annual24InvoicingQs,
+  },
+  {
+    id: "ops-24m-drl",
+    title: "Emergency Drill Practice",
+    subtitle: "24-Month Advanced Competency",
+    questions: annual24DrillQs,
+  },
+];
+
+export type OpsExamTier = "onboarding" | "12-month" | "24-month";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMERGENCY DRILL PRACTICE — ONBOARDING (15 Qs)
+// Scenario-based: basic response steps, call chains, role clarity
+// ─────────────────────────────────────────────────────────────────────────────
