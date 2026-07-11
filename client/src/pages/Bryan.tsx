@@ -124,7 +124,7 @@ const VIDEOS = [
     color: "from-cyan-900/60 to-slate-900",
     accent: "border-cyan-400/40",
     videoSrc: `/video/10_nept.mp4`,
-    backdropSrc: "/medivac_comms_bg.jpg",
+    backdropSrc: "/bg_10_nept.png",
   },
   {
     id: 11,
@@ -136,7 +136,7 @@ const VIDEOS = [
     color: "from-violet-900/60 to-slate-900",
     accent: "border-violet-400/40",
     videoSrc: `/video/11_optimiser.mp4`,
-    backdropSrc: "/medivac_comms_bg.jpg",
+    backdropSrc: "/bg_11_optimiser.png",
   },
   {
     id: 12,
@@ -148,7 +148,7 @@ const VIDEOS = [
     color: "from-emerald-900/60 to-slate-900",
     accent: "border-emerald-400/40",
     videoSrc: `/video/12_analyst.mp4`,
-    backdropSrc: "/medivac_comms_bg.jpg",
+    backdropSrc: "/bg_12_analyst.png",
   },
 ];
 

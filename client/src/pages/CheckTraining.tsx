@@ -7,7 +7,7 @@ import {
   Shield, Target, Award, ChevronDown, Plus, Zap, Activity,
   GraduationCap, Eye, Lock, UserCheck, AlertCircle, CheckSquare,
   XCircle, ClipboardList, X, Copy, BookMarked, Brain, Trophy,
-  ChevronLeft, RotateCcw, CheckCircle2, Timer
+  ChevronLeft, RotateCcw, CheckCircle2, Timer, Scale
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
 import { EXAMS, PASS_MARK, EXAM_DURATION_MINUTES, type Exam, type ExamQuestion } from "@/data/theoryExams";
