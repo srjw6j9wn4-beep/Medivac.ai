@@ -219,6 +219,7 @@ const BASE_NAV: NavItem[] = [
       { label: "Ferry Flights", path: "/ferry" },
       { label: "Tech Log", path: "/techlog" },
       { label: "Check & Training", path: "/check-training" },
+      { label: "Regulations Reference", path: "/regulations" },
       { label: "Medical Equipment", path: "/medical-equipment" },
       { label: "Stock Usage & Orders", path: "/stock-usage" },
       { label: "After-Hours AI Med Line", path: "/after-hours" },

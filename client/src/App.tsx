@@ -31,6 +31,7 @@ import UserManagement from "@/pages/UserManagement";
 import RBACPermissions from "@/pages/RBACPermissions";
 import SystemSettings from "@/pages/SystemSettings";
 import CheckTraining from "@/pages/CheckTraining";
+import Regulations from "@/pages/Regulations";
 import MedicalEquipment from "@/pages/MedicalEquipment";
 import StockUsage from "@/pages/StockUsage";
 import AfterHours from "@/pages/AfterHours";
@@ -101,6 +102,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/finance" component={() => <FuelFinance role={role} />} />
       <Route path="/audit" component={() => <AuditReports role={role} />} />
       <Route path="/check-training" component={() => <CheckTraining role={role} />} />
+      <Route path="/regulations" component={() => <Regulations />} />
       <Route path="/medical-equipment" component={() => <MedicalEquipment role={role} />} />
       <Route path="/stock-usage" component={() => <StockUsage role={role} />} />
       <Route path="/after-hours" component={() => <AfterHours role={role} />} />
