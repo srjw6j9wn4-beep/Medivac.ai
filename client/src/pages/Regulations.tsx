@@ -560,10 +560,29 @@ export default function Regulations() {
         ))}
       </div>
 
+      {/* Search tips */}
+      {!search && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Try:</span>
+          {["fatigue", "MEL", "journey log", "annual leave", "on call", "LAME", "dispatch", "EBA"].map(tip => (
+            <button
+              key={tip}
+              onClick={() => setSearch(tip)}
+              className="text-xs px-2.5 py-1 rounded-full border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+            >
+              {tip}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Results count */}
       <p className="text-xs text-muted-foreground">
         Showing {filtered.length} of {REGS.length} regulations
         {search && ` matching "${search}"`}
+        {search && (
+          <button onClick={() => setSearch("")} className="ml-2 text-primary hover:underline">clear</button>
+        )}
       </p>
 
       {/* Regulation cards */}
