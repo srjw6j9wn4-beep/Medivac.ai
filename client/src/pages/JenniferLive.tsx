@@ -490,7 +490,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
                     )}
                   </div>
                   <div className="text-center space-y-1">
-                    <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Bryan</h2>
+                    <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Graham</h2>
                     <p className="text-xs text-muted-foreground max-w-[200px] leading-relaxed text-center">
                       {isConnecting ? statusMsg : "Live face-to-face AI Q&A — real expressions, real voice, deep Medivac.ai knowledge"}
                     </p>
