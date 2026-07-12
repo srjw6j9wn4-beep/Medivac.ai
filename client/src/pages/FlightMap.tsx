@@ -38,10 +38,34 @@ const DEFAULT_VB = { x: 0, y: 0, w: 100, h: 65 };
 const MIN_W = 20;   // max zoom in
 const MAX_W = 150;  // max zoom out
 
+// Approximate AU state borders mapped to 100×65 SVG coordinate space
+// Lon range: 114°E–154°E → 0–100; Lat range: -10°S–-44°S → 0–65
+const lonToX = (lon: number) => ((lon - 114) / 40) * 100;
+const latToY = (lat: number) => ((-lat - 10) / 34) * 65;
+const pt = (lon: number, lat: number) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`;
+
+// Simplified state border polygons (approximate major boundary vertices)
+const STATE_BORDERS = [
+  { id: 'nsw', label: 'NSW', labelPos: { lon: 146, lat: -31.5 },
+    points: [pt(141,  -34), pt(141,  -29), pt(149.3,-28.2), pt(150.1,-29.5), pt(152.5,-31.5), pt(153.5,-28.2), pt(153.6,-26.5), pt(151.2,-24.6), pt(150,-23.5), pt(148,-24), pt(145,-25.5), pt(141,-29), pt(141,-34), pt(141,-34), pt(150.2,-34.1), pt(149.9,-37.5), pt(148.2,-37.5), pt(146.4,-38), pt(143,-38), pt(141,-34)] },
+  { id: 'vic', label: 'VIC', labelPos: { lon: 144.5, lat: -36.8 },
+    points: [pt(141,-34), pt(141,-38), pt(143,-38), pt(146.4,-38), pt(148.2,-37.5), pt(149.9,-37.5), pt(150.2,-34.1), pt(141,-34)] },
+  { id: 'qld', label: 'QLD', labelPos: { lon: 145, lat: -22 },
+    points: [pt(138,-26), pt(138,-29), pt(141,-29), pt(141,-22), pt(138,-22), pt(138,-17), pt(139.5,-17), pt(141,-17), pt(141,-26), pt(138,-26)] },
+  { id: 'sa',  label: 'SA',  labelPos: { lon: 135, lat: -30 },
+    points: [pt(129,-31.5), pt(129,-26), pt(132,-26), pt(132,-22), pt(138,-22), pt(138,-26), pt(141,-26), pt(141,-34), pt(129,-34), pt(129,-31.5)] },
+  { id: 'wa',  label: 'WA',  labelPos: { lon: 122, lat: -27 },
+    points: [pt(114,-22), pt(114,-34), pt(129,-34), pt(129,-26), pt(129,-22), pt(114,-22)] },
+  { id: 'nt',  label: 'NT',  labelPos: { lon: 133, lat: -19 },
+    points: [pt(129,-26), pt(129,-22), pt(132,-22), pt(132,-17), pt(136,-17), pt(136,-26), pt(129,-26)] },
+];
+
 export default function FlightMap({ role }: Props) {
   const [selectedMission, setSelectedMission] = useState<string | null>(null);
   const [hoveredAirport, setHoveredAirport]   = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen]       = useState(false);
+  const [showStateBorders, setShowStateBorders] = useState(true);
+  const [showAllAircraft, setShowAllAircraft]   = useState(false);
 
   // ViewBox state for pan/zoom
   const [vb, setVb] = useState(DEFAULT_VB);
@@ -163,6 +187,26 @@ export default function FlightMap({ role }: Props) {
           >
             <RotateCcw size={12} />
           </button>
+          {/* State borders toggle */}
+          <button
+            onClick={() => setShowStateBorders(b => !b)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold transition-colors border ${
+              showStateBorders ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300' : 'border-card-border text-muted-foreground hover:text-foreground'
+            }`}
+            title="Toggle state borders"
+          >
+            Borders
+          </button>
+          {/* All aircraft toggle */}
+          <button
+            onClick={() => setShowAllAircraft(b => !b)}
+            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold transition-colors border ${
+              showAllAircraft ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-card-border text-muted-foreground hover:text-foreground'
+            }`}
+            title="Show all aircraft including airborne"
+          >
+            All A/C
+          </button>
           <div className="w-px h-4 bg-white/10 mx-1" />
           <button
             onClick={toggleFullscreen}
@@ -187,6 +231,29 @@ export default function FlightMap({ role }: Props) {
             onWheel={handleWheel}
             onMouseDown={handleMouseDown}
           >
+            {/* State borders */}
+            {showStateBorders && STATE_BORDERS.map(s => (
+              <g key={s.id}>
+                <polygon
+                  points={s.points.join(' ')}
+                  fill="none"
+                  stroke="rgba(148,163,184,0.20)"
+                  strokeWidth="0.35"
+                  strokeDasharray="0.8,0.4"
+                />
+                <text
+                  x={lonToX(s.labelPos.lon)}
+                  y={latToY(s.labelPos.lat)}
+                  fontSize="2.4"
+                  fill="rgba(148,163,184,0.35)"
+                  textAnchor="middle"
+                  fontFamily="monospace"
+                  fontWeight="bold"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >{s.label}</text>
+              </g>
+            ))}
+
             {/* Grid lines */}
             {[20, 40, 60, 80].map(x => (
               <line key={`vg${x}`} x1={x} y1="0" x2={x} y2="65" stroke="rgba(255,255,255,0.03)" strokeWidth="0.3" />
@@ -346,9 +413,19 @@ export default function FlightMap({ role }: Props) {
 
         {/* Fleet position */}
         <div>
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Fleet Position</h2>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fleet Position</h2>
+            <button
+              onClick={() => setShowAllAircraft(b => !b)}
+              className={`text-[9px] font-bold px-2 py-0.5 rounded border transition-colors ${
+                showAllAircraft ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-card-border text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {showAllAircraft ? 'All A/C' : 'On Ground'}
+            </button>
+          </div>
           <div className="space-y-1.5">
-            {AIRCRAFT.map(ac => (
+            {AIRCRAFT.filter(ac => showAllAircraft || ac.status !== 'Airborne').map(ac => (
               <div key={ac.rego} className="flex items-center gap-2 p-2 bg-card border border-card-border rounded-lg">
                 <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0",
                   ac.status === 'Airborne'    ? 'bg-cyan-400 animate-pulse' :
@@ -364,6 +441,9 @@ export default function FlightMap({ role }: Props) {
                 )}>{ac.status}</span>
               </div>
             ))}
+            {AIRCRAFT.filter(ac => showAllAircraft || ac.status !== 'Airborne').length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-2">All aircraft airborne</div>
+            )}
           </div>
         </div>
       </div>

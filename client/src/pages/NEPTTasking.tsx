@@ -51,6 +51,8 @@ interface NeptTask {
   patientName: string | null;
   patientRef: string | null;
   escortName: string | null;
+  escortHeavy: boolean;
+  driverNameLeg2: string | null;
   referringHospital: string | null;
   receivingHospital: string | null;
   aircraftReg: string | null;
@@ -80,9 +82,20 @@ const AIRCRAFT_OPTIONS = [
   "VH-MQK", "VH-NAJ",
 ];
 
-const PILOT_OPTIONS = ["Capt. R. Hughes", "Capt. T. Barnes", "Capt. M. Clarke"];
-const NURSE_OPTIONS = ["S. Mitchell RN", "Dr. K. Patel", "J. O'Brien RN"];
+const PILOT_OPTIONS = ["Capt. R. Hughes", "Capt. T. Barnes", "Capt. M. Clarke", "Capt. S. Nguyen", "Capt. L. Grant"];
+const NURSE_OPTIONS = ["S. Mitchell RN", "Dr. K. Patel", "J. O'Brien RN", "C. Andrews RN", "P. Wallace RN", "B. Foster RN"];
 const DRIVER_OPTIONS = ["T. Walsh", "D. Nguyen", "P. Martin", "B. Scott"];
+
+// Live shift roster — mirrors Dispatch DAILY_SHIFTS for NEPT assignment
+const NEPT_SHIFTS = [
+  { code: "BHI-AMB-D1",   label: "BHI Day 1",    base: "Broken Hill", aircraft: "VH-MVX", pilot: "Capt. R. Hughes",  nurse: "S. Mitchell RN"  },
+  { code: "BHI-AMB-D2",   label: "BHI Day 2",    base: "Broken Hill", aircraft: "VH-MWK", pilot: "Capt. T. Barnes",  nurse: "J. O'Brien RN"   },
+  { code: "BHI-AMB-N1",   label: "BHI Night",    base: "Broken Hill", aircraft: "VH-MVX", pilot: "Capt. M. Clarke",  nurse: "C. Andrews RN"   },
+  { code: "DU-AMB-D1",    label: "Dubbo Day 1",  base: "Dubbo",       aircraft: "VH-MVW", pilot: "Capt. S. Nguyen", nurse: "P. Wallace RN"   },
+  { code: "DU-AMB-N1",    label: "Dubbo Night",  base: "Dubbo",       aircraft: "VH-XYJ", pilot: "Capt. L. Grant",   nurse: "B. Foster RN"    },
+  { code: "DU-NEPT",      label: "Dubbo NEPT",   base: "Dubbo",       aircraft: "VH-XYU", pilot: "Capt. S. Nguyen", nurse: ""                },
+  { code: "BK-NEPT",      label: "Bankstown NEPT", base: "Bankstown", aircraft: "VH-LTQ", pilot: "Capt. R. Hughes",  nurse: ""                },
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
 function emptySector(): Sector {
@@ -203,6 +216,8 @@ function emptyDraft(ref: string): TaskDraft {
     patientName: null,
     patientRef: null,
     escortName: null,
+    escortHeavy: false,
+    driverNameLeg2: null,
     referringHospital: null,
     receivingHospital: null,
     aircraftReg: null,
@@ -674,10 +689,10 @@ function TaskModal({
                   <input
                     type="number"
                     min="0"
-                    step="10"
+                    step="0.01"
                     className="flex-1 bg-background/50 border border-card-border rounded-r-lg px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-cyan-400/50"
                     value={d.groundTransportCost ?? 200}
-                    onChange={e => setD(p => ({ ...p, groundTransportCost: parseFloat(e.target.value) || 0 }))}
+                    onChange={e => setD(p => ({ ...p, groundTransportCost: parseFloat(parseFloat(e.target.value).toFixed(2)) || 0 }))}
                   />
                 </div>
               </div>
@@ -720,6 +735,13 @@ function TaskModal({
               <div className="col-span-2">
                 <label className={labelCls}>Escort Name</label>
                 <input className={fieldCls} placeholder="Escort / passenger name (if applicable)" value={d.escortName ?? ""} onChange={e => set("escortName", e.target.value)} />
+                {d.escortName && (
+                  <label className="flex items-center gap-2 mt-1.5 cursor-pointer select-none">
+                    <input type="checkbox" checked={d.escortHeavy} onChange={e => set("escortHeavy", e.target.checked)}
+                      className="w-3.5 h-3.5 rounded accent-amber-400" />
+                    <span className="text-xs text-amber-300 font-medium">&gt;120 kg weight category</span>
+                  </label>
+                )}
               </div>
             </div>
           </div>
@@ -728,6 +750,36 @@ function TaskModal({
           <div>
             <div className="text-xs font-semibold text-cyan-400/80 mb-2 flex items-center gap-1.5" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
               <Plane size={12} /> Aircraft &amp; Crew Assignment
+            </div>
+            {/* Shift selector — auto-fills crew from live roster */}
+            <div className="mb-3 p-2.5 bg-cyan-500/5 border border-cyan-400/20 rounded-lg">
+              <label className={labelCls}>Import from Shift / Roster</label>
+              <div className="flex items-center gap-2">
+                <select
+                  className={`flex-1 ${fieldCls}`}
+                  defaultValue=""
+                  onChange={e => {
+                    const shift = NEPT_SHIFTS.find(s => s.code === e.target.value);
+                    if (shift) {
+                      setD(p => ({
+                        ...p,
+                        aircraftReg: shift.aircraft || p.aircraftReg,
+                        pilotName: shift.pilot || p.pilotName,
+                        nurseName: shift.nurse || p.nurseName,
+                      }));
+                      e.target.value = "";
+                    }
+                  }}
+                >
+                  <option value="">— Select shift to auto-fill crew —</option>
+                  {NEPT_SHIFTS.map(s => (
+                    <option key={s.code} value={s.code}>
+                      {s.label} — {s.pilot} / {s.aircraft}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Selecting a shift pre-fills aircraft, pilot, and nurse. Adjust individually below.</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
@@ -752,8 +804,15 @@ function TaskModal({
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Ground Driver</label>
+                <label className={labelCls}>Road Leg 1 — Pickup Driver</label>
                 <select className={fieldCls} value={d.driverName ?? ""} onChange={e => set("driverName", e.target.value || null)}>
+                  <option value="">— Unassigned —</option>
+                  {DRIVER_OPTIONS.map(dr => <option key={dr}>{dr}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Road Leg 2 — Drop-off Driver</label>
+                <select className={fieldCls} value={d.driverNameLeg2 ?? ""} onChange={e => set("driverNameLeg2", e.target.value || null)}>
                   <option value="">— Unassigned —</option>
                   {DRIVER_OPTIONS.map(dr => <option key={dr}>{dr}</option>)}
                 </select>
@@ -1728,6 +1787,8 @@ function AutoTaskingModal({ onClose, onSaveTasks, existingTasks }: {
         patientName: null,
         patientRef: null,
         escortName: null,
+        escortHeavy: false,
+        driverNameLeg2: null,
         referringHospital: null,
         receivingHospital: null,
         aircraftReg: t.aircraft,
@@ -2405,6 +2466,15 @@ export default function NEPTTasking({ role }: Props) {
       }
       return true;
     });
+    // Default sort: by requiredBy (scheduled departure) ascending — earliest mission first
+    list.sort((a, b) => {
+      const aTime = a.requiredBy || a.estimatedEta || a.createdAt;
+      const bTime = b.requiredBy || b.estimatedEta || b.createdAt;
+      if (!aTime && !bTime) return 0;
+      if (!aTime) return 1;
+      if (!bTime) return -1;
+      return aTime.localeCompare(bTime);
+    });
     if (etaSort) {
       list.sort((a, b) => {
         if (!a.estimatedEta && !b.estimatedEta) return 0;
@@ -2729,7 +2799,12 @@ export default function NEPTTasking({ role }: Props) {
                         {t.escortName && (
                           <div className="flex items-center gap-1.5">
                             <Users size={10} className="text-blue-400 shrink-0" />
-                            <div className="text-xs text-blue-300">{t.escortName}</div>
+                            <div className="text-xs text-blue-300">
+                              {t.escortName}
+                              {t.escortHeavy && (
+                                <span className="ml-1 px-1 py-0 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">&gt;120kg</span>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -2760,11 +2835,17 @@ export default function NEPTTasking({ role }: Props) {
                         {t.driverName ? (
                           <div className="flex items-center gap-1.5">
                             <Truck size={10} className="text-amber-400 shrink-0" />
-                            <span className="text-[13px] font-medium text-foreground">{t.driverName}</span>
+                            <span className="text-[13px] font-medium text-foreground">{t.driverName} <span className="text-[10px] text-muted-foreground">(L1)</span></span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/40"><Truck size={9} />Driver TBA</span>
+                          </div>
+                        )}
+                        {t.driverNameLeg2 && (
+                          <div className="flex items-center gap-1.5">
+                            <Truck size={10} className="text-orange-400 shrink-0" />
+                            <span className="text-[13px] font-medium text-foreground">{t.driverNameLeg2} <span className="text-[10px] text-muted-foreground">(L2)</span></span>
                           </div>
                         )}
                       </div>

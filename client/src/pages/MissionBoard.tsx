@@ -54,7 +54,12 @@ export default function MissionBoard({ role }: Props) {
               <div className="text-xs text-muted-foreground">{m.from} → {m.to}</div>
               <div className="flex items-center gap-2 mt-2">
                 <span className={`text-xs px-1.5 py-0.5 rounded border ${priorityColor[m.priority]}`}>{m.priority}</span>
-                <span className="text-xs text-muted-foreground">{m.type} · {m.aircraft}</span>
+                <span className="text-xs text-muted-foreground">
+                  {m.type === 'Ferry' ? (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-violet-500/15 text-violet-300 border border-violet-500/30 mr-1"><Plane size={9} />Ferry</span>
+                  ) : null}
+                  {m.type !== 'Ferry' && m.type} · {m.aircraft}
+                </span>
               </div>
             </button>
           ))}

@@ -9,7 +9,7 @@ const SAMPLE_ANALYSIS = [
   {
     missionId: "M001",
     callsign: "MEDIVAC 01",
-    summary: "P1 Medevac — Dubbo to Sydney. Patient: 67yo male, STEMI. Crew optimal for case complexity. ETA within cardiac intervention window.",
+    summary: "P1 Medivac — Dubbo to Sydney. Patient: 67yo male, STEMI. Crew optimal for case complexity. ETA within cardiac intervention window.",
     risks: [
       { label: "Weather (IMC enroute)", level: "low" },
       { label: "Patient instability risk", level: "medium" },

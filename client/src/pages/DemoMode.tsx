@@ -71,7 +71,7 @@ function PilotIPadScreen() {
           <span className="text-[8px] font-bold text-green-400 uppercase tracking-wider">All Gates Green — Ready for Dispatch</span>
         </div>
         <div className="text-[11px] font-bold">YSDU → YSSY</div>
-        <div className="text-[8px] text-white/60">VH-MVW · B200 · P1 Medevac</div>
+        <div className="text-[8px] text-white/60">VH-MVW · B200 · P1 Medivac</div>
       </div>
       {/* Release gates */}
       <div className="px-3 py-1.5 space-y-1">
@@ -399,7 +399,7 @@ const ROLE_DEMOS = [
 
 const DEMO_STEPS = [
   { id: 1, title: "Welcome & Intro", cue: "Jennifer intro video", talking: "Medivac.ai is an end-to-end aeromedical operations platform for King Air B200/B300 fleets, built for RFDS-style operators.", done: true },
-  { id: 2, title: "Mission Acceptance Story", cue: "Navigate to Mission Board", talking: "Walk through a live P1 medevac from NEPT call → dispatch intake → release gates → airborne. Show how every compliance gate is enforced.", done: true },
+  { id: 2, title: "Mission Acceptance Story", cue: "Navigate to Mission Board", talking: "Walk through a live P1 Medivac from NEPT call → dispatch intake → release gates → airborne. Show how every compliance gate is enforced.", done: true },
   { id: 3, title: "Compliance Gate Demo", cue: "Open MEDIVAC 02 (blocked)", talking: "Show dispatch BLOCKED state — APG release and fuel missing. Explain how the system prevents premature release. CASA audit trail is automatic.", done: false },
   { id: 4, title: "iPad & iPhone Role Demo", cue: "Demo Mode — Device Views tab", talking: "Show how each role sees a purpose-built screen. Pilot gets release gates and fuel. Nurse gets patient vitals and checklist. Doctor gets Jennifer AI brief.", done: false },
   { id: 5, title: "ISO Compliance Score", cue: "Switch to Safety role → ISO page", talking: "Live readiness scoring across ISO 9001, 13485, 27001, and 25010. Evidence packs, CAPA tracking, certification critical path.", done: false },

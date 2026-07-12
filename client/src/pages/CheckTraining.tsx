@@ -242,8 +242,17 @@ function canViewTrainees(role: UserRole) {
   return true; // all roles can view in demo — in production scope to supervisory/check pilots
 }
 
+const UNCONFIGURED_PREFIX = "242820000000";
 function openJotform(formId: string) {
+  if (formId.startsWith(UNCONFIGURED_PREFIX)) {
+    // Placeholder ID — send to Jotform dashboard so ops can grab the real form URL
+    window.open("https://www.jotform.com/myaccount/forms", "_blank", "noopener");
+    return;
+  }
   window.open(`https://form.jotform.com/${formId}`, "_blank", "noopener");
+}
+function isConfigured(formId: string) {
+  return !formId.startsWith(UNCONFIGURED_PREFIX);
 }
 
 // ─── Mini progress bar ────────────────────────────────────────────────────────
@@ -947,9 +956,13 @@ export default function CheckTraining({ role }: Props) {
                     <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                       <Clock size={10} /> {form.frequency}
                     </div>
-                    <button onClick={() => openJotform(form.formId)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 ${form.bg} border ${form.color} ${form.accent} rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity`}>
-                      Open Form <ExternalLink size={10} />
+                    <button
+                      onClick={() => openJotform(form.formId)}
+                      title={isConfigured(form.formId) ? "Open Jotform" : "Form ID not yet configured — opens your Jotform dashboard to find the correct link"}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 ${
+                        isConfigured(form.formId) ? `${form.bg} border ${form.color} ${form.accent}` : "bg-amber-500/10 border border-amber-500/30 text-amber-400"
+                      } rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity`}>
+                      {isConfigured(form.formId) ? <><span>Open Form</span> <ExternalLink size={10} /></> : <><span>Configure Link</span> <ExternalLink size={10} /></>}
                     </button>
                   </div>
                 </div>

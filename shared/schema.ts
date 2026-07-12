@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -103,19 +103,21 @@ export const neptTasks = sqliteTable("nept_tasks", {
   patientName:   text("patient_name"),                // identify only — no clinical data
   patientRef:    text("patient_ref"),                 // task ID / UR number
   escortName:    text("escort_name"),
+  escortHeavy:   integer("escort_heavy").default(0),  // 1 = escort >120 kg (weight category flag)
   referringHospital: text("referring_hospital"),
   receivingHospital: text("receiving_hospital"),
   aircraftReg:   text("aircraft_reg"),                // assigned aircraft
   pilotName:     text("pilot_name"),
   nurseName:     text("nurse_name"),
-  driverName:    text("driver_name"),            // ground transport driver assigned
+  driverName:    text("driver_name"),            // Road Leg 1 — pickup driver
+  driverNameLeg2: text("driver_name_leg2"),       // Road Leg 2 — drop-off driver
   dispatchedBy:  text("dispatched_by"),
   estimatedEta:  text("estimated_eta"),               // ISO datetime — estimated arrival at destination
   actualDepart:  text("actual_depart"),               // ISO datetime
   actualArrive:  text("actual_arrive"),               // ISO datetime
   completedAt:   text("completed_at"),                 // ISO datetime — auto-set when status → Complete
   notes:         text("notes"),
-  groundTransportCost: integer("ground_transport_cost").default(200),  // van pick/drop $200 each
+  groundTransportCost: real("ground_transport_cost").default(200),  // van pick/drop — dollars and cents
   createdAt:     text("created_at").notNull(),
   updatedAt:     text("updated_at").notNull(),
 });

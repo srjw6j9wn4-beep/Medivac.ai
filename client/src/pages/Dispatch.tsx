@@ -77,7 +77,7 @@ interface CreatedMission {
 }
 
 export default function Dispatch({ role }: Props) {
-  const [missionType, setMissionType] = useState("Medevac");
+  const [missionType, setMissionType] = useState("Medivac");
   const [from, setFrom]               = useState("YSDU");
   const [to, setTo]                   = useState("YSSY");
   const [priority, setPriority]       = useState("P1");
@@ -356,7 +356,7 @@ export default function Dispatch({ role }: Props) {
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-2">Mission Type</label>
             <div className="flex flex-wrap gap-2">
-              {["Medevac", "NEPT", "ACC", "RAHS", "Dental", "Ferry", "Special"].map(t => (
+              {["Medivac", "NEPT", "ACC", "RAHS", "Dental", "Ferry", "Special"].map(t => (
                 <button key={t} onClick={() => setMissionType(t)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                     missionType === t

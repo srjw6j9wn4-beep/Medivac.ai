@@ -18,7 +18,7 @@ function downloadWeeklyPack() {
         rows: [
           { label: "Total Missions", value: "24" },
           { label: "NEPT Missions", value: "18" },
-          { label: "Medevac (P1)", value: "4" },
+          { label: "Medivac (P1)", value: "4" },
           { label: "Dental / Routine", value: "2" },
           { label: "Mission Completion Rate", value: "100%" },
           { label: "Average Mission Duration", value: "2h 14min" },
