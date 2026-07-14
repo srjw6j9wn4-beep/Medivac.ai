@@ -71,7 +71,6 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await seedDefaultRates();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
@@ -110,6 +109,17 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      // Seed default rates AFTER the server is listening. This is a Supabase
+      // network round-trip; running it before listen() means a slow or failed
+      // DB call on cold start prevents the process from binding, the /api/health
+      // check fails, and the platform returns 503 for the ENTIRE API (including
+      // NEPT create-task). Keep it in the background and never let it crash boot.
+      seedDefaultRates().catch((err) =>
+        console.error("[boot] seedDefaultRates failed (non-fatal):", err),
+      );
     },
   );
-})();
+})().catch((err) => {
+  console.error("[boot] fatal startup error:", err);
+  process.exit(1);
+});

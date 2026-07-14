@@ -161,12 +161,17 @@ const DEFAULT_RATES = [
 ];
 
 export async function seedDefaultRates(): Promise<void> {
-  const { count } = await supabase.from('quote_rates').select('*', { count: 'exact', head: true }).then(r => ({ count: r.count ?? 0 }));
-  if (count > 0) return;
-  const now = new Date().toISOString();
-  const rows = DEFAULT_RATES.map(r => ({ ...r, auto_update_enabled: 1, previous_value: null, previous_date: null, last_checked: now, notes: null, updated_at: now }));
-  await supabase.from('quote_rates').insert(rows);
-  console.log(`[quote-rates] Seeded ${DEFAULT_RATES.length} default rates`);
+  try {
+    const { count } = await supabase.from('quote_rates').select('*', { count: 'exact', head: true }).then(r => ({ count: r.count ?? 0 }));
+    if (count > 0) return;
+    const now = new Date().toISOString();
+    const rows = DEFAULT_RATES.map(r => ({ ...r, auto_update_enabled: 1, previous_value: null, previous_date: null, last_checked: now, notes: null, updated_at: now }));
+    await supabase.from('quote_rates').insert(rows);
+    console.log(`[quote-rates] Seeded ${DEFAULT_RATES.length} default rates`);
+  } catch (err) {
+    // Seeding is best-effort and must never block or crash server startup.
+    console.error('[quote-rates] Seeding skipped due to error:', err);
+  }
 }
 
 // ── Types for new tables ──────────────────────────────────────────────────────
