@@ -53,6 +53,7 @@ const QUICK_QUESTIONS = [
   "Tell me about the Dubbo engineering team",
   "Who are the van drivers across the bases?",
   "Who is the secretary of Check and Training?",
+  "Tell me about Karen Barlow",
 ];
 
 function Waveform({ active }: { active: boolean }) {
@@ -76,10 +77,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
   const [speaking, setSpeaking]           = useState(false);
   const [listening, setListening]         = useState(false);
 
-  const [chatLog, setChatLog]             = useState<Msg[]>([{
-    role: "ai",
-    text: "G'day — I'm Graham, your Medivac.ai AI presenter and mission analyst. Press \"Go Live\" to connect — I'll answer your questions face to face with full voice and expressions.",
-  }]);
+  const [chatLog, setChatLog]             = useState<Msg[]>([]);
   const [apiHistory, setApiHistory]       = useState<ApiMsg[]>([]);
   const [input, setInput]                 = useState("");
   const [thinking, setThinking]           = useState(false);
@@ -112,44 +110,17 @@ export default function BryanLive({ role }: { role: UserRole }) {
   }, []);
 
   // ── Speak ────────────────────────────────────────────────────────────────────
-  // FULL mode: repeat() is permitted and works via WebSocket directly.
-  // Fire repeat() only after any in-flight interrupt has cleared (one rAF tick).
-  // Split into sentence chunks so Graham starts speaking on sentence 1
-  // without waiting for the full response to be queued — eliminates buffering.
+  // Send the full answer as a single repeat() call after interrupt settles.
+  // Splitting into chunks causes HeyGen to lose lip-sync and freeze mid-answer.
+  // A 350ms settle window after interrupt() is enough for the session to clear
+  // before the new text is queued — avoids overlap and keeps sync tight.
   function bryanSpeak(text: string) {
     const s = sessionRef.current;
     if (!s) return;
     try { s.interrupt(); } catch {}
-
-    // Split on sentence boundaries
-    const sentences = text
-      .split(/(?<=[.!?])\s+/)
-      .map((t: string) => t.trim())
-      .filter(Boolean);
-
-    if (sentences.length <= 1) {
-      // Short answer — speak directly after interrupt clears
-      setTimeout(() => {
-        try { s.repeat(text.trim()); } catch (e) { console.error("[Bryan] repeat() failed:", e); }
-      }, 200);
-      return;
-    }
-
-    // For multi-sentence answers: speak first sentence immediately,
-    // then queue the rest as a single follow-on chunk after a short delay.
-    // HeyGen queues internally — we just need to not block on the full text.
-    const first = sentences[0];
-    const rest  = sentences.slice(1).join(" ");
-
     setTimeout(() => {
-      try { s.repeat(first); } catch (e) { console.error("[Bryan] repeat() ch1 failed:", e); }
-      // Queue remainder ~300ms later so HeyGen has time to register the first chunk
-      if (rest) {
-        setTimeout(() => {
-          try { s.repeat(rest); } catch (e) { console.error("[Bryan] repeat() ch2 failed:", e); }
-        }, 300);
-      }
-    }, 200);
+      try { s.repeat(text.trim()); } catch (e) { console.error("[Bryan] repeat() failed:", e); }
+    }, 350);
   }
 
   // ── Greeting guard ────────────────────────────────────────────────────────
@@ -157,10 +128,10 @@ export default function BryanLive({ role }: { role: UserRole }) {
     if (streamReadyRef.current && sessionStartedRef.current && !greetedRef.current) {
       greetedRef.current = true;
       setTimeout(() => {
-        const greeting = "G'day — I'm Graham, Medivac.ai's AI presenter. I'm live and ready to answer your questions. Ask me anything about dispatch gates, mission types, compliance, or the connected apps.";
+        const greeting = "Hello — I'm Graham, Medivac.ai's AI presenter. I'm live and ready to answer your questions. Ask me anything about dispatch gates, mission types, compliance, or the connected apps.";
         setChatLog(prev => [...prev, { role: "ai", text: greeting }]);
         bryanSpeak(greeting);
-      }, 800);
+      }, 2500);
     }
   }
 
@@ -180,7 +151,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
         const errMsg = data.error || "Failed to get session token";
         // HeyGen 400 = invalid or expired API key
         if (res.status === 400 || errMsg.toLowerCase().includes("invalid") || errMsg.toLowerCase().includes("api")) {
-          throw new Error("Graham Live is temporarily unavailable — the HeyGen API key needs to be updated in Railway. Please contact your system administrator.");
+          throw new Error("Graham is temporarily unavailable — the HeyGen API key needs to be updated in Railway. Please contact your system administrator.");
         }
         throw new Error(errMsg);
       }
@@ -432,6 +403,59 @@ export default function BryanLive({ role }: { role: UserRole }) {
       keywords: ["executive general manager", "egm aviation", "general manager aviation", "mark davey"],
       answer: "Mark Davey.",
     },
+    // ── Quick question scripted answers ──────────────────────────────────────
+    {
+      keywords: ["six dispatch release", "dispatch release gates", "6 dispatch", "six gates", "release gates"],
+      answer: "The six dispatch release gates are the sequential go-no-go checks Medivac.ai runs before any mission launches. They cover: crew fatigue and duty compliance, aircraft airworthiness and defect status, weather and NOTAM clearance, patient medical authority and transfer documentation, receiving facility confirmation, and flight plan lodgement with ATC. Every gate must be signed off with a timestamped role approval before the mission can be released. Nothing flies until all six are green.",
+    },
+    {
+      keywords: ["lord howe island", "lord howe", "lordhowe"],
+      answer: "Lord Howe Island missions require careful pre-flight planning. The airstrip is short and weight-critical, and while the island does have an instrument approach — an RNAV procedure to Runway 10 — minima are high and the approach requires specific crew authorisation. Medivac.ai captures the Lord Howe-specific weight and balance limits for the King Air B200, the mandatory one-engine-inoperative drift-down analysis, approach currency requirements for the crew, and the requirement to carry adequate fuel to divert to Port Macquarie or Ballina if the approach is not achievable. The platform flags all of these automatically when Lord Howe Island is selected as a destination.",
+    },
+    {
+      keywords: ["nets", "ecmo", "neonatal", "nets ecmo"],
+      answer: "NETS — the Newborn and paediatric Emergency Transport Service — and ECMO missions are among the most equipment-intensive and time-critical flights in the RFDS SE operation. Medivac.ai handles the extended patient weight and incubator load in the weight and balance, flags the NETS team composition and certification requirements, tracks the ECMO circuit priming checklist, and ensures the receiving NICU has confirmed acceptance before dispatch release is granted. Cold ischaemia time tracking is also integrated for organ transport components of these missions.",
+    },
+    {
+      keywords: ["iso compliance", "iso tracking", "compliance tracking", "iso check"],
+      answer: "The ISO compliance module tracks airworthiness directives, maintenance release status, and regulatory compliance items across the fleet in real time. When a tech log entry is raised in the Flight Tech Log, it automatically surfaces against the aircraft's maintenance schedule and flags any items that could affect serviceability. Dispatch cannot release an aircraft with an open mandatory defect — the system enforces this gate automatically, removing the risk of human oversight.",
+    },
+    {
+      keywords: ["aeroroster", "aero roster", "roster connect", "roster medivac"],
+      answer: "AeroRoster feeds crew duty and rest data directly into Medivac.ai. Before dispatch release is granted, the platform checks each crew member's accumulated duty time, rest period since last flight, and CASA Part 48 fatigue compliance. If any crew member is approaching or beyond their limits, the dispatch gate is flagged red and the mission cannot proceed without a manual authorisation override from the Director of Operations. This integration removes the need for manual spreadsheet checks and provides a full audit trail.",
+    },
+    {
+      keywords: ["flight tech log", "techlog", "tech log feed", "tech log dispatch"],
+      answer: "The Flight Tech Log captures every defect, maintenance action, and airworthiness note raised by crew and engineers after each sector. That data flows directly into the Medivac.ai dispatch system — so when a pilot raises a defect at Broken Hill at 2am, the duty operations coordinator sees it on their screen in real time, it is logged against the aircraft record, and the dispatch gate for that aircraft is automatically held until the maintenance team either clears the defect or applies a deferral under MEL authority.",
+    },
+    {
+      keywords: ["who manages operations", "head of operations", "operations manager", "chief of operations"],
+      answer: "Operations are managed by the Director of Operations, who holds final authority for mission release override and fleet deployment decisions across the RFDS SE Section.",
+    },
+    {
+      keywords: ["senior base pilots", "base pilots", "who are the pilots"],
+      answer: "The Senior Base Pilots lead operations at each base — Dubbo, Bankstown, and Broken Hill. They are the primary point of contact for crew rostering, base-level safety reporting, and day-to-day flight operations management at their respective stations.",
+    },
+    {
+      keywords: ["dubbo engineering", "engineering team", "dubbo engineers", "maintenance team"],
+      answer: "The Dubbo engineering team is the primary Line Maintenance organisation for the RFDS SE Section's King Air fleet. They handle scheduled maintenance, defect rectification, and airworthiness release for aircraft based at Dubbo. The team works in close coordination with the Flight Tech Log system, receiving defect notifications in real time and logging all maintenance actions directly against the aircraft record.",
+    },
+    {
+      keywords: ["van drivers", "ground transport", "patient transport drivers"],
+      answer: "Patient ground transport is coordinated across Dubbo, Bankstown, and Broken Hill bases. Van drivers form a critical part of the aeromedical chain — meeting aircraft on arrival and transferring patients to receiving facilities. Their schedules are coordinated through the Medivac.ai mission timeline so the ground team is notified of ETA changes in real time.",
+    },
+    {
+      keywords: ["secretary check and training", "check and training secretary", "c&t secretary"],
+      answer: "The Check and Training secretariat manages pilot training records, type rating currency, and CASA-mandated proficiency check scheduling for the RFDS SE Section. Training records are tracked in AeroRoster and flagged when a crew member is approaching expiry on any check or rating.",
+    },
+    {
+      keywords: ["chief medical officer", "cmo", "medical officer"],
+      answer: "The Chief Medical Officer oversees all aeromedical clinical standards, patient care protocols, and medical authority approvals for the RFDS SE Section. The CMO signs off on clinical guidelines that are embedded directly in the Medivac.ai patient transfer workflow.",
+    },
+    {
+      keywords: ["karen barlow", "karen", "senior flight nurse", "flight nurse dubbo", "dubbo nurse"],
+      answer: "Karen Barlow is the Senior Flight Nurse at the Dubbo base — and one of the longest-serving members of RFDS SE. She was there at the very start of the Dubbo base and is an integral, foundational part of the operation. There isn’t much that Karen hasn’t seen in her time with us. She is regarded with enormous respect across the entire organisation.",
+    },
   ];
 
   function findScriptedAnswer(question: string): string | null {
@@ -479,24 +503,42 @@ export default function BryanLive({ role }: { role: UserRole }) {
       return;
     }
 
-    const newHistory = [...apiHistoryRef.current, { role: "user" as const, content: q }];
+    // Keep history to last 8 messages (4 exchanges) to avoid token overflow
+    const trimmed = apiHistoryRef.current.slice(-8);
+    const newHistory = [...trimmed, { role: "user" as const, content: q }];
+
+    const attemptChat = async (attempt: number): Promise<void> => {
+      try {
+        const res  = await apiRequest("POST", "/api/bryan/chat", { messages: newHistory });
+        const json = await res.json() as { reply?: string; error?: string };
+
+        if (!res.ok || json.error) {
+          throw new Error(json.error || `Server error ${res.status}`);
+        }
+
+        const reply = json.reply || "I didn't quite catch that — could you rephrase?";
+
+        setChatLog(prev => [...prev, { role: "ai", text: reply }]);
+        setApiHistory([...newHistory, { role: "assistant", content: reply }]);
+        try { sessionRef.current?.stopListening(); } catch {}
+        bryanSpeak(reply);
+
+      } catch (err) {
+        if (attempt < 2) {
+          // Retry once after 1.5s
+          await new Promise(r => setTimeout(r, 1500));
+          return attemptChat(attempt + 1);
+        }
+        const msg = err instanceof Error ? err.message : "Connection issue";
+        console.error("Graham chat failed:", msg);
+        const fallback = "I'm having trouble reaching the AI service right now — please try again in a moment.";
+        setChatLog(prev => [...prev, { role: "ai", text: fallback }]);
+        try { sessionRef.current?.stopListening(); } catch {}
+      }
+    };
 
     try {
-      const res  = await apiRequest("POST", "/api/bryan/chat", { messages: newHistory });
-      const json = await res.json() as { reply?: string; error?: string };
-      const reply = json.reply || "I'm having a bit of trouble connecting right now — please try again.";
-
-      setChatLog(prev => [...prev, { role: "ai", text: reply }]);
-      setApiHistory([...newHistory, { role: "assistant", content: reply }]);
-
-      // Stop listening expression before speaking
-      try { sessionRef.current?.stopListening(); } catch {}
-
-      bryanSpeak(reply);
-
-    } catch {
-      setChatLog(prev => [...prev, { role: "ai", text: "Connection issue — please try again." }]);
-      try { sessionRef.current?.stopListening(); } catch {}
+      await attemptChat(0);
     } finally {
       setThinking(false);
     }
@@ -597,10 +639,10 @@ export default function BryanLive({ role }: { role: UserRole }) {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-            Graham — Live Avatar Q&amp;A
+            Graham — Live Q&amp;A
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            LiveAvatar · WebRTC · Real face &amp; voice · Claude AI · Type or speak your question
+            Ask Graham anything — face to face, real voice, deep Medivac.ai knowledge
           </p>
         </div>
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
@@ -632,10 +674,10 @@ export default function BryanLive({ role }: { role: UserRole }) {
           <div className="rounded-2xl border border-card-border overflow-hidden" style={{ background: '#050d1a' }}>
             <div className="px-4 py-3 border-b border-card-border">
               <p className="font-semibold text-sm" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Medivac.AI — Aeromedical Operations Reimagined</p>
-              <p className="text-xs text-muted-foreground mt-0.5">2:34 · Watch Graham introduce the platform, then go live to ask questions</p>
+              <p className="text-xs text-muted-foreground mt-0.5">1:01 · Graham introduces Medivac.ai · Then go live for Q&amp;A</p>
             </div>
-            <div className="relative" style={{ paddingBottom: '56.25%' }}>
-              <video className="absolute inset-0 w-full h-full" src="/video/jennifer_intro.mp4" controls playsInline poster="/graham_bg_professional.png" style={{ background: '#050d1a' }} />
+            <div className="relative flex justify-center" style={{ background: '#050d1a' }}>
+              <video className="h-auto" style={{ maxHeight: 560, width: 'auto', maxWidth: '100%' }} src="/graham_intro.mp4" controls playsInline poster="/graham_bg_professional.png" />
               {/* Simulated blink overlay — only rendered while intro video is showing (!isLive) */}
               {!isLive && (
                 <div
@@ -682,7 +724,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
             {/* Portrait video — 9:16 aspect ratio, fills frame */}
             <div className="relative w-full" style={{ aspectRatio: '9/16', minHeight: 420, maxHeight: 640, background: 'url(/graham_bg_portrait.png) center/cover no-repeat' }}>
 
-              {/* Video — visible so attach() works, but hidden behind the canvas */}
+              {/* Video hidden — attach() needs it in DOM, chroma-key canvas renders on top */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -694,7 +736,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
                 x-webkit-airplay="allow"
               />
 
-              {/* Canvas — chroma-keyed output: green pixels removed, comms backdrop shows through */}
+              {/* Canvas — chroma-keys out HeyGen green (#00d804), backdrop shows through */}
               <canvas
                 ref={canvasRef}
                 className="absolute inset-0 w-full h-full object-cover"

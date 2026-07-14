@@ -345,7 +345,28 @@ export default function StockUsage({ role }: Props) {
         ).join("\n") +
         `\n\nPlease invoice RFDS South Eastern Section ABN 48 096 916 620.\n\nNote: S8 controlled substance items require a valid RFDS SE Section permit attached.\n\nKind regards,\nRFDS South Eastern Section — Medical Operations\n`
       );
-      window.open(`mailto:${s.email}?subject=${subject}&body=${body}`, "_blank");
+      // Try mailto: — works in most browsers; may be blocked in iframe environments
+      const mailtoUrl = `mailto:${s.email}?subject=${subject}&body=${body}`;
+      try {
+        const opened = window.open(mailtoUrl, "_blank");
+        // If window.open returns null/undefined the browser blocked it — fall back silently
+        if (!opened) {
+          // Create an anchor and click it instead (mailto: links work via <a> even in iframes)
+          const a = document.createElement("a");
+          a.href = mailtoUrl;
+          a.style.display = "none";
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => document.body.removeChild(a), 500);
+        }
+      } catch (_) {
+        const a = document.createElement("a");
+        a.href = mailtoUrl;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => document.body.removeChild(a), 500);
+      }
     });
     setOrderSent(true);
     setTimeout(() => setShowOrderModal(false), 1200);

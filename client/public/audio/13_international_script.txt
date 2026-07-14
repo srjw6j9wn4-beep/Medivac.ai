@@ -1,0 +1,17 @@
+International Organ and Insurance Transfer — Special Mission Protocol.
+
+When the Royal Flying Doctor Service South Eastern Section operates an international organ retrieval or repatriation flight, the complexity increases significantly — crossing regulatory boundaries, coordinating with transplant registries, customs and border protection, and insurance medical authorities simultaneously.
+
+Medivac-dot-ai captures all of this in a single, role-tagged workflow.
+
+The pre-flight stage verifies the international flight plan, overflight permits, customs and border protection notifications, and CASA Part 121 compliance for jets like the Challenger 604 or 605. Every clearance is logged against a timestamped role sign-off — so there is no ambiguity about who confirmed what, and when.
+
+For organ transfers, the Tissue and Organ Authority notification, transplant coordinator contact, and cold ischaemia time clock are built into the workflow. The system flags when you are approaching the viability window so the team can act — not react.
+
+For insurance and repatriation transfers, the insurance company medical authority reference, liability confirmation, and receiving facility acceptance are all captured before departure. This protects the service and the patient.
+
+During flight, the checklist tracks organ viability status, patient condition monitoring intervals, and any required border health declarations — automatically surfaced to the crew based on the destination country.
+
+At handover, the system generates a mission summary capturing route, times, organ cold time logged, crew roles, and all sign-offs — ready for audit, insurance claim submission, or transplant registry reporting.
+
+This is not just a checklist. It is an internationally-compliant operations record for the most time-critical missions your team will ever fly.

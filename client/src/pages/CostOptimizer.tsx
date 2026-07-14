@@ -34,13 +34,14 @@ const ICONS: Record<string, React.ComponentType<any>> = {
   UserX, PlaneTakeoff, Moon, Route, Truck, Hotel, Clock, Milestone,
 };
 
-type TabKey = "dashboard" | "leakage" | "staffing" | "assets" | "action-plan";
+type TabKey = "dashboard" | "leakage" | "staffing" | "assets" | "base-pnl" | "action-plan";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "dashboard", label: "Cost Dashboard" },
   { key: "leakage", label: "Revenue Leakage Scanner" },
   { key: "staffing", label: "Base Staffing Planner" },
   { key: "assets", label: "Asset Acquisition Analyser" },
+  { key: "base-pnl", label: "Base P&L Comparison" },
   { key: "action-plan", label: "Action Plan" },
 ];
 
@@ -585,6 +586,51 @@ function BariatricVanCard() {
   );
 }
 
+
+// ── Sprinter alternatives (research-backed) ────────────────────────────────
+const SPRINTER_ALTERNATIVES = [
+  {
+    id: "landcruiser-70",
+    make: "Toyota", model: "LandCruiser 70 Series",
+    priceRange: "AU$76k–$87k base / ~AU$150k–$300k fitted",
+    rfdsUsed: true,
+    summary: "The dominant rural/remote Australian ambulance platform. Used by SA Ambulance (10 units), NSW Ambulance (80+), QAS, and RFDS. Simple solid-axle mechanicals service anywhere in regional Australia.",
+    pros: ["Widest parts & mechanic network in Australia", "Proven in RFDS remote operations", "True 4x4 capability for off-road access"],
+    cons: ["Smaller interior cabin than Sprinter", "Firmer ride on long highway transfers"],
+    serviceability: "Excellent — independent 4x4 & diesel workshops nationally",
+  },
+  {
+    id: "hiace",
+    make: "Toyota", model: "HiAce LWB Van",
+    priceRange: "AU$55k–$70k base / ~AU$120k–$200k fitted",
+    rfdsUsed: true,
+    summary: "Used by RFDS Victoria, QAS Patient Transport, and NSW Ambulance Extended Care. Large interior volume, simple mainstream Toyota mechanicals — significantly cheaper to service than a Sprinter.",
+    pros: ["Large interior for multi-patient or equipment builds", "Mainstream Toyota servicing & parts", "Strong ambulance upfit ecosystem (Mader, Amtek)"],
+    cons: ["Standard 2WD — limited off-road without modification", "Lower GVM than Sprinter for heavy fit-outs"],
+    serviceability: "Excellent — any Toyota dealer or independent light-commercial mechanic",
+  },
+  {
+    id: "iveco-daily",
+    make: "Iveco", model: "Daily (incl. 4x4)",
+    priceRange: "AU$58k–$102k base / 4x4 from ~AU$104k",
+    rfdsUsed: false,
+    summary: "Ladder-frame chassis (truck architecture) used by St Vincent's Sydney patient transport fleet. Truck-style design is cheaper to repair than Sprinter's integrated passenger-car electronics. 4x4 variant available.",
+    pros: ["True ladder-frame = simpler for independent mechanics", "Higher payload/GVM for heavy builds", "4x4 variant for rural deployment"],
+    cons: ["Smaller dealer footprint than Toyota/Ford in remote areas", "4x4 pricing approaches Sprinter territory"],
+    serviceability: "Good — Iveco truck dealers & heavy-vehicle independent workshops",
+  },
+  {
+    id: "ford-transit",
+    make: "Ford", model: "Transit (Ambulance Preparation Package)",
+    priceRange: "AU$60k–$75k base / ~AU$130k–$220k fitted",
+    rfdsUsed: false,
+    summary: "Only vehicle with a factory Ambulance Preparation Package (dual AGM batteries, dual alternators, modified wiring). Capped-price servicing at ~$399–$499/service vs opaque Mercedes dealer pricing. Largest mainstream dealer network in Australia.",
+    pros: ["Factory Ambulance Preparation Package — upfit-ready", "Capped-price servicing published (≈$399–$499)", "Largest dealer footprint in rural/regional Australia"],
+    cons: ["Not yet in mainstream Australian ambulance state fleets", "2WD only in ambulance variants (no 4x4)"],
+    serviceability: "Excellent — largest independent workshop network of any van brand in Australia",
+  },
+];
+
 function AssetAcquisitionTab() {
   return (
     <div className="space-y-6" data-testid="tab-assets">
@@ -592,6 +638,43 @@ function AssetAcquisitionTab() {
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2"><Car size={15} style={{ color: TEAL }} /> Vehicle Acquisitions</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-4">
           {VEHICLE_ASSETS.map(v => <VehicleCard key={v.id} v={v} />)}
+          {/* Sprinter Alternatives — research-backed alternatives to Mercedes Sprinter */}
+          <div className="col-span-full mt-2 mb-1">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Mercedes Sprinter — Alternatives Analysis</h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-400 bg-amber-500/10">Research</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 mb-3">
+              The Mercedes Sprinter has high dealer-dependent servicing costs (e.g. $3,000 headlight replacements). The following vehicles are established RFDS-grade alternatives with simpler, cheaper maintenance.
+            </p>
+          </div>
+          {SPRINTER_ALTERNATIVES.map(v => (
+            <div key={v.id} className="bg-card border border-card-border rounded-2xl p-4 flex flex-col gap-2" data-testid={`alt-vehicle-${v.id}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-xs font-bold text-foreground">{v.make} {v.model}</div>
+                  <div className="text-xs text-muted-foreground">{v.priceRange}</div>
+                </div>
+                {v.rfdsUsed && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 whitespace-nowrap">RFDS used</span>
+                )}
+              </div>
+              <div className="text-[11px] text-muted-foreground">{v.summary}</div>
+              <div className="space-y-1">
+                {v.pros.map((p: string, i: number) => (
+                  <div key={i} className="flex gap-1.5 text-[11px] text-green-400/90"><span>✓</span><span className="text-foreground/80">{p}</span></div>
+                ))}
+              </div>
+              <div className="space-y-1">
+                {v.cons.map((c: string, i: number) => (
+                  <div key={i} className="flex gap-1.5 text-[11px] text-amber-400/80"><span>⚠</span><span className="text-muted-foreground">{c}</span></div>
+                ))}
+              </div>
+              <div className="mt-auto text-[10px] text-muted-foreground border-t border-card-border pt-2">
+                Serviceability: <span className="text-foreground font-semibold">{v.serviceability}</span>
+              </div>
+            </div>
+          ))}
           <BariatricVanCard />
         </div>
       </div>
@@ -606,6 +689,155 @@ function AssetAcquisitionTab() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════════════════════
+// TAB 5b — Base P&L Comparison
+// ══════════════════════════════════════════════════════════════════════════
+const BASE_PNL_DATA = [
+  {
+    base: "Dubbo",
+    contract: "NEPT",
+    revenue: 4_250_000,
+    directCosts: 2_180_000,
+    overhead: 620_000,
+    margin: 1_450_000,
+    sectors: 1_820,
+    revenuePerSector: 2_335,
+    costPerSector: 1_538,
+    highlights: ["High NEPT volume — strong utilisation", "Lower crew costs vs metro"],
+    leaks: ["Road transport markup under-claimed", "Fuel surcharge not consistently applied"],
+  },
+  {
+    base: "Bankstown",
+    contract: "NEPT",
+    revenue: 3_680_000,
+    directCosts: 2_540_000,
+    overhead: 890_000,
+    margin: 250_000,
+    sectors: 1_340,
+    revenuePerSector: 2_746,
+    costPerSector: 2_560,
+    highlights: ["Highest rate-per-sector (metro premium)"],
+    leaks: ["High overhead drag — hangar, metro crew costs", "Low margin despite premium rates", "Parking / positioning sectors unbilled"],
+  },
+  {
+    base: "Broken Hill",
+    contract: "NEPT",
+    revenue: 1_920_000,
+    directCosts: 890_000,
+    overhead: 310_000,
+    margin: 720_000,
+    sectors: 760,
+    revenuePerSector: 2_526,
+    costPerSector: 1_579,
+    highlights: ["Lowest overhead per sector", "Strong margin % on low volume"],
+    leaks: ["Underutilised — capacity exists for growth", "Clinic run frequency could increase"],
+  },
+];
+
+function BasePnlTab() {
+  const [selectedContract, setSelectedContract] = useState<string>("NEPT");
+  const contracts = [...new Set(BASE_PNL_DATA.map(b => b.contract))];
+  const filtered = BASE_PNL_DATA.filter(b => b.contract === selectedContract);
+  const fmtAUD = (v: number) => "$" + (v >= 1_000_000 ? (v/1_000_000).toFixed(2)+"M" : (v/1_000).toFixed(0)+"k");
+
+  const barMax = Math.max(...filtered.map(b => b.revenue));
+
+  return (
+    <div className="space-y-5" data-testid="tab-base-pnl">
+      {/* Contract filter */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contract:</span>
+        {contracts.map(c => (
+          <button key={c} onClick={() => setSelectedContract(c)}
+            className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+              selectedContract === c ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400" : "bg-background/50 border-card-border text-muted-foreground hover:text-foreground"
+            }`}>{c}</button>
+        ))}
+        <span className="text-xs text-muted-foreground ml-2">Comparing {filtered.length} bases · Indicative modelled data</span>
+      </div>
+
+      {/* Summary bar chart */}
+      <div className="bg-card border border-card-border rounded-2xl p-5">
+        <h3 className="text-sm font-bold mb-4 flex items-center gap-2">
+          <Activity size={14} style={{ color: TEAL }} /> Revenue vs Cost vs Margin — by Base
+        </h3>
+        <div className="space-y-4">
+          {filtered.map(b => (
+            <div key={b.base} className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-foreground" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{b.base}</span>
+                <span className={`font-semibold ${b.margin > 500_000 ? "text-green-400" : b.margin > 0 ? "text-amber-400" : "text-red-400"}`}>
+                  {fmtAUD(b.margin)} margin
+                </span>
+              </div>
+              {/* Revenue bar */}
+              <div className="relative h-5 bg-background/50 rounded overflow-hidden border border-card-border">
+                <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${(b.revenue/barMax)*100}%`, background: TEAL, opacity: 0.85 }} />
+                <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${(b.directCosts/barMax)*100}%`, background: RED, opacity: 0.6 }} />
+                <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${(b.overhead/barMax)*100}%`, background: "#f59e0b", opacity: 0.4 }} />
+                <span className="absolute right-2 top-0.5 text-[10px] font-bold text-foreground">{fmtAUD(b.revenue)}</span>
+              </div>
+              <div className="flex gap-3 text-[10px] text-muted-foreground">
+                <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{background:TEAL,opacity:0.85}}/>Revenue: {fmtAUD(b.revenue)}</span>
+                <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{background:RED,opacity:0.6}}/>Direct: {fmtAUD(b.directCosts)}</span>
+                <span><span className="inline-block w-2 h-2 rounded-sm mr-1" style={{background:"#f59e0b",opacity:0.6}}/>Overhead: {fmtAUD(b.overhead)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Per-sector comparison */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {filtered.map(b => (
+          <div key={b.base} className="bg-card border border-card-border rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{b.base}</h4>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                b.margin > 500_000 ? "text-green-400 bg-green-500/10 border-green-500/30"
+                : b.margin > 0 ? "text-amber-400 bg-amber-500/10 border-amber-500/30"
+                : "text-red-400 bg-red-500/10 border-red-500/30"
+              }`}>{((b.margin/b.revenue)*100).toFixed(0)}% margin</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-background/50 rounded-lg p-2">
+                <div className="text-muted-foreground">Revenue/sector</div>
+                <div className="font-bold tabular-nums text-foreground">${b.revenuePerSector}</div>
+              </div>
+              <div className="bg-background/50 rounded-lg p-2">
+                <div className="text-muted-foreground">Cost/sector</div>
+                <div className="font-bold tabular-nums text-foreground">${b.costPerSector}</div>
+              </div>
+              <div className="bg-background/50 rounded-lg p-2">
+                <div className="text-muted-foreground">Sectors/yr</div>
+                <div className="font-bold tabular-nums text-foreground">{b.sectors.toLocaleString()}</div>
+              </div>
+              <div className="bg-background/50 rounded-lg p-2">
+                <div className="text-muted-foreground">Contribution</div>
+                <div className={`font-bold tabular-nums ${b.margin>0?"text-green-400":"text-red-400"}`}>{fmtAUD(b.margin)}</div>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Strengths</div>
+              {b.highlights.map((h,i) => <div key={i} className="text-[11px] text-muted-foreground flex gap-1.5"><span className="text-green-400 mt-px">✓</span>{h}</div>)}
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Revenue Leaks</div>
+              {b.leaks.map((l,i) => <div key={i} className="text-[11px] text-muted-foreground flex gap-1.5"><span className="text-red-400 mt-px">⚠</span>{l}</div>)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 text-xs text-amber-400/80">
+        <span className="font-bold text-amber-400">Note: </span>
+        Figures are indicative modelled estimates based on sector volumes and rate card data. Connect your financial system for live actuals.
+      </div>
+    </div>
+  );
+}
+
 // TAB 5 — Action Plan
 // ══════════════════════════════════════════════════════════════════════════
 function priorityColor(p: string) {
@@ -905,6 +1137,7 @@ export default function CostOptimizer() {
         <StaffingPlannerTab onApprove={handleApproveStaffing} approvedIds={addedIds} />
       )}
       {activeTab === "assets" && <AssetAcquisitionTab />}
+      {activeTab === "base-pnl" && <BasePnlTab />}
       {activeTab === "action-plan" && <ActionPlanTab />}
     </div>
   );

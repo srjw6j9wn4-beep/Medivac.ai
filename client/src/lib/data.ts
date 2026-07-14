@@ -157,6 +157,8 @@ export interface Aircraft {
   type: string;
   base: string;
   status: 'Serviceable' | 'Maintenance' | 'AOG' | 'Airborne';
+  assignedCaptain?: string;  // named captain for Part 121 / type-rated aircraft
+  assignedFO?: string;       // named first officer
   nextService: string;
   techLogState: 'Current' | 'Overdue' | 'Pending';
   defects: number;
@@ -175,6 +177,8 @@ export const AIRCRAFT: Aircraft[] = [
   { rego: 'VH-XYO', type: 'King Air B200C', base: 'Bankstown (YSBK)',     status: 'Serviceable', nextService: '120 hrs (48 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-XYR', type: 'King Air B200',  base: 'Broken Hill (YBHI)',   status: 'Serviceable', nextService: '120 hrs (88 remaining)', techLogState: 'Current',  defects: 1, maintenanceRelease: true  },
   { rego: 'VH-XYU', type: 'King Air B200',  base: 'Dubbo (YSDU)',         status: 'Maintenance', nextService: 'In maintenance',          techLogState: 'Pending',  defects: 3, maintenanceRelease: false },
+  // ── Bombardier Challenger 604/605 (1) ────────────────────────────────────────
+  { rego: 'VH-CL1', type: 'Challenger 604/605', base: 'Bankstown (YSBK)',   status: 'Serviceable', nextService: '600 hrs (312 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true, assignedCaptain: 'Capt. M. Fuge', assignedFO: 'F/O A. Walsh'  },
   // ── King Air B350 series (4) ────────────────────────────────────────────────
   { rego: 'VH-MQD', type: 'King Air B350',  base: 'Dubbo (YSDU)',         status: 'Airborne',    nextService: '300 hrs (44 remaining)', techLogState: 'Current',  defects: 0, maintenanceRelease: true  },
   { rego: 'VH-MQK', type: 'King Air B350',  base: 'Bankstown (YSBK)',     status: 'Serviceable', nextService: '300 hrs (112 remaining)', techLogState: 'Current', defects: 0, maintenanceRelease: true  },

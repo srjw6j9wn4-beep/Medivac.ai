@@ -150,6 +150,18 @@ const VIDEOS = [
     videoSrc: `/video/12_analyst.mp4`,
     backdropSrc: "/bg_12_analyst.png",
   },
+  {
+    id: 13,
+    title: "International Organ & Insurance Transfer",
+    duration: "2:08",
+    section: "Special Missions",
+    desc: "Bryan covers the full workflow for cross-border organ retrieval and insurance repatriation flights — international clearances, ANZOD coordination, cold ischaemia time monitoring, customs, and CASA Part 121 compliance.",
+    thumbSrc: "/thumb_13_international.png",
+    color: "from-indigo-900/60 to-slate-900",
+    accent: "border-indigo-400/40",
+    videoSrc: `/video/13_international.mp4`,
+    backdropSrc: "/bg_13_international.png",
+  },
 ];
 
 const STARTERS = [
@@ -247,6 +259,7 @@ export default function Bryan({ role }: Props) {
   // Other
   const [videoError, setVideoError] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const autoPlayRef = useRef(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainNodeRef  = useRef<GainNode | null>(null); // kept for type compat, no longer used
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -266,7 +279,7 @@ export default function Bryan({ role }: Props) {
   // Native volume at 1.0 is sufficient and avoids MediaElementSource re-routing issues.
   const audioSetupDone = useRef(false); // kept to avoid breaking video-switch reset logic
 
-  // When active video changes, reload
+  // When active video changes, reload — auto-play if tile was clicked
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -274,12 +287,22 @@ export default function Bryan({ role }: Props) {
     audioSetupDone.current = false;
     video.volume = 1.0;
     video.src = activeVideo.videoSrc;
-    video.load();
     setPlaying(false);
     setProgress(0);
     setCurrentTime("0:00");
     setTotalTime("0:00");
     setVideoError("");
+    video.load();
+    if (autoPlayRef.current) {
+      autoPlayRef.current = false;
+      const onCanPlay = () => {
+        video.removeEventListener("canplay", onCanPlay);
+        video.play().then(() => setVideoError("")).catch((err: Error) => {
+          setVideoError(err.message || "Playback blocked — tap Play to start.");
+        });
+      };
+      video.addEventListener("canplay", onCanPlay);
+    }
   }, [activeVideo]);
 
   // Wire video events
@@ -332,6 +355,7 @@ export default function Bryan({ role }: Props) {
   }
 
   function handleVideoSelect(v: typeof VIDEOS[0]) {
+    autoPlayRef.current = true;
     videoRef.current?.pause();
     setActiveVideo(v);
   }
@@ -344,6 +368,7 @@ export default function Bryan({ role }: Props) {
   }
 
   function handleNext() {
+    autoPlayRef.current = true;
     videoRef.current?.pause();
     setActiveVideo(VIDEOS[(VIDEOS.indexOf(activeVideo) + 1) % VIDEOS.length]);
   }

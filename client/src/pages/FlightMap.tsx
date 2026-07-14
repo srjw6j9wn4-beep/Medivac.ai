@@ -12,130 +12,83 @@ const ROUTES = [
   { from: { x: 44, y: 32 }, to: { x: 52, y: 48 }, mission: 'M004', status: 'Airborne', color: '#4ade80' },
 ];
 
-const AIRPORT_POSITIONS: Record<string, { x: number; y: number }> = {
-  YSDU: { x: 52, y: 48 },
-  YBHI: { x: 18, y: 44 },
-  YMLT: { x: 72, y: 82 },
-  YSSY: { x: 82, y: 68 },
-  YWLG: { x: 44, y: 32 },
-  YMOR: { x: 56, y: 28 },
-  YDYS: { x: 50, y: 72 },
-  YNAR: { x: 50, y: 48 },
-  YCOR: { x: 32, y: 44 },
-  YLHI: { x: 94, y: 44 },
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  Active:    'text-orange-400',
-  Airborne:  'text-cyan-400',
-  Pending:   'text-yellow-400',
-  Complete:  'text-green-400',
-  Cancelled: 'text-red-400',
-};
-
-// Default viewBox: full 100×65 canvas
-const DEFAULT_VB = { x: 0, y: 0, w: 100, h: 65 };
-const MIN_W = 20;   // max zoom in
-const MAX_W = 150;  // max zoom out
-
-// Approximate AU state borders mapped to 100×65 SVG coordinate space
-// Lon range: 114°E–154°E → 0–100; Lat range: -10°S–-44°S → 0–65
-const lonToX = (lon: number) => ((lon - 114) / 40) * 100;
-const latToY = (lat: number) => ((-lat - 10) / 34) * 65;
-const pt = (lon: number, lat: number) => `${lonToX(lon).toFixed(1)},${latToY(lat).toFixed(1)}`;
-
-// Simplified state border polygons (approximate major boundary vertices)
-const STATE_BORDERS = [
-  { id: 'nsw', label: 'NSW', labelPos: { lon: 146, lat: -31.5 },
-    points: [pt(141,  -34), pt(141,  -29), pt(149.3,-28.2), pt(150.1,-29.5), pt(152.5,-31.5), pt(153.5,-28.2), pt(153.6,-26.5), pt(151.2,-24.6), pt(150,-23.5), pt(148,-24), pt(145,-25.5), pt(141,-29), pt(141,-34), pt(141,-34), pt(150.2,-34.1), pt(149.9,-37.5), pt(148.2,-37.5), pt(146.4,-38), pt(143,-38), pt(141,-34)] },
-  { id: 'vic', label: 'VIC', labelPos: { lon: 144.5, lat: -36.8 },
-    points: [pt(141,-34), pt(141,-38), pt(143,-38), pt(146.4,-38), pt(148.2,-37.5), pt(149.9,-37.5), pt(150.2,-34.1), pt(141,-34)] },
-  { id: 'qld', label: 'QLD', labelPos: { lon: 145, lat: -22 },
-    points: [pt(138,-26), pt(138,-29), pt(141,-29), pt(141,-22), pt(138,-22), pt(138,-17), pt(139.5,-17), pt(141,-17), pt(141,-26), pt(138,-26)] },
-  { id: 'sa',  label: 'SA',  labelPos: { lon: 135, lat: -30 },
-    points: [pt(129,-31.5), pt(129,-26), pt(132,-26), pt(132,-22), pt(138,-22), pt(138,-26), pt(141,-26), pt(141,-34), pt(129,-34), pt(129,-31.5)] },
-  { id: 'wa',  label: 'WA',  labelPos: { lon: 122, lat: -27 },
-    points: [pt(114,-22), pt(114,-34), pt(129,-34), pt(129,-26), pt(129,-22), pt(114,-22)] },
-  { id: 'nt',  label: 'NT',  labelPos: { lon: 133, lat: -19 },
-    points: [pt(129,-26), pt(129,-22), pt(132,-22), pt(132,-17), pt(136,-17), pt(136,-26), pt(129,-26)] },
-];
 
 export default function FlightMap({ role }: Props) {
   const [selectedMission, setSelectedMission] = useState<string | null>(null);
   const [hoveredAirport, setHoveredAirport]   = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen]       = useState(false);
-  const [showStateBorders, setShowStateBorders] = useState(true);
-  const [showAllAircraft, setShowAllAircraft]   = useState(false);
 
   // ViewBox state for pan/zoom
-  const [vb, setVb] = useState(DEFAULT_VB);
+  const leafletRef     = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
 
-  // Drag state (stored in ref to avoid re-render on every mousemove)
-  const dragging   = useRef(false);
-  const dragStart  = useRef({ mx: 0, my: 0, vbx: 0, vby: 0 });
-  const svgRef     = useRef<SVGSVGElement>(null);
+
+  // ── Leaflet map initialisation ────────────────────────────────────────────
+  useEffect(() => {
+    if (mapInstanceRef.current || !leafletRef.current) return;
+    import("leaflet").then(L => {
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      });
+      const map = L.map(leafletRef.current!, {
+        center: [-32.5, 146.5], zoom: 6,
+        zoomControl: true, attributionControl: true,
+      });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18,
+      }).addTo(map);
+
+      // Airport markers
+      NSW_AIRPORTS.forEach(ap => {
+        const isBase = ap.icao === 'YSDU' || ap.icao === 'YBHI' || ap.icao === 'YSBK';
+        const html = isBase
+          ? `<div style="background:#0097A7;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">✈</div>`
+          : `<div style="background:#1e293b;color:#94a3b8;border-radius:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;border:1px solid #334155;box-shadow:0 1px 4px rgba(0,0,0,0.4);">✈</div>`;
+        L.marker([ap.lat, ap.lng], {
+          icon: L.divIcon({ className: "", html, iconSize: isBase ? [30,30] : [22,22], iconAnchor: isBase ? [15,15] : [11,11] })
+        }).bindPopup(`<b>${ap.name}</b><br/>${ap.icao}${isBase ? "<br/><b style='color:#0097A7'>RFDS Base</b>" : ""}`).addTo(map);
+      });
+
+      // Active mission routes
+      MISSIONS.filter(m => m.status !== 'Complete' && m.status !== 'Cancelled').forEach(m => {
+        const fromAp = NSW_AIRPORTS.find(a => a.icao === m.from);
+        const toAp   = NSW_AIRPORTS.find(a => a.icao === m.to);
+        if (fromAp && toAp) {
+          const color = m.status === 'Airborne' ? '#22d3ee' : m.status === 'Active' ? '#f97316' : '#facc15';
+          L.polyline([[fromAp.lat, fromAp.lng],[toAp.lat, toAp.lng]], {
+            color, weight: m.status === 'Airborne' ? 3 : 2, opacity: 0.85,
+            dashArray: m.status === 'Airborne' ? undefined : "6 4",
+          }).bindPopup(`<b>${m.callsign}</b><br/>${m.from} → ${m.to}<br/>${m.status}`).addTo(map);
+        }
+      });
+
+      mapInstanceRef.current = { map, L };
+    });
+    return () => {
+      if (mapInstanceRef.current) { mapInstanceRef.current.map.remove(); mapInstanceRef.current = null; }
+    };
+  }, []);
+
+  const zoom = (factor: number) => {
+    if (mapInstanceRef.current) {
+      factor < 1 ? mapInstanceRef.current.map.zoomIn() : mapInstanceRef.current.map.zoomOut();
+    }
+  };
+  const resetView = () => {
+    if (mapInstanceRef.current) mapInstanceRef.current.map.setView([-32.5, 146.5], 6);
+  };
 
   const selected       = MISSIONS.find(m => m.id === selectedMission);
   const activeMissions = MISSIONS.filter(m => m.status !== 'Complete' && m.status !== 'Cancelled');
 
   // ── Zoom ─────────────────────────────────────────────────────────────────────
-  function zoom(factor: number, cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2) {
-    setVb(prev => {
-      const newW = Math.min(MAX_W, Math.max(MIN_W, prev.w * factor));
-      const ratio = newW / prev.w;
-      // keep the zoom centre fixed
-      const newX = cx - (cx - prev.x) * ratio;
-      const newH = prev.h * ratio;
-      const newY = cy - (cy - prev.y) * ratio;
-      return { x: newX, y: newY, w: newW, h: newH };
-    });
-  }
 
-  // ── Scroll-wheel zoom ─────────────────────────────────────────────────────
-  function handleWheel(e: React.WheelEvent<SVGSVGElement>) {
-    e.preventDefault();
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    // Convert mouse position to SVG coordinate space
-    const mx = vb.x + ((e.clientX - rect.left) / rect.width)  * vb.w;
-    const my = vb.y + ((e.clientY - rect.top)  / rect.height) * vb.h;
-    zoom(e.deltaY > 0 ? 1.15 : 0.87, mx, my);
-  }
-
-  // ── Pan (drag) ────────────────────────────────────────────────────────────
-  function handleMouseDown(e: React.MouseEvent<SVGSVGElement>) {
-    dragging.current  = true;
-    dragStart.current = { mx: e.clientX, my: e.clientY, vbx: vb.x, vby: vb.y };
-  }
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!dragging.current || !svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const scaleX = vb.w / rect.width;
-    const scaleY = vb.h / rect.height;
-    const dx = (e.clientX - dragStart.current.mx) * scaleX;
-    const dy = (e.clientY - dragStart.current.my) * scaleY;
-    setVb(prev => ({
-      ...prev,
-      x: dragStart.current.vbx - dx,
-      y: dragStart.current.vby - dy,
-    }));
-  }, [vb.w, vb.h]);
-
-  const handleMouseUp = useCallback(() => { dragging.current = false; }, []);
-
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup',   handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup',   handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
 
   // Reset view
-  function resetView() { setVb(DEFAULT_VB); }
 
   // ── Fullscreen (CSS overlay — no browser API needed) ─────────────────────
   function toggleFullscreen() { setIsFullscreen(f => !f); }
@@ -187,26 +140,6 @@ export default function FlightMap({ role }: Props) {
           >
             <RotateCcw size={12} />
           </button>
-          {/* State borders toggle */}
-          <button
-            onClick={() => setShowStateBorders(b => !b)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold transition-colors border ${
-              showStateBorders ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-300' : 'border-card-border text-muted-foreground hover:text-foreground'
-            }`}
-            title="Toggle state borders"
-          >
-            Borders
-          </button>
-          {/* All aircraft toggle */}
-          <button
-            onClick={() => setShowAllAircraft(b => !b)}
-            className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold transition-colors border ${
-              showAllAircraft ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-card-border text-muted-foreground hover:text-foreground'
-            }`}
-            title="Show all aircraft including airborne"
-          >
-            All A/C
-          </button>
           <div className="w-px h-4 bg-white/10 mx-1" />
           <button
             onClick={toggleFullscreen}
@@ -217,134 +150,9 @@ export default function FlightMap({ role }: Props) {
           </button>
         </div>
 
-        {/* SVG canvas */}
-        <div className="relative flex-1" style={compact ? {} : { paddingBottom: '62%' }}>
-          <svg
-            ref={svgRef}
-            viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
-            className={cn("w-full", compact ? "h-full absolute inset-0" : "absolute inset-0 h-full")}
-            style={{
-              background: 'radial-gradient(ellipse at 50% 50%, rgba(6,182,212,0.03) 0%, transparent 70%)',
-              cursor: dragging.current ? 'grabbing' : 'grab',
-              userSelect: 'none',
-            }}
-            onWheel={handleWheel}
-            onMouseDown={handleMouseDown}
-          >
-            {/* State borders */}
-            {showStateBorders && STATE_BORDERS.map(s => (
-              <g key={s.id}>
-                <polygon
-                  points={s.points.join(' ')}
-                  fill="none"
-                  stroke="rgba(148,163,184,0.20)"
-                  strokeWidth="0.35"
-                  strokeDasharray="0.8,0.4"
-                />
-                <text
-                  x={lonToX(s.labelPos.lon)}
-                  y={latToY(s.labelPos.lat)}
-                  fontSize="2.4"
-                  fill="rgba(148,163,184,0.35)"
-                  textAnchor="middle"
-                  fontFamily="monospace"
-                  fontWeight="bold"
-                  style={{ pointerEvents: 'none', userSelect: 'none' }}
-                >{s.label}</text>
-              </g>
-            ))}
-
-            {/* Grid lines */}
-            {[20, 40, 60, 80].map(x => (
-              <line key={`vg${x}`} x1={x} y1="0" x2={x} y2="65" stroke="rgba(255,255,255,0.03)" strokeWidth="0.3" />
-            ))}
-            {[13, 26, 39, 52].map(y => (
-              <line key={`hg${y}`} x1="0" y1={y} x2="100" y2={y} stroke="rgba(255,255,255,0.03)" strokeWidth="0.3" />
-            ))}
-
-            {/* Flight routes */}
-            {ROUTES.map(r => (
-              <g key={r.mission}>
-                <line
-                  x1={r.from.x} y1={r.from.y} x2={r.to.x} y2={r.to.y}
-                  stroke={r.color}
-                  strokeWidth={selectedMission === r.mission ? "0.8" : "0.4"}
-                  strokeDasharray={r.status === 'Airborne' ? "none" : "1,1"}
-                  opacity={r.status === 'Complete' ? 0.3 : 0.7}
-                />
-                {r.status === 'Airborne' && (
-                  <circle r="0.8" fill={r.color}>
-                    <animateMotion
-                      dur="8s"
-                      repeatCount="indefinite"
-                      path={`M${r.from.x},${r.from.y} L${r.to.x},${r.to.y}`}
-                    />
-                  </circle>
-                )}
-              </g>
-            ))}
-
-            {/* Airports */}
-            {NSW_AIRPORTS.map(ap => {
-              const pos = AIRPORT_POSITIONS[ap.icao];
-              if (!pos) return null;
-              const isBase    = ap.icao === 'YSDU' || ap.icao === 'YBHI' || ap.icao === 'YSBK';
-              const isHovered = hoveredAirport === ap.icao;
-              return (
-                <g key={ap.icao}
-                  onMouseEnter={() => setHoveredAirport(ap.icao)}
-                  onMouseLeave={() => setHoveredAirport(null)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  {isBase && (
-                    <circle cx={pos.x} cy={pos.y} r="2.5" fill="rgba(34,211,238,0.1)" stroke="rgba(34,211,238,0.3)" strokeWidth="0.3" />
-                  )}
-                  <circle
-                    cx={pos.x} cy={pos.y}
-                    r={isBase ? "1.2" : "0.8"}
-                    fill={isBase ? "#22d3ee" : "#64748b"}
-                    stroke={isHovered ? "#fff" : "none"}
-                    strokeWidth="0.3"
-                  />
-                  <text
-                    x={pos.x + 1.8} y={pos.y + 0.8}
-                    fontSize="2.2"
-                    fill={isBase ? "#22d3ee" : "#94a3b8"}
-                    fontFamily="monospace"
-                    fontWeight={isBase ? "bold" : "normal"}
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {ap.icao}
-                  </text>
-                  {isHovered && (
-                    <text x={pos.x + 1.8} y={pos.y + 3.2} fontSize="1.8" fill="#e2e8f0" style={{ pointerEvents: 'none' }}>
-                      {ap.name}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-
-          {/* Legend — always bottom-left of the SVG wrapper */}
-          <div className="absolute bottom-3 left-3 flex flex-col gap-1 pointer-events-none">
-            {[
-              { color: 'bg-cyan-400',   label: 'Airborne' },
-              { color: 'bg-orange-400', label: 'Active' },
-              { color: 'bg-yellow-400', label: 'Pending' },
-              { color: 'bg-green-400',  label: 'Complete' },
-            ].map(l => (
-              <div key={l.label} className="flex items-center gap-1.5">
-                <span className={`w-2 h-0.5 ${l.color} rounded`} />
-                <span className="text-[10px] text-muted-foreground">{l.label}</span>
-              </div>
-            ))}
-          </div>
-
-          {/* Zoom level hint */}
-          <div className="absolute top-3 right-3 text-[9px] text-muted-foreground/50 pointer-events-none font-mono">
-            {Math.round((DEFAULT_VB.w / vb.w) * 100)}%
-          </div>
+        {/* Leaflet map — OpenStreetMap tiles + airport overlays */}
+        <div className="relative flex-1" style={{ minHeight: compact ? "100%" : "480px" }}>
+          <div ref={leafletRef} style={{ width: "100%", height: "100%", minHeight: compact ? "400px" : "480px" }} />
         </div>
       </div>
     );

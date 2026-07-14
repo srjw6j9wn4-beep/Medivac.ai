@@ -31,8 +31,8 @@ import { apiRequest, API_BASE } from "@/lib/queryClient";
 import type { UserRole } from "@/lib/data";
 
 // ── Avatar config ─────────────────────────────────────────────────────────────
-const AVATAR_ID = "bd43ce31-7425-4379-8407-60f029548e61"; // New avatar (confirmed working)
-const VOICE_ID  = "9c8b542a-bf5c-4f4c-9011-75c79a274387"; // Bryan - Professional (male)
+const AVATAR_ID = "bd43ce31-7425-4379-8407-60f029548e61"; // Jennifer avatar (confirmed working)
+const VOICE_ID  = "5f745b3db0db43739f31499f4f0aedd6"; // Claire Lawson (Jennifer's voice)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Msg    = { role: "user" | "ai"; text: string };
@@ -71,7 +71,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
 
   const [chatLog, setChatLog]             = useState<Msg[]>([{
     role: "ai",
-    text: "G'day — I'm Graham, your Medivac.ai AI presenter and mission analyst. Press \"Go Live\" to connect — I'll answer your questions face to face with full voice and expressions.",
+    text: "Hello — I'm Jennifer, Medivac.ai's core intelligence. Press \"Go Live\" to connect — I'll answer your questions face to face with full voice and deep platform knowledge.",
   }]);
   const [apiHistory, setApiHistory]       = useState<ApiMsg[]>([]);
   const [input, setInput]                 = useState("");
@@ -81,6 +81,9 @@ export default function JenniferLive({ role }: { role: UserRole }) {
   const [micTranscript, setMicTranscript] = useState("");
 
   const videoRef          = useRef<HTMLVideoElement>(null);
+  const canvasRef         = useRef<HTMLCanvasElement>(null);
+  const rafRef            = useRef<number>(0);
+  const imgDataRef        = useRef<ImageData | null>(null);
   const audioRef          = useRef<HTMLAudioElement | null>(null);
   const sessionRef        = useRef<LiveAvatarSession | null>(null);
   const chatEndRef        = useRef<HTMLDivElement>(null);
@@ -119,7 +122,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
     if (streamReadyRef.current && sessionStartedRef.current && !greetedRef.current) {
       greetedRef.current = true;
       setTimeout(() => {
-        const greeting = "G'day — I'm Graham, Medivac.ai's AI presenter. I'm live and ready to answer your questions. Ask me anything about dispatch gates, mission types, compliance, or the connected apps.";
+        const greeting = "Hello — I'm Jennifer, Medivac.ai's core intelligence. I'm live and ready to answer your questions. Ask me anything about our platform, compliance, mission operations, or the connected apps.";
         setChatLog(prev => [...prev, { role: "ai", text: greeting }]);
         jenniferSpeak(greeting);
       }, 800);
@@ -141,7 +144,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
       if (!data.token) throw new Error(data.error || "Failed to get session token");
 
       setConnState("connecting");
-      setStatusMsg("Connecting to Graham…");
+      setStatusMsg("Connecting to Jennifer…");
 
       const session = new LiveAvatarSession(data.token);
       sessionRef.current = session;
@@ -155,8 +158,9 @@ export default function JenniferLive({ role }: { role: UserRole }) {
           videoRef.current.play().catch(() => {});
         }
         setConnState("live");
-        setStatusMsg("Graham is live");
+        setStatusMsg("Jennifer is live");
         streamReadyRef.current = true;
+        startChromaKey();
         maybeGreet();
       });
 
@@ -192,9 +196,55 @@ export default function JenniferLive({ role }: { role: UserRole }) {
   }
 
   // ── End session ───────────────────────────────────────────────────────────
+
+  // ── Chroma-key canvas (removes HeyGen green, draws backdrop + avatar) ────────
+  function startChromaKey() {
+    const vid = videoRef.current;
+    const cvs = canvasRef.current;
+    if (!vid || !cvs) return;
+    const scratch = document.createElement('canvas');
+    const sCtx = scratch.getContext('2d', { willReadFrequently: true });
+    const dCtx = cvs.getContext('2d',    { willReadFrequently: true });
+    if (!sCtx || !dCtx) return;
+
+    // Pre-load the backdrop image so we can draw it directly onto the canvas
+    const backdropImg = new Image();
+    backdropImg.src = '/jennifer_backdrop_v2.png';
+    let backdropReady = false;
+    backdropImg.onload = () => { backdropReady = true; };
+
+    function processFrame() {
+      const v = videoRef.current;
+      const c = canvasRef.current;
+      if (!v || !c || v.readyState < 2 || v.videoWidth === 0) { scheduleNext(); return; }
+      const fw = v.videoWidth; const fh = v.videoHeight;
+      if (c.width !== fw) c.width = fw;
+      if (c.height !== fh) c.height = fh;
+
+      // Draw avatar video directly — CSS backdrop behind canvas shows through the page
+      dCtx.drawImage(v, 0, 0, fw, fh);
+      scheduleNext();
+    }
+    function scheduleNext() {
+      const v = videoRef.current;
+      if (!v) return;
+      if ('requestVideoFrameCallback' in v) { (v as any).requestVideoFrameCallback(processFrame); }
+      else { rafRef.current = requestAnimationFrame(processFrame); }
+    }
+    scheduleNext();
+  }
+
+  function stopChromaKey() {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
+    imgDataRef.current = null;
+    const c = canvasRef.current;
+    if (c) { const ctx = c.getContext('2d'); ctx?.clearRect(0, 0, c.width, c.height); }
+  }
+
   function doEndSession(silent = false) {
     if (keepAliveRef.current) clearInterval(keepAliveRef.current);
     stopMic();
+    stopChromaKey();
     sessionRef.current?.stop().catch(() => {});
     sessionRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -401,10 +451,10 @@ export default function JenniferLive({ role }: { role: UserRole }) {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-            Graham — Live Avatar Q&amp;A
+            Jennifer — Medivac.ai Core Intelligence
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            LiveAvatar · WebRTC · Real face &amp; voice · Claude AI · Type or speak your question
+            Your AI mission analyst — live face-to-face, real voice, across every module
           </p>
         </div>
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
@@ -423,10 +473,10 @@ export default function JenniferLive({ role }: { role: UserRole }) {
         <div className="rounded-2xl border border-card-border overflow-hidden" style={{ background: '#050d1a' }}>
           <div className="px-4 py-3 border-b border-card-border">
             <p className="font-semibold text-sm" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Medivac.AI — Aeromedical Operations Reimagined</p>
-            <p className="text-xs text-muted-foreground mt-0.5">2:34 · Watch Graham introduce the platform, then go live to ask questions</p>
+            <p className="text-xs text-muted-foreground mt-0.5">2:34 · Go live to ask Jennifer anything about the platform face to face</p>
           </div>
           <div className="relative" style={{ paddingBottom: '56.25%' }}>
-            <video className="absolute inset-0 w-full h-full" src={`/video/jennifer_intro.mp4`} controls playsInline poster="/jennifer_bg.jpg" style={{ background: '#050d1a' }} />
+            <video className="absolute inset-0 w-full h-full" src={`/video/jennifer_intro.mp4`} controls playsInline poster="/jennifer_backdrop_v2.png" style={{ background: '#050d1a' }} />
           </div>
         </div>
       )}
@@ -434,43 +484,42 @@ export default function JenniferLive({ role }: { role: UserRole }) {
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
 
         {/* ── LEFT: Avatar ──────────────────────────────────────── */}
-        <div className="xl:col-span-2 space-y-4">
+        <div className="xl:col-span-3 space-y-4">
 
           {/* GO LIVE banner — only shown when not yet connected */}
           {!isLive && !isConnecting && (
             <button onClick={startSession}
               className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-lg text-black bg-cyan-400 hover:bg-cyan-300 shadow-xl shadow-cyan-400/30 transition-all active:scale-95 animate-pulse hover:animate-none border-2 border-cyan-300">
               <PhoneCall size={22} />
-              GO LIVE — Start Talking to Graham
+              GO LIVE — Talk to Jennifer
             </button>
           )}
           {isConnecting && (
             <div className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-sm text-cyan-400 border border-cyan-400/30" style={{ background: 'rgba(5,13,26,0.7)' }}>
               <Loader2 size={18} className="animate-spin" />
-              {statusMsg || "Connecting to Graham…"}
+              {statusMsg || "Connecting to Jennifer…"}
             </div>
           )}
-          <div className="rounded-2xl border border-card-border overflow-hidden relative" style={{ background: 'linear-gradient(rgba(5,13,26,0.80), rgba(5,13,26,0.88)), url(/jennifer_bg.jpg) center/cover no-repeat' }}>
+          <div className="rounded-2xl border border-card-border overflow-hidden relative" style={{ background: 'linear-gradient(rgba(5,13,26,0.80), rgba(5,13,26,0.88)), url(/jennifer_backdrop_v2.png) center/cover no-repeat' }}>
 
             {/* Portrait video — 9:16 aspect ratio, fills frame */}
-            <div className="relative w-full" style={{ aspectRatio: '9/16', minHeight: 420, maxHeight: 640, background: 'linear-gradient(rgba(5,13,26,0.85), rgba(5,13,26,0.92)), url(/jennifer_bg.jpg) center/cover no-repeat' }}>
+            <div className="relative w-full" style={{ aspectRatio: '9/16', minHeight: 420, maxHeight: 640, background: 'linear-gradient(rgba(5,13,26,0.85), rgba(5,13,26,0.92)), url(/jennifer_backdrop_v2.png) center/cover no-repeat' }}>
 
+              {/* Video hidden — attach() needs it in DOM, chroma-key canvas renders on top */}
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted={false}
                 className="absolute inset-0 w-full h-full object-cover"
-                style={{ display: isLive ? "block" : "none" }}
-                onClick={() => {
+                style={{ opacity: isLive ? 1 : 0, pointerEvents: "none" }}
+              />
 
-                  // Fallback: unmute video directly
-                  if (videoRef.current) {
-                    videoRef.current.muted = false;
-                    videoRef.current.volume = 1.0;
-                    videoRef.current.play().catch(() => {});
-                  }
-                }}
+              {/* Canvas — chroma-keys out HeyGen green, backdrop shows through */}
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ opacity: 0, pointerEvents: "none" }}
               />
 
               {!isLive && (
@@ -490,7 +539,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
                     )}
                   </div>
                   <div className="text-center space-y-1">
-                    <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Graham</h2>
+                    <h2 className="text-lg font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Jennifer</h2>
                     <p className="text-xs text-muted-foreground max-w-[200px] leading-relaxed text-center">
                       {isConnecting ? statusMsg : "Live face-to-face AI Q&A — real expressions, real voice, deep Medivac.ai knowledge"}
                     </p>
@@ -499,7 +548,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
                     <button onClick={startSession} data-testid="button-start-session"
                       className="flex items-center justify-center gap-3 w-full px-6 py-4 bg-cyan-400 hover:bg-cyan-300 text-black text-base font-black rounded-2xl transition-all shadow-xl shadow-cyan-400/40 active:scale-95 animate-pulse hover:animate-none">
                       <PhoneCall size={20} />
-                      GO LIVE — Talk to Graham
+                      GO LIVE — Talk to Jennifer
                     </button>
                   )}
                 </div>
@@ -557,8 +606,8 @@ export default function JenniferLive({ role }: { role: UserRole }) {
               </button>
               <div className="flex-1 text-[10px] text-muted-foreground text-center">
                 {isLive
-                  ? micActive  ? "Speak now — Graham will answer live"
-                  : speaking   ? "Graham is speaking…"
+                  ? micActive  ? "Speak now — Jennifer will answer live"
+                  : speaking   ? "Jennifer is speaking…"
                   : thinking   ? "Thinking…"
                   :              "Type or use the mic"
                   : isConnecting ? statusMsg
@@ -585,7 +634,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
           )}
 
           {/* Quick questions */}
-          <div className="space-y-2 p-3 rounded-2xl border border-card-border backdrop-blur-sm" style={{ background: 'linear-gradient(rgba(5,13,26,0.78), rgba(5,13,26,0.85)), url(/jennifer_bg.jpg) center bottom/cover no-repeat' }}>
+          <div className="space-y-2 p-3 rounded-2xl border border-card-border backdrop-blur-sm" style={{ background: 'linear-gradient(rgba(5,13,26,0.78), rgba(5,13,26,0.85)), url(/jennifer_backdrop_v2.png) center bottom/cover no-repeat' }}>
             <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Quick Questions</div>
             <div className="flex flex-wrap gap-1.5">
               {QUICK_QUESTIONS.map(q => (
@@ -599,11 +648,11 @@ export default function JenniferLive({ role }: { role: UserRole }) {
         </div>
 
         {/* ── RIGHT: Chat ────────────────────────────────────────── */}
-        <div className="xl:col-span-3 flex flex-col rounded-2xl border border-card-border overflow-hidden relative" style={{ minHeight: 580, background: 'linear-gradient(rgba(5,13,26,0.82), rgba(5,13,26,0.88)), url(/jennifer_bg.jpg) center/cover no-repeat' }}>
+        <div className="xl:col-span-2 flex flex-col rounded-2xl border border-card-border overflow-hidden relative" style={{ minHeight: 580, background: 'linear-gradient(rgba(5,13,26,0.82), rgba(5,13,26,0.88)), url(/jennifer_backdrop_v2.png) center/cover no-repeat' }}>
 
           <div className="px-4 py-3 border-b border-card-border flex items-center gap-2 flex-wrap backdrop-blur-sm" style={{ background: 'rgba(5,13,26,0.70)' }}>
             <MessageCircle size={14} className="text-cyan-400 shrink-0" />
-            <span className="text-sm font-semibold">Graham Q&amp;A</span>
+            <span className="text-sm font-semibold">Jennifer — Core Intelligence</span>
             <span className="text-[9px] px-2 py-0.5 bg-cyan-400/10 text-cyan-400 rounded-full border border-cyan-400/20">
               Claude AI · Medivac.ai + connected apps
             </span>
@@ -629,7 +678,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
                   style={msg.role === "ai" ? { background: 'rgba(5,13,26,0.78)' } : {}}
                 >
                   {msg.role === "ai" && (
-                    <span className="text-cyan-400 font-bold text-[10px] block mb-1">Graham</span>
+                    <span className="text-cyan-400 font-bold text-[10px] block mb-1">Jennifer</span>
                   )}
                   {msg.text}
                 </div>
@@ -642,7 +691,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
                   <span className="text-[10px] font-bold text-cyan-400">J</span>
                 </div>
                 <div className="border border-white/10 p-3 rounded-2xl rounded-tl-sm flex items-center gap-2 backdrop-blur-sm" style={{ background: 'rgba(5,13,26,0.78)' }}>
-                  <span className="text-cyan-400 font-bold text-[10px]">Graham</span>
+                  <span className="text-cyan-400 font-bold text-[10px]">Jennifer</span>
                   {[0,1,2].map(i => (
                     <span key={i} className="w-1.5 h-1.5 rounded-full bg-cyan-400/60 animate-bounce"
                       style={{ animationDelay: `${i * 120}ms` }} />
@@ -668,7 +717,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
           <div className="px-4 py-3 border-t border-card-border space-y-2 backdrop-blur-sm" style={{ background: 'rgba(5,13,26,0.80)' }}>
             {!isLive && connState === "idle" && (
               <p className="text-[10px] text-muted-foreground text-center pb-1">
-                Text chat works without a live session. Start the session for Graham to answer face to face.
+                Text chat works without a live session. Start the session for Jennifer to answer face to face.
               </p>
             )}
             <div className="flex gap-2">
@@ -687,7 +736,7 @@ export default function JenniferLive({ role }: { role: UserRole }) {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && !thinking && !micActive && handleSend()}
-                placeholder={micActive ? "Listening…" : "Ask Graham anything about Medivac.ai…"}
+                placeholder={micActive ? "Listening…" : "Ask Jennifer anything about Medivac.ai…"}
                 disabled={thinking || micActive}
                 data-testid="input-question"
                 className="flex-1 border border-white/15 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-cyan-400/50 disabled:opacity-50 text-white placeholder:text-slate-400" style={{ background: 'rgba(5,13,26,0.75)' }}

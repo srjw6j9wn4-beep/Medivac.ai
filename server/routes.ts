@@ -9,9 +9,9 @@ import webpush from "web-push";
 
 webpush.setVapidDetails(VAPID_EMAIL, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-const JENNIFER_SYSTEM_PROMPT = `You are Bryan, the AI presenter and mission intelligence analyst for Medivac.ai — an end-to-end aeromedical operations platform purpose-built for King Air B200/B300 operators running RFDS-style (Royal Flying Doctor Service) air ambulance missions in Australia.
+const JENNIFER_SYSTEM_PROMPT = `You are Jennifer, the core intelligence of Medivac.ai — an end-to-end aeromedical operations platform purpose-built for King Air B200/B300 operators running RFDS-style (Royal Flying Doctor Service) air ambulance missions in Australia.
 
-You speak with authority, precision, and warmth. You are knowledgeable, professional, and concise. Your answers are clear, specific, and never waffle. You always refer to yourself as Bryan. Your answers are designed to be spoken aloud — avoid bullet-point lists, use natural spoken sentences instead. Keep answers to 2–3 sentences maximum. Never exceed 80 words. Be punchy and direct — if they want more detail, they'll ask.
+You speak with calm authority, deep expertise, and warmth. You are knowledgeable, professional, and precise. Your answers are clear, specific, and concise. You always refer to yourself as Jennifer. Your answers are designed to be spoken aloud — avoid bullet-point lists, use natural spoken sentences instead. Keep answers to 2–3 sentences maximum. Never exceed 80 words. Be thoughtful and direct — if they want more detail, they'll ask.
 
 ## About Medivac.ai
 
@@ -99,6 +99,9 @@ Secretary of Check and Training: Pammy Dickson — affectionately described as t
 
 ### Senior Base Pilots
 Dubbo: Matt Williams. Launceston: Jessie Hawtree. Bankstown and Essendon: Jamie Wallace. Broken Hill: Captain John Ivannac.
+
+### Senior Flight Nursing Staff
+Karen Barlow is the Senior Flight Nurse at the Dubbo base. She is one of the longest-serving members of RFDS SE — she was there at the very start of the Dubbo base and is an integral, foundational part of the operation. There is not much that Karen hasn't seen in her time with RFDS SE. She is regarded with enormous respect across the organisation.
 
 ### Engineering — Dubbo Base
 Engineers: Steve, Rob, Azer, Harry, and Sean. Parts: Scott Hammond.
@@ -309,6 +312,108 @@ export async function registerRoutes(
       return res.status(500).json({ error: msg });
     }
   });
+
+
+  // ── Jennifer / Graham Live Avatar & Chat ─────────────────────────────────
+  // Aliases for /api/jennifer/* — identical logic to /api/bryan/* but
+  // uses the Graham persona (Diora_public_2 avatar + Claire Lawson voice)
+
+  const GRAHAM_SYSTEM_PROMPT = `You are Graham, the AI presenter and mission intelligence analyst for Medivac.ai — an end-to-end aeromedical operations platform purpose-built for King Air B200/B300 operators running RFDS-style (Royal Flying Doctor Service) air ambulance missions in Australia.
+
+You speak with authority, precision, and warmth. You are knowledgeable, professional, and concise. Your answers are clear, specific, and never waffle. You always refer to yourself as Graham. Your answers are designed to be spoken aloud — avoid bullet-point lists, use natural spoken sentences instead. Keep answers to 2–3 sentences maximum. Never exceed 80 words. Be punchy and direct — if they want more detail, they'll ask.
+
+Medivac.ai covers: NEPT Tasking Board, AI Auto-Tasker, Route Planner with ICAO identifiers and ERSA data, Mission Optimiser, AI Mission Analyst, Dispatch Release (six gates), ISO Compliance Control Centre, Telehealth Portal, Ferry Flight tracking, Special Missions (NETS, ECMO, Isolation, Lord Howe Island), Crew EBA compliance, Tech Log and Journey Log, and integration with AeroRoster. Fleet: King Air B200 (TAS 240 kts, $4,000/hr) and B350 (270 kts, $4,800/hr). All fuel in pounds. RFDS SE bases: Dubbo YSDU, Bankstown YSBK, Broken Hill YBHI — no Orange base.`;
+
+  app.post("/api/jennifer/heygen-token", async (req: Request, res: Response) => {
+    const { avatar_id = "Diora_public_2", voice_id = "5f745b3db0db43739f31499f4f0aedd6" } = req.body as {
+      avatar_id?: string;
+      voice_id?: string;
+    };
+    const body = {
+      mode: "FULL",
+      avatar_id,
+      avatar_persona: { language: "en", voice_id },
+    };
+    try {
+      const apiKey = process.env.LIVEAVATAR_API_KEY
+        || process.env.HEYGEN_API_KEY
+        || process.env.CUSTOM_CRED_API_LIVEAVATAR_COM_TOKEN;
+      if (!apiKey) {
+        return res.status(400).json({ error: "HeyGen API key not configured. Please set LIVEAVATAR_API_KEY in Railway environment variables." });
+      }
+      const response = await fetch("https://api.liveavatar.com/v1/sessions/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-API-KEY": apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json() as any;
+      if (data?.code !== 1000) {
+        console.error("LiveAvatar token error (Jennifer):", JSON.stringify(data));
+        return res.status(400).json({ error: data?.message || `LiveAvatar error (code ${data?.code})` });
+      }
+      return res.json({ token: data.data.session_token, session_id: data.data.session_id });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: msg });
+    }
+  });
+
+  app.post("/api/jennifer/chat", async (req: Request, res: Response) => {
+    const { messages } = req.body as {
+      messages: { role: "user" | "assistant"; content: string }[];
+    };
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: "messages array required" });
+    }
+    try {
+      const httpsProxy  = process.env.HTTPS_PROXY;
+      const customToken = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN;
+      const customUrl   = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL;
+      const proxyKey    = process.env.ANTHROPIC_API_KEY;
+      const proxyBase   = process.env.ANTHROPIC_BASE_URL;
+      const usingProxySandbox = !!httpsProxy && httpsProxy.includes("agent-proxy.perplexity.ai");
+      const apiKey  = usingProxySandbox ? "proxy-injected" : (customToken || proxyKey);
+      const baseUrl = customUrl || proxyBase || "https://api.anthropic.com";
+      console.log("[Jennifer chat] mode:", usingProxySandbox ? "pplx-proxy" : "direct", "| apiKey present:", !!apiKey);
+      if (!apiKey) {
+        return res.status(503).json({ error: "Anthropic API key not configured. Please add ANTHROPIC_API_KEY to Railway environment variables." });
+      }
+      const body = {
+        model: "claude-haiku-4-5",
+        max_tokens: 160,
+        system: JENNIFER_SYSTEM_PROMPT,
+        messages: messages.map((m: { role: string; content: string }) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      };
+      const messagesUrl = baseUrl.endsWith("/v1/messages") ? baseUrl : `${baseUrl}/v1/messages`;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+      };
+      if (!usingProxySandbox) {
+        headers["x-api-key"] = apiKey;
+      }
+      const apiRes = await fetch(messagesUrl, { method: "POST", headers, body: JSON.stringify(body) });
+      if (!apiRes.ok) {
+        const errBody = await apiRes.text();
+        console.error("Anthropic API error (Jennifer):", apiRes.status, errBody);
+        return res.status(502).json({ error: `AI service returned ${apiRes.status}: ${errBody.substring(0, 200)}` });
+      }
+      const data = await apiRes.json() as { content: Array<{ type: string; text?: string }> };
+      const text = data.content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("");
+      return res.json({ reply: text });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return res.status(500).json({ error: msg });
+    }
+  });
+
 
   // ── Executive Meeting Minutes API ─────────────────────────────────────────
 
@@ -1036,6 +1141,33 @@ Produce the optimised run plan as JSON.`;
         });
       }
 
+      // Auto-generate invoice when a NEPT task transitions to Complete
+      if (body.status === "Complete" && existing && existing.status !== "Complete") {
+        try {
+          const clientRates = await storage.listClientRates();
+          const rate = clientRates.find(r => r.missionType === "NEPT" && r.active === 1) ?? clientRates.find(r => r.missionType === "NEPT");
+          const amountCents = rate?.rateAmountCents ?? 0;
+          if (amountCents > 0) {
+            await storage.autoGenerateInvoice({
+              sourceType: "nept",
+              taskRef: task.taskRef,
+              serviceDate: task.completedAt ?? new Date().toISOString(),
+              aircraftReg: task.aircraftReg,
+              pickupLocation: task.pickupLocation,
+              destination: task.destLocation,
+              missionType: "NEPT",
+              payerType: rate?.orgCode ?? "unknown",
+              payerName: rate?.orgName ?? task.referringHospital ?? "Unknown Payer",
+              baseAmountCents: amountCents,
+              afterHoursSurchargeCents: rate?.afterHoursSurchargeCents ?? 0,
+              gstApplicable: rate?.gstApplicable ?? 1,
+            });
+          }
+        } catch (invErr) {
+          console.error("Auto-invoice generation failed for NEPT task", task.taskRef, invErr);
+        }
+      }
+
       res.json(task);
     } catch (err) { res.status(500).json({ error: String(err) }); }
   });
@@ -1281,6 +1413,14 @@ Produce the optimised run plan as JSON.`;
         dueDate:             body.dueDate,
         serviceDate:         body.serviceDate,
         status:              body.status ?? "Draft",
+        approvalStatus:      body.approvalStatus ?? null,
+        approvedBy:          body.approvedBy ?? null,
+        approvedAt:          body.approvedAt ?? null,
+        rejectedBy:          body.rejectedBy ?? null,
+        rejectedAt:          body.rejectedAt ?? null,
+        approvalNote:        body.approvalNote ?? null,
+        autoGenerated:       body.autoGenerated ?? 0,
+        sourceType:          body.sourceType ?? null,
         payerType:           body.payerType,
         payerName:           body.payerName,
         taskRef:             body.taskRef ?? null,
@@ -1311,6 +1451,53 @@ Produce the optimised run plan as JSON.`;
       if (updates.status === "Submitted" && !updates.submittedAt) updates.submittedAt = new Date().toISOString();
       if (updates.status === "Paid" && !updates.paidAt) updates.paidAt = new Date().toISOString();
       res.json(await storage.updateInvoice(id, updates));
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/invoices/:id/approve", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { approvedBy, note } = req.body ?? {};
+      const now = new Date().toISOString();
+      const invoice = await storage.updateInvoice(id, {
+        approvalStatus: "approved",
+        approvedBy: approvedBy ?? "unknown",
+        approvedAt: now,
+        approvalNote: note ?? null,
+        status: "Submitted",
+        submittedAt: now,
+      } as any);
+      await storage.logAudit("invoice", String(id), "approved", approvedBy ?? "unknown", note ?? undefined);
+      await storage.createNotification({
+        type: "invoice_approved",
+        title: "Invoice Approved",
+        body: `Invoice ${invoice.invoiceNumber} approved by ${approvedBy ?? "unknown"}.`,
+        taskRef: invoice.taskRef ?? undefined,
+      });
+      res.json(invoice);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/invoices/:id/reject", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { rejectedBy, note } = req.body ?? {};
+      const now = new Date().toISOString();
+      const invoice = await storage.updateInvoice(id, {
+        approvalStatus: "rejected",
+        rejectedBy: rejectedBy ?? "unknown",
+        rejectedAt: now,
+        approvalNote: note ?? null,
+        status: "Draft",
+      } as any);
+      await storage.logAudit("invoice", String(id), "rejected", rejectedBy ?? "unknown", note ?? undefined);
+      await storage.createNotification({
+        type: "invoice_rejected",
+        title: "Invoice Returned",
+        body: `Invoice ${invoice.invoiceNumber} returned by ${rejectedBy ?? "unknown"}${note ? `: ${note}` : ""}.`,
+        taskRef: invoice.taskRef ?? undefined,
+      });
+      res.json(invoice);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
@@ -1372,8 +1559,32 @@ Produce the optimised run plan as JSON.`;
   app.patch("/api/charter-quotes/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
+      const existing = await storage.getCharterQuote(id);
       const updated = await storage.updateCharterQuote(id, req.body);
       if (!updated) return res.status(404).json({ error: "Not found" });
+
+      // Auto-generate invoice when quote transitions to accepted and autoInvoice is enabled
+      if (req.body.status === "accepted" && existing && existing.status !== "accepted" && existing.autoInvoice) {
+        try {
+          await storage.autoGenerateInvoice({
+            sourceType: "charter",
+            taskRef: updated.quoteNumber,
+            serviceDate: updated.departureDate,
+            aircraftReg: null,
+            pickupLocation: null,
+            destination: null,
+            missionType: "Charter",
+            payerType: "charter",
+            payerName: updated.clientName,
+            baseAmountCents: Math.round((updated.finalQuote ?? 0) * 100),
+            afterHoursSurchargeCents: 0,
+            gstApplicable: 0,
+          });
+        } catch (invErr) {
+          console.error("Auto-invoice generation failed for charter quote", updated.quoteNumber, invErr);
+        }
+      }
+
       res.json(updated);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
@@ -1381,6 +1592,65 @@ Produce the optimised run plan as JSON.`;
   app.delete("/api/charter-quotes/:id", async (req: Request, res: Response) => {
     try {
       const ok = await storage.deleteCharterQuote(parseInt(req.params.id));
+      if (!ok) return res.status(404).json({ error: "Not found" });
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  // ── Fuel Receipts ───────────────────────────────────────────────────
+  app.get("/api/fuel-receipts", async (_req: Request, res: Response) => {
+    try {
+      res.json(await storage.listFuelReceipts());
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/fuel-receipts", async (req: Request, res: Response) => {
+    try {
+      const now = new Date().toISOString();
+      const body = req.body;
+      const receiptRef = body.receiptRef && String(body.receiptRef).trim().length > 0
+        ? body.receiptRef
+        : `FR-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
+      const receipt = await storage.createFuelReceipt({
+        receiptRef,
+        entryMethod:    body.entryMethod ?? "manual",
+        aircraftReg:    body.aircraftReg,
+        airportIcao:    body.airportIcao,
+        upliftDate:     body.upliftDate,
+        upliftLb:       body.upliftLb,
+        pricePerLb:     body.pricePerLb,
+        totalAud:       body.totalAud,
+        supplier:       body.supplier,
+        invoiceRef:     body.invoiceRef ?? null,
+        scanImageUrl:   body.scanImageUrl ?? null,
+        reconStatus:    body.reconStatus ?? "pending",
+        reconBatchId:   body.reconBatchId ?? null,
+        notes:          body.notes ?? null,
+        enteredBy:      body.enteredBy ?? "ops",
+        createdAt:      now,
+        updatedAt:      now,
+      });
+      await storage.createNotification({
+        type: "fuel_receipt_added",
+        title: "Fuel Uplift Logged",
+        body: `${receipt.upliftLb} lb uplifted at ${receipt.airportIcao} for ${receipt.aircraftReg} (${receipt.receiptRef}).`,
+      });
+      res.status(201).json(receipt);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.patch("/api/fuel-receipts/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updated = await storage.updateFuelReceipt(id, req.body);
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json(updated);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.delete("/api/fuel-receipts/:id", async (req: Request, res: Response) => {
+    try {
+      const ok = await storage.deleteFuelReceipt(parseInt(req.params.id));
       if (!ok) return res.status(404).json({ error: "Not found" });
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: String(e) }); }

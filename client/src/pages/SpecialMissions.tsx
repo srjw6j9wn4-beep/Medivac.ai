@@ -15,13 +15,13 @@ import {
   Anchor, Heart, Activity, Plane, Shield, CheckCircle2, AlertTriangle,
   ChevronRight, Plus, ClipboardList, Clock, User, ChevronDown, ChevronUp,
   CheckSquare, Square, Loader2, ArrowRight, FileText, RotateCcw, X,
-  Radio, Stethoscope,
+  Radio, Stethoscope, Globe,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type MissionType = "lord-howe" | "nets" | "ecmo" | "isolation" | "telehealth";
+type MissionType = "lord-howe" | "nets" | "ecmo" | "isolation" | "telehealth" | "international-transfer";
 type WorkflowStage =
   | "pre-flight"
   | "crew-brief"
@@ -129,6 +129,15 @@ const MISSION_TYPES: {
     border: "border-emerald-500/40",
     accent: "bg-emerald-500/10",
     desc: "Remote telehealth-assisted transfer",
+  },
+  {
+    id: "international-transfer",
+    label: "International Organ / Insurance",
+    icon: <Globe size={18} />,
+    color: "text-indigo-400",
+    border: "border-indigo-500/40",
+    accent: "bg-indigo-500/10",
+    desc: "Cross-border organ retrieval or insurance repatriation",
   },
 ];
 
@@ -477,6 +486,104 @@ const CHECKLISTS: Record<MissionType, ChecklistSection[]> = {
         { id: "th-22", label: "Patient outcome documented", role: "Flight Nurse / Paramedic" },
         { id: "th-23", label: "Journey log signed — all sectors", blocker: true, role: "Pilot in Command" },
         { id: "th-24", label: "Device disinfected & returned to store", role: "Flight Nurse / Paramedic" },
+      ],
+    },
+  ],
+
+  "international-transfer": [
+    {
+      stage: "pre-flight",
+      title: "Pre-Flight — International Clearances",
+      items: [
+        { id: "intl-01", label: "International flight plan filed & accepted — ICAO format", blocker: true, role: "Pilot in Command" },
+        { id: "intl-02", label: "Overflight permits obtained for all transit countries", blocker: true, role: "Dispatching Operator" },
+        { id: "intl-03", label: "CASA Part 121 AOC confirmed for this registration", blocker: true, role: "Pilot in Command" },
+        { id: "intl-04", label: "Crew passports & visas valid for all destination/transit countries", blocker: true, role: "Pilot in Command" },
+        { id: "intl-05", label: "Customs and Border Protection (ABF) notified — outbound", role: "Dispatching Operator" },
+        { id: "intl-06", label: "Destination country entry requirements confirmed", blocker: true, role: "Dispatching Operator" },
+        { id: "intl-07", label: "Health authority declarations prepared (if required)", role: "Flight Nurse / Paramedic" },
+        { id: "intl-08", label: "Aerodrome PPR obtained for international destination", role: "Pilot in Command" },
+        { id: "intl-09", label: "Handling agent confirmed at destination", role: "Dispatching Operator" },
+        { id: "intl-10", label: "Fuel arrangements confirmed at all stops", blocker: true, role: "Pilot in Command" },
+        { id: "intl-11", label: "Weather & NOTAM check completed — all sectors including international", blocker: true, role: "Pilot in Command" },
+        { id: "intl-12", label: "ETOPS / Extended range authorisation confirmed (if applicable)", role: "Pilot in Command" },
+      ],
+    },
+    {
+      stage: "crew-brief",
+      title: "Crew Brief — Mission Specifics",
+      items: [
+        // Organ-specific items
+        { id: "intl-13", label: "Organ Donor Authority (Donate Life / ANZOD) notified", blocker: true, role: "Dispatching Operator", detail: "For organ retrieval missions only" },
+        { id: "intl-14", label: "Transplant coordinator contact details confirmed", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-15", label: "Cold ischaemia time window noted & clock started at retrieval", blocker: true, role: "Flight Nurse / Paramedic", detail: "Heart/Lung: 4–6 hrs | Liver: 12 hrs | Kidney: 24 hrs" },
+        { id: "intl-16", label: "Receiving transplant team confirmed & available at destination", blocker: true, role: "Dispatching Operator" },
+        // Insurance-specific items
+        { id: "intl-17", label: "Insurance company medical authority reference number obtained", blocker: true, role: "Dispatching Operator", detail: "For repatriation/insurance missions" },
+        { id: "intl-18", label: "Financial liability confirmation received in writing", blocker: true, role: "Dispatching Operator" },
+        { id: "intl-19", label: "Receiving hospital acceptance confirmed", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-20", label: "Patient/family informed consent for international transfer documented", blocker: true, role: "Flight Nurse / Paramedic" },
+        // General
+        { id: "intl-21", label: "Emergency diversion airports identified — all sectors", role: "Pilot in Command" },
+        { id: "intl-22", label: "In-flight emergency protocols briefed — international context", role: "Pilot in Command" },
+      ],
+    },
+    {
+      stage: "aircraft-config",
+      title: "Aircraft Config — Jet & Medical",
+      items: [
+        { id: "intl-23", label: "Aircraft airworthiness confirmed — journey log current", blocker: true, role: "Pilot in Command" },
+        { id: "intl-24", label: "Part 121 maintenance release signed", blocker: true, role: "Pilot in Command" },
+        { id: "intl-25", label: "Fuel load calculated for international range + alternate + reserves", blocker: true, role: "Pilot in Command" },
+        { id: "intl-26", label: "Medical equipment installed & serviceable", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-27", label: "Organ transport container loaded — temp monitoring active", blocker: true, role: "Flight Nurse / Paramedic", detail: "For organ missions — verify cooling/perfusion active" },
+        { id: "intl-28", label: "Medical oxygen supply confirmed — extended duration", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-29", label: "Defibrillator, ventilator & medication stock checked", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-30", label: "HF / SATCOM comms tested & operational", blocker: true, role: "Pilot in Command" },
+        { id: "intl-31", label: "Aircraft documents — Airworthiness, Insurance, Registration on board", blocker: true, role: "Pilot in Command" },
+      ],
+    },
+    {
+      stage: "patient-handover",
+      title: "Patient / Organ Handover",
+      items: [
+        { id: "intl-32", label: "Patient identity confirmed — full name, DOB, passport", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-33", label: "Medical summary & transfer documentation received", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-34", label: "Sending physician handover completed — verbal & written", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-35", label: "Organ retrieval surgical team handover completed", blocker: true, role: "Flight Nurse / Paramedic", detail: "For organ missions" },
+        { id: "intl-36", label: "Organ cold time logged at handover", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-37", label: "Customs declaration forms completed for patient/organ transport", role: "Dispatching Operator" },
+        { id: "intl-38", label: "Border health declaration completed (if required)", role: "Flight Nurse / Paramedic" },
+        { id: "intl-39", label: "Patient stable & fit for air transport — fitness to fly confirmed", blocker: true, role: "Flight Nurse / Paramedic" },
+      ],
+    },
+    {
+      stage: "airborne",
+      title: "En Route — International Sectors",
+      items: [
+        { id: "intl-40", label: "Position reports at required intervals — HF/SATCOM", role: "Pilot in Command" },
+        { id: "intl-41", label: "FIR boundary position reports filed", role: "Pilot in Command" },
+        { id: "intl-42", label: "Organ cold time monitored — notify transplant coordinator if nearing limit", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-43", label: "Organ perfusion/temp status checked every 30 min", role: "Flight Nurse / Paramedic" },
+        { id: "intl-44", label: "Patient vital signs monitored & documented every 20 min", role: "Flight Nurse / Paramedic" },
+        { id: "intl-45", label: "Customs arrival notification transmitted (if required by destination)", role: "Dispatching Operator" },
+        { id: "intl-46", label: "Diversion fuel state checked — alternate remaining confirmed", role: "Pilot in Command" },
+      ],
+    },
+    {
+      stage: "post-flight",
+      title: "Post-Flight — Handover & Compliance",
+      items: [
+        { id: "intl-47", label: "Organ handover to receiving surgical team — cold time logged at delivery", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-48", label: "ANZOD / Donate Life mission completion report submitted", blocker: true, role: "Dispatching Operator", detail: "For organ missions" },
+        { id: "intl-49", label: "Insurance company post-transfer report submitted", blocker: true, role: "Dispatching Operator", detail: "For insurance/repatriation missions" },
+        { id: "intl-50", label: "Patient handover to receiving facility — written confirmation", blocker: true, role: "Flight Nurse / Paramedic" },
+        { id: "intl-51", label: "Customs clearance completed — arrival declaration lodged", role: "Pilot in Command" },
+        { id: "intl-52", label: "ABF inbound notification lodged (for return to Australia)", role: "Dispatching Operator" },
+        { id: "intl-53", label: "Journey log signed — all international sectors", blocker: true, role: "Pilot in Command" },
+        { id: "intl-54", label: "Part 121 operational record completed", blocker: true, role: "Pilot in Command" },
+        { id: "intl-55", label: "Mission debrief completed — all crew", role: "Dispatching Operator" },
+        { id: "intl-56", label: "Medivac.ai mission summary exported for audit file", role: "Dispatching Operator" },
       ],
     },
   ],
@@ -1090,6 +1197,7 @@ export default function SpecialMissions({ role }: Props) {
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [filterType, setFilterType] = useState<MissionType | "all">("all");
   const [filterComplete, setFilterComplete] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   const { data: sessions = [], isLoading } = useQuery<Session[]>({
     queryKey: ["/api/special-missions"],
@@ -1144,12 +1252,32 @@ export default function SpecialMissions({ role }: Props) {
   const complete = sessions.filter(s => s.status === "complete").length;
 
   if (activeSession) {
+    try {
+      return (
+        <SessionWorkflow
+          session={activeSession}
+          onClose={() => setActiveSession(null)}
+          onUpdate={(updates) => handleUpdate(activeSession, updates as Partial<Session>)}
+        />
+      );
+    } catch (err) {
+      console.error("[SpecialMissions] SessionWorkflow render error:", err);
+      setActiveSession(null);
+      return null;
+    }
+  }
+
+  if (renderError) {
     return (
-      <SessionWorkflow
-        session={activeSession}
-        onClose={() => setActiveSession(null)}
-        onUpdate={(updates) => handleUpdate(activeSession, updates as Partial<Session>)}
-      />
+      <div className="p-6 flex flex-col items-center justify-center gap-4 min-h-64">
+        <div className="text-red-400 font-semibold">Something went wrong loading Special Missions.</div>
+        <button
+          onClick={() => { setRenderError(null); setActiveSession(null); }}
+          className="px-4 py-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-sm font-semibold hover:bg-cyan-500/20 transition-colors"
+        >
+          ↺ Reload
+        </button>
+      </div>
     );
   }
 
@@ -1275,7 +1403,7 @@ export default function SpecialMissions({ role }: Props) {
       {!isLoading && filtered.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(s => (
-            <SessionCard key={s.id} session={s} onClick={() => setActiveSession(s)} />
+            <SessionCard key={s.id} session={s} onClick={() => { try { setActiveSession(s); } catch(e) { setRenderError(String(e)); } }} />
           ))}
         </div>
       )}

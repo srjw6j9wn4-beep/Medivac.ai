@@ -370,6 +370,19 @@ const onboardNeptQs: ExamQuestion[] = [
     explanation: "Operations staff are responsible for coordinating ground transport at the destination when required, working with the receiving facility or ambulance services. This must be confirmed before the flight departs.",
     source: "RFDS SE Operations Manual — Patient Transfer Chain of Care",
   },
+  {
+    id: "ops-ob-nept-16",
+    question: "Who is the Senior Flight Nurse at the Dubbo base?",
+    options: [
+      "Karen Barlow",
+      "Shannon Nott",
+      "Pammy Dickson",
+      "Marg Moon",
+    ],
+    correctIndex: 0,
+    explanation: "Karen Barlow is the Senior Flight Nurse at Dubbo. She is one of the longest-serving members of RFDS SE — present since the Dubbo base was established — and is regarded as an integral, foundational part of the operation. When escalating clinical queries at Dubbo, Karen is a key point of contact.",
+    source: "RFDS SE Personnel — Dubbo Base Clinical Staff",
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

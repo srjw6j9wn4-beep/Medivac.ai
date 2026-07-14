@@ -96,6 +96,18 @@ const FLEET = {
     canDirt: true, icon: "🛩", seats: 6,
     color: "#6A1B9A", accentLight: "#f3e5f5",
   },
+  PC12: {
+    name: "Pilatus PC-12/47E", shortName: "PC-12",
+    cruiseKts: 285, rangeNm: 1460,
+    costPerHour: 3200, contractRate: 2600,
+    fuelBurnLph: 215, fuelCostPerL: 1.85,
+    pilotRate: 750, maintenanceRate: 0.22,
+    canDirt: true, icon: "✈", seats: 8,
+    color: "#2E7D32", accentLight: "#e8f5e9",
+    // Clinic runs only — Dubbo (YSDU), Broken Hill (YBHI), Bankstown (YSBK)
+    clinicOnly: true,
+    bases: ["dubbo", "broken-hill", "bankstown"],
+  },
   HELO: {
     name: "Helicopter (AW139)", shortName: "AW139",
     cruiseKts: 180, rangeNm: 500,
@@ -104,10 +116,21 @@ const FLEET = {
     pilotRate: 1050, maintenanceRate: 0.38,
     canDirt: true, icon: "🚁", seats: 4,
     color: "#E65100", accentLight: "#fff3e0",
+    part121: false,
+  },
+  CL60: {
+    name: "Challenger 604/605", shortName: "CL604/5",
+    cruiseKts: 460, rangeNm: 3700,
+    costPerHour: 9500, contractRate: 8000,
+    fuelBurnLph: 1200, fuelCostPerL: 1.85,
+    pilotRate: 1400, maintenanceRate: 0.42,
+    canDirt: false, icon: "✈", seats: 10,
+    color: "#1A237E", accentLight: "#e8eaf6",
+    part121: true, // CASA Part 121 — large aircraft AOC required
   },
 } as const;
 type FleetKey = keyof typeof FLEET;
-const AIRCRAFT = { B200: FLEET.B200, B350: FLEET.B350, PC24: FLEET.PC24, HELO: FLEET.HELO } as const;
+const AIRCRAFT = { B200: FLEET.B200, B350: FLEET.B350, PC24: FLEET.PC24, PC12: FLEET.PC12, HELO: FLEET.HELO, CL60: FLEET.CL60 } as const;
 type AircraftKey = keyof typeof AIRCRAFT;
 type CasePriority = "P1" | "P2" | "P3";
 type CaseType = "trauma"|"cardiac"|"stroke"|"burns"|"neuro"|"paeds"|"general";
@@ -146,8 +169,6 @@ const RFDS_BASES = [
   { id:"bankstown",   name:"Bankstown",   icao:"YSBK", lat:-33.924, lon:150.988 },
   { id:"dubbo",       name:"Dubbo",       icao:"YSDU", lat:-32.217, lon:148.575 },
   { id:"broken-hill", name:"Broken Hill", icao:"YBHI", lat:-31.988, lon:141.472 },
-  { id:"essendon",   name:"Essendon",    icao:"YMEN", lat:-37.728, lon:144.902 },
-  { id:"albury",     name:"Albury",      icao:"YMAY", lat:-36.068, lon:146.958 },
 ];
 // gndKm = actual road distance (airport → hospital front door)
 // gndSpeedKph = realistic average incl. traffic lights, hospital zone, intersections
@@ -303,7 +324,7 @@ function calcRoundTrip(
 // ─────────────────────────────────────────────────────────────────────────────
 // FLEET COMPARISON — board-ready
 // ─────────────────────────────────────────────────────────────────────────────
-const BOARD_FLEET: FleetKey[] = ["B200","B300","PC24"];
+const BOARD_FLEET: FleetKey[] = ["B200","B300","PC24","PC12","CL60"];
 
 interface FleetComparisonProps {
   baseLat:number; baseLon:number;
@@ -321,7 +342,22 @@ function FleetComparison({
   const [mode, setMode] = useState<CostMode>("contract");
   const [expandedKey, setExpandedKey] = useState<FleetKey|null>(null);
 
+  // PC-12 is clinic-only — only available from Dubbo, Broken Hill, Bankstown
+  const PC12_BASES = ["dubbo","broken-hill","bankstown"];
   const results: RoundTripResult[] = enabledFleet
+    .filter(k => {
+      const ac = FLEET[k] as any;
+      if (ac.clinicOnly && ac.bases) {
+        // derive current base id from lat/lon match
+        const matchBase = [
+          {id:"dubbo", lat:-32.217, lon:148.575},
+          {id:"broken-hill", lat:-31.988, lon:141.472},
+          {id:"bankstown", lat:-33.924, lon:150.988},
+        ].find(b => Math.abs(b.lat - baseLat) < 0.1 && Math.abs(b.lon - baseLon) < 0.2);
+        return matchBase ? ac.bases.includes(matchBase.id) : false;
+      }
+      return true;
+    })
     .map(k => calcRoundTrip(k,baseLat,baseLon,patLat,patLon,hospLat,hospLon,hospGndKm,isEmergency,hospGndSpeedKph))
     .sort((a,b)=>a.missionTotalMin-b.missionTotalMin);
 
@@ -1257,6 +1293,18 @@ export default function MissionOptimiser(){
                   })}
                 </div>
               </div>
+              {/* Part 121 warning — shown when Challenger is among selected aircraft */}
+              {inputs.availableAircraft.includes("CL60") && (
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+                  <AlertTriangle size={13} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-amber-300">CASA Part 121 — Challenger 604/605</div>
+                    <div className="text-[10px] text-amber-200/80 mt-0.5 leading-relaxed">
+                      MTOW &gt;8,618 kg. Requires Part 121 AOC, Part 121 crew type ratings, and CAO†48.1 Schedule 1 (Large) duty limits.
+                    </div>
+                  </div>
+                </div>
+              )}
               <div><Label className="text-xs text-muted-foreground">Amb speed</Label>
                 <div className="h-8 text-sm mt-1 flex items-center text-muted-foreground text-xs">Per hospital (realistic)</div></div>
             </CardContent>
@@ -1450,12 +1498,14 @@ export default function MissionOptimiser(){
                   <Label className="text-xs text-muted-foreground mb-2 block">Aircraft to compare</Label>
                   <div className="flex flex-wrap gap-2">
                     {(Object.keys(FLEET) as FleetKey[]).map(key=>{
-                      const ac=FLEET[key];const active=fleetEnabled.includes(key);
+                      const ac=FLEET[key] as any;const active=fleetEnabled.includes(key);
                       return(
                         <button key={key} onClick={()=>toggleFleet(key)}
-                          className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${active?"border-cyan-500/50":"border-border text-muted-foreground hover:border-cyan-500/30"}`}
+                          className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all flex items-center gap-1.5 ${active?"border-cyan-500/50":"border-border text-muted-foreground hover:border-cyan-500/30"}`}
                           style={active?{color:ac.color,borderColor:ac.color+"60",background:ac.color+"15"}:undefined}>
                           {ac.icon} {ac.shortName}
+                          {ac.clinicOnly && <span className="text-[9px] px-1 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">CLINIC</span>}
+                          {ac.part121   && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold">Pt121</span>}
                         </button>
                       );
                     })}
@@ -1473,6 +1523,12 @@ export default function MissionOptimiser(){
                   </div>
                 </div>
               </div>
+              {fleetEnabled.includes("PC12") && (
+                <div className="rounded-lg bg-green-500/5 border border-green-500/20 px-3 py-2 text-xs text-green-300/70 flex items-start gap-2">
+                  <Info size={11} className="shrink-0 mt-0.5 text-green-400"/>
+                  <span><strong className="text-green-300">PC-12 — Clinic runs only.</strong> Available from Dubbo (YSDU), Broken Hill (YBHI) and Bankstown (YSBK). Single-engine turboprop — dirt/gravel strip capable. If your selected base is not one of these three, the PC-12 is automatically excluded from results.</span>
+                </div>
+              )}
               <div className="rounded-lg bg-cyan-500/5 border border-cyan-500/15 px-3 py-2 text-xs text-cyan-300/70">
                 <Info size={11} className="inline mr-1.5"/>NSW Ambulance ground fees auto-applied: {isEmergency?"$464 call-out + $4.18/km":"$365 call-out + $2.26/km"} (NSW resident, 2025). Capped at $7,601.
               </div>

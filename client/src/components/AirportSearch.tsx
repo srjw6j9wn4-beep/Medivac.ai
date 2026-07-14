@@ -377,3 +377,100 @@ export function AirportLegPicker({
     </div>
   );
 }
+
+// ─── IntlAirportSearch ───────────────────────────────────────────────────────
+// Typeahead for the INTL_AIRPORTS list in quoteEngine (ICAO/IATA/name/city/country)
+import { INTL_AIRPORTS, type IntlAirportInfo } from "@/lib/quoteEngine";
+
+interface IntlAirportSearchProps {
+  value: string;                        // selected ICAO
+  onChange: (icao: string) => void;
+  airports?: IntlAirportInfo[];         // pass filtered subset (e.g. PC12 range) or omit for all
+  placeholder?: string;
+  className?: string;
+}
+
+export function IntlAirportSearch({ value, onChange, airports, placeholder = "City, ICAO or country…", className }: IntlAirportSearchProps) {
+  const pool = airports ?? INTL_AIRPORTS;
+  const selected = pool.find(a => a.icao === value) ?? null;
+
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const results = query.length === 0 ? [] : pool.filter(a => {
+    const q = query.toLowerCase();
+    return (
+      a.icao.toLowerCase().includes(q) ||
+      a.iata.toLowerCase().includes(q) ||
+      a.name.toLowerCase().includes(q) ||
+      a.city.toLowerCase().includes(q) ||
+      a.country.toLowerCase().includes(q)
+    );
+  }).slice(0, 10);
+
+  function select(a: IntlAirportInfo) {
+    onChange(a.icao);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function clear() {
+    onChange("");
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div ref={containerRef} className={`relative ${className ?? ""}`}>
+      {selected ? (
+        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-card border border-indigo-500/40 rounded text-xs">
+          <span className="font-mono font-bold text-indigo-300">{selected.icao}</span>
+          <span className="text-muted-foreground truncate flex-1">{selected.name}</span>
+          <span className="text-[9px] text-muted-foreground shrink-0">{selected.country}</span>
+          <button onClick={clear} className="text-muted-foreground hover:text-foreground shrink-0 ml-1">
+            <X size={11} />
+          </button>
+        </div>
+      ) : (
+        <input
+          type="text"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          className="w-full text-xs bg-card border border-indigo-500/30 rounded px-2 py-1.5 focus:outline-none focus:border-indigo-400/50 placeholder:text-muted-foreground"
+        />
+      )}
+
+      {open && results.length > 0 && (
+        <div className="absolute z-50 w-full mt-0.5 bg-card border border-indigo-500/30 rounded-lg shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+          {results.map(a => (
+            <button
+              key={a.icao}
+              type="button"
+              onMouseDown={() => select(a)}
+              className="w-full px-2.5 py-2 text-left flex items-center gap-2 hover:bg-indigo-500/10 border-b border-card-border last:border-0"
+            >
+              <span className="font-mono font-bold text-indigo-300 text-xs w-12 shrink-0">{a.icao}</span>
+              <span className="text-[10px] text-muted-foreground w-8 shrink-0">{a.iata}</span>
+              <span className="text-xs text-foreground truncate flex-1">{a.city}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">{a.country}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

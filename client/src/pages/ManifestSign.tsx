@@ -317,7 +317,27 @@ export default function ManifestSign() {
               </div>
             )}
             <div className="mt-4 flex gap-3 print:hidden">
-              <button onClick={() => window.print()} className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-5 py-2 rounded-lg text-sm transition-colors">
+              <button
+                onClick={() => {
+                  // Try window.print() first (works in browser tabs)
+                  // If inside an iframe (pplx.app), fall back to downloading the page as HTML
+                  try {
+                    window.print();
+                  } catch (_) {
+                    // Fallback: capture current document HTML and trigger download
+                    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>RFDS Passenger Manifest</title><style>body{font-family:sans-serif;padding:24px}@media print{.print\\:hidden{display:none}}</style></head><body>${document.querySelector('.max-w-2xl')?.innerHTML ?? document.body.innerHTML}</body></html>`;
+                    const blob = new Blob([html], { type: "text/html" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `RFDS_Manifest_${new Date().toISOString().slice(0,10)}.html`;
+                    a.style.display = "none";
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => { document.body.removeChild(a); }, 2000);
+                  }
+                }}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold px-5 py-2 rounded-lg text-sm transition-colors"
+              >
                 🖨️ Print / Save PDF
               </button>
             </div>

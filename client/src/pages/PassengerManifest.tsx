@@ -356,7 +356,16 @@ export default function PassengerManifest({ role }: Props) {
     } finally { setSaving(false); }
   }
 
-  function loadForEdit(m: any) {
+  async function archiveManifest(id: number, status: string) {
+    try {
+      await apiRequest("PATCH", `/api/manifests/${id}`, { status });
+      queryClient.invalidateQueries({ queryKey: ["/api/manifests"] });
+    } catch (e) {
+      console.error("Archive failed", e);
+    }
+  }
+
+    function loadForEdit(m: any) {
     setFlightDate(m.flight_date || m.flightDate);
     setFlightNumber(m.flight_number || m.flightNumber);
     setAircraftReg(m.aircraft_reg || m.aircraftReg);
@@ -456,11 +465,29 @@ export default function PassengerManifest({ role }: Props) {
                 <p className="text-sm mt-1">Click "New Manifest" to create the first booking</p>
               </div>
             ) : (
+              <>
+              <div className="flex gap-1.5 mb-3">
+                {(["active","completed","cancelled"] as const).map(f => (
+                  <button key={f} onClick={() => setManifestFilter(f)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                      manifestFilter === f
+                        ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400"
+                        : "bg-background/50 border-card-border text-muted-foreground hover:text-foreground"
+                    }`}>
+                    {f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
               <div className="space-y-3">
-                {manifests.map((m: any) => {
+                {manifests.filter((m: any) => {
+                  if (manifestFilter === "active") return m.status !== "completed" && m.status !== "cancelled";
+                  return m.status === manifestFilter;
+                }).map((m: any) => {
                   const sectors_: Sector[] = (() => { try { return JSON.parse(m.sectors); } catch { return []; } })();
                   const pax_: Passenger[] = (() => { try { return JSON.parse(m.passengers); } catch { return []; } })();
                   const statusColor = m.status === "signed" ? "text-green-400 bg-green-900/30 border-green-700"
+                    : m.status === "completed" ? "text-cyan-400 bg-cyan-900/30 border-cyan-700"
+                    : m.status === "cancelled" ? "text-red-400 bg-red-900/30 border-red-700"
                     : "text-slate-400 bg-slate-800 border-slate-600";
                   const returnCount = pax_.filter((p: any) => p.hasReturn).length;
                   return (
@@ -501,12 +528,40 @@ export default function PassengerManifest({ role }: Props) {
                           >
                             Edit
                           </button>
+                          {m.status !== "completed" && m.status !== "cancelled" && (
+                            <>
+                              <button
+                                onClick={() => archiveManifest(m.id, "completed")}
+                                className="bg-cyan-700/40 hover:bg-cyan-600/50 text-cyan-300 text-xs font-semibold px-3 py-1.5 rounded-lg border border-cyan-600/40 transition-colors"
+                                title="Archive as completed"
+                              >
+                                ✓ Completed
+                              </button>
+                              <button
+                                onClick={() => archiveManifest(m.id, "cancelled")}
+                                className="bg-red-700/30 hover:bg-red-600/40 text-red-300 text-xs font-semibold px-3 py-1.5 rounded-lg border border-red-600/30 transition-colors"
+                                title="Archive as cancelled"
+                              >
+                                ✕ Cancelled
+                              </button>
+                            </>
+                          )}
+                          {(m.status === "completed" || m.status === "cancelled") && (
+                            <button
+                              onClick={() => archiveManifest(m.id, "draft")}
+                              className="bg-slate-600/40 hover:bg-slate-500/50 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-600/40 transition-colors"
+                              title="Restore to active"
+                            >
+                              Restore
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
+              </>
             )}
           </div>
         )}

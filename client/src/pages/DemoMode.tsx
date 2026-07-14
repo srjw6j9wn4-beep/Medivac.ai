@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { type UserRole } from "@/lib/data";
-import { PlayCircle, CheckCircle, ChevronRight, Star, Users, Shield, Plane, BarChart3, MessageCircle, Tablet, Smartphone } from "lucide-react";
+import { PlayCircle, CheckCircle, ChevronRight, Star, Users, Shield, Plane, BarChart3, MessageCircle, Tablet, Smartphone, RotateCcw } from "lucide-react";
 
 interface Props { role: UserRole; }
 
@@ -397,9 +397,9 @@ const ROLE_DEMOS = [
 
 // ─── Demo Steps ──────────────────────────────────────────────────────────────
 
-const DEMO_STEPS = [
-  { id: 1, title: "Welcome & Intro", cue: "Jennifer intro video", talking: "Medivac.ai is an end-to-end aeromedical operations platform for King Air B200/B300 fleets, built for RFDS-style operators.", done: true },
-  { id: 2, title: "Mission Acceptance Story", cue: "Navigate to Mission Board", talking: "Walk through a live P1 Medivac from NEPT call → dispatch intake → release gates → airborne. Show how every compliance gate is enforced.", done: true },
+const INITIAL_DEMO_STEPS = [
+  { id: 1, title: "Welcome & Intro", cue: "Jennifer intro video", talking: "Medivac.ai is an end-to-end aeromedical operations platform for King Air B200/B300 fleets, built for RFDS-style operators.", done: false },
+  { id: 2, title: "Mission Acceptance Story", cue: "Navigate to Mission Board", talking: "Walk through a live P1 Medivac from NEPT call → dispatch intake → release gates → airborne. Show how every compliance gate is enforced.", done: false },
   { id: 3, title: "Compliance Gate Demo", cue: "Open MEDIVAC 02 (blocked)", talking: "Show dispatch BLOCKED state — APG release and fuel missing. Explain how the system prevents premature release. CASA audit trail is automatic.", done: false },
   { id: 4, title: "iPad & iPhone Role Demo", cue: "Demo Mode — Device Views tab", talking: "Show how each role sees a purpose-built screen. Pilot gets release gates and fuel. Nurse gets patient vitals and checklist. Doctor gets Jennifer AI brief.", done: false },
   { id: 5, title: "ISO Compliance Score", cue: "Switch to Safety role → ISO page", talking: "Live readiness scoring across ISO 9001, 13485, 27001, and 25010. Evidence packs, CAPA tracking, certification critical path.", done: false },
@@ -413,6 +413,15 @@ const DEMO_STEPS = [
 export default function DemoMode({ role }: Props) {
   const [tab, setTab] = useState<"runsheet" | "devices" | "qa">("devices");
   const [selectedRole, setSelectedRole] = useState(ROLE_DEMOS[0]);
+  const [steps, setSteps] = useState(INITIAL_DEMO_STEPS);
+
+  function toggleStep(id: number) {
+    setSteps(prev => prev.map(s => s.id === id ? { ...s, done: !s.done } : s));
+  }
+
+  function resetSteps() {
+    setSteps(INITIAL_DEMO_STEPS.map(s => ({ ...s, done: false })));
+  }
 
   const tabs = [
     { id: "devices", label: "iPad & iPhone Demo" },
@@ -514,8 +523,34 @@ export default function DemoMode({ role }: Props) {
       {/* ── Run-of-Show tab ── */}
       {tab === "runsheet" && (
         <div className="space-y-2">
-          {DEMO_STEPS.map(step => (
-            <div key={step.id} className={`p-4 rounded-xl border transition-all ${step.done ? "bg-green-500/5 border-green-500/20 opacity-60" : "bg-card border-card-border hover:border-cyan-500/30"}`}>
+          {/* Header: progress + reset */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">
+                {steps.filter(s => s.done).length} of {steps.length} complete
+              </span>
+              <div className="h-1.5 w-32 rounded-full bg-border overflow-hidden">
+                <div
+                  className="h-1.5 rounded-full bg-cyan-500 transition-all duration-500"
+                  style={{ width: `${(steps.filter(s => s.done).length / steps.length) * 100}%` }}
+                />
+              </div>
+            </div>
+            <button
+              onClick={resetSteps}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 text-muted-foreground hover:text-foreground text-xs font-semibold transition-colors"
+            >
+              <RotateCcw size={12} />
+              Reset
+            </button>
+          </div>
+
+          {steps.map(step => (
+            <button
+              key={step.id}
+              onClick={() => toggleStep(step.id)}
+              className={`w-full text-left p-4 rounded-xl border transition-all ${step.done ? "bg-green-500/5 border-green-500/20 opacity-60 hover:opacity-80" : "bg-card border-card-border hover:border-cyan-500/30"}`}
+            >
               <div className="flex items-start gap-3">
                 <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border ${step.done ? "bg-green-500/20 border-green-500/30 text-green-400" : "bg-muted border-border text-muted-foreground"}`}>
                   {step.done ? "✓" : step.id}
@@ -529,7 +564,7 @@ export default function DemoMode({ role }: Props) {
                 </div>
                 {!step.done && <ChevronRight size={16} className="text-muted-foreground flex-shrink-0 mt-0.5" />}
               </div>
-            </div>
+            </button>
           ))}
 
           {/* Pilot program ask */}

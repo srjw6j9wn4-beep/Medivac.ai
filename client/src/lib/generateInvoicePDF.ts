@@ -357,26 +357,26 @@ export function generateInvoicePDF(d: InvoicePDFData) {
 </body>
 </html>`;
 
-  // Open in new tab and trigger print dialog
   try {
     const blob = new Blob([html], { type: "text/html" });
     const url  = URL.createObjectURL(blob);
     const safe = `RFDS_SE_Invoice_${d.invoiceNumber.replace(/[^\w-]/g, "_")}`;
 
-    const w = window.open(url, "_blank");
-    if (!w) {
-      // Popup blocked — fall back to download
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${safe}.html`;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    // Primary: <a download> — works inside iframes where window.open is blocked
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safe}.html`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 5000);
+
+    // Secondary: also try to open in a new tab so user can print directly
+    try { window.open(url, "_blank"); } catch (_) { /* popup blocked — download is enough */ }
   } catch (_) {
-    const w = window.open("", "_blank");
-    if (w) { w.document.write(html); w.document.close(); }
+    try {
+      const w = window.open("", "_blank");
+      if (w) { w.document.write(html); w.document.close(); }
+    } catch (__) { /* nothing more we can do */ }
   }
 }

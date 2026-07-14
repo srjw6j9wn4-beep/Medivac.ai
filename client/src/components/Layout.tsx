@@ -6,7 +6,7 @@ import { ROLES, type UserRole } from "@/lib/data";
 import {
   ChevronDown, ChevronRight, Activity, Users, Shield, Settings,
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
-  Moon, Sun, Menu, X, PanelLeftClose, PanelLeftOpen,
+  Moon, Sun, SunMoon, Menu, X, PanelLeftClose, PanelLeftOpen,
   Bell, BellRing, CheckCheck, ExternalLink, TrendingUp,
 } from "lucide-react";
 import EmergencyButton from "@/components/EmergencyButton";
@@ -199,6 +199,7 @@ const BASE_NAV: NavItem[] = [
       { label: "Mission Board", path: "/missions" },
       { label: "NSW Flight Map", path: "/map" },
       { label: "Dispatch & Intake", path: "/dispatch" },
+      { label: "Crew Rest Calculator", path: "/rest-calculator" },
       { label: "Charter Quote", path: "/charter-quote" },
       { label: "Operational Risk Assessment", path: "/ora" },
       { label: "Flight Planning", path: "/flight-planning" },
@@ -232,6 +233,7 @@ const BASE_NAV: NavItem[] = [
     iconLg: <Radio size={28} />,
     children: [
       { label: "Jennifer — Presenter", path: "/jennifer" },
+      { label: "Jennifer — Live Q&A", path: "/jennifer-live-qa" },
       { label: "Graham — Live Q&A", path: "/jennifer-live" },
       { label: "AI Mission Analyst", path: "/ai-analyst" },
       { label: "Telehealth Portal", path: "/telehealth", restricted: ['engineer'] },
@@ -249,6 +251,7 @@ const BASE_NAV: NavItem[] = [
       { label: "Contract Compliance", path: "/contracts", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
       { label: "Fuel & Finance", path: "/finance", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
       { label: "Audit & Reports", path: "/audit" },
+      { label: "Government Tenders", path: "/government-tenders" },
     ],
   },
   {
@@ -259,6 +262,7 @@ const BASE_NAV: NavItem[] = [
       { label: "User Management", path: "/users", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
       { label: "RBAC Permissions", path: "/rbac", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety'] },
       { label: "System Settings", path: "/settings", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety', 'senior_management'] },
+      { label: "API Integration Hub", path: "/api-integrations", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety', 'senior_management'] },
     ],
   },
 ];
@@ -302,7 +306,29 @@ function getDefaultSections(r: UserRole): string[] {
 export default function Layout({ children, role, onRoleChange }: LayoutProps) {
   const [location] = useLocation();
   const [expanded, setExpanded]       = useState<string[]>(() => getDefaultSections(role));
-  const [darkMode, setDarkMode]       = useState(true);
+  const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark');
+  // darkMode derived from theme + system preference
+  const [systemDark, setSystemDark] = useState(() =>
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+  const darkMode = theme === 'dark' || (theme === 'auto' && systemDark);
+
+  // Watch system preference for auto mode
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Apply .light class to <html> whenever darkMode changes
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+    }
+  }, [darkMode]);
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [panelOpen, setPanelOpen]     = useState(false);
   const [tooltip, setTooltip]         = useState<{ label: string; y: number } | null>(null);
@@ -323,10 +349,12 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
 
   useEffect(() => { setExpanded(getDefaultSections(role)); }, [role]);
 
-  const toggleTheme = () => {
-    setDarkMode(d => !d);
-    document.documentElement.classList.toggle('light');
+  const cycleTheme = () => {
+    setTheme(t => t === 'dark' ? 'light' : t === 'light' ? 'auto' : 'dark');
   };
+
+  const themeLabel = theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'Auto';
+  const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : SunMoon;
 
   // ── Shared full-nav panel content ─────────────────────────────────────────
   const navPanel = (
@@ -414,8 +442,13 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
           <div className="w-2 h-2 rounded-full bg-green-400" />
         </div>
         <span className="text-xs text-muted-foreground flex-1 whitespace-nowrap">LIVE · DEMO</span>
-        <button onClick={toggleTheme} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded flex-shrink-0">
-          {darkMode ? <Sun size={14} /> : <Moon size={14} />}
+        <button
+          onClick={cycleTheme}
+          title={`Theme: ${themeLabel} — click to cycle`}
+          className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+        >
+          <ThemeIcon size={12} />
+          <span className="text-[10px] font-semibold">{themeLabel}</span>
         </button>
       </div>
     </>
@@ -500,8 +533,13 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         <div className="px-3 py-3 border-t border-sidebar-border flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-400" />
           <span className="text-xs text-muted-foreground flex-1">LIVE · DEMO</span>
-          <button onClick={toggleTheme} className="text-muted-foreground p-1 rounded">
-            {darkMode ? <Sun size={14} /> : <Moon size={14} />}
+          <button
+            onClick={cycleTheme}
+            title={`Theme: ${themeLabel}`}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground flex-shrink-0"
+          >
+            <ThemeIcon size={12} />
+            <span className="text-[10px] font-semibold">{themeLabel}</span>
           </button>
         </div>
       </aside>

@@ -7,7 +7,7 @@ import {
   Shield, Target, Award, ChevronDown, Plus, Zap, Activity,
   GraduationCap, Eye, Lock, UserCheck, AlertCircle, CheckSquare,
   XCircle, ClipboardList, X, Copy, BookMarked, Brain, Trophy,
-  ChevronLeft, RotateCcw, CheckCircle2, Timer
+  ChevronLeft, RotateCcw, CheckCircle2, Timer, Radio
 } from "lucide-react";
 import { generatePDF } from "@/lib/generatePDF";
 import { EXAMS, PASS_MARK, EXAM_DURATION_MINUTES, type Exam, type ExamQuestion } from "@/data/theoryExams";
@@ -16,6 +16,12 @@ import { EXAMS_OPS } from "@/data/theoryExamsOps";
 import { EXAMS_B200_SYSTEMS } from "@/data/theoryExamsB200Systems";
 import { EXAMS_B350_SYSTEMS } from "@/data/theoryExamsB350Systems";
 import { EXAMS_IFR } from "@/data/theoryExamsIFR";
+import { EXAMS_ERP } from "@/data/theoryExamsERP";
+import { EXAMS_PROLINE21 } from "@/data/theoryExamsProLine21";
+import CBTProLine21 from "@/pages/CBTProLine21";
+import CBTB200Systems from "@/pages/CBTB200Systems";
+import CBTB350Systems from "@/pages/CBTB350Systems";
+import CBTEmergencyResponsePlan from "@/pages/CBTEmergencyResponsePlan";
 
 interface Props { role: UserRole; }
 
@@ -244,12 +250,18 @@ function canViewTrainees(role: UserRole) {
 
 const UNCONFIGURED_PREFIX = "242820000000";
 function openJotform(formId: string) {
-  if (formId.startsWith(UNCONFIGURED_PREFIX)) {
-    // Placeholder ID — send to Jotform dashboard so ops can grab the real form URL
-    window.open("https://www.jotform.com/myaccount/forms", "_blank", "noopener");
-    return;
-  }
-  window.open(`https://form.jotform.com/${formId}`, "_blank", "noopener");
+  const url = formId.startsWith(UNCONFIGURED_PREFIX)
+    ? "https://www.jotform.com/myaccount/forms"
+    : `https://form.jotform.com/${formId}`;
+  // Use <a> click — works in iframe contexts where window.open may be blocked
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => document.body.removeChild(a), 500);
 }
 function isConfigured(formId: string) {
   return !formId.startsWith(UNCONFIGURED_PREFIX);
@@ -363,11 +375,12 @@ function formatRenewalDate(iso?: string): string {
 }
 
 const OPS_STAFF_DEFAULT: OpsStaffMember[] = [
-  { id: "s1", name: "Sarah Mitchell", role: "Team Lead",   base: "Dubbo",       startDate: "2026-06-02" },
-  { id: "s2", name: "James Okafor",   role: "Dispatcher",  base: "Broken Hill", startDate: "2026-06-02" },
-  { id: "s3", name: "Priya Sharma",   role: "Dispatcher",  base: "Bankstown",   startDate: "2026-06-09" },
-  { id: "s4", name: "Tom Harding",    role: "Coordinator", base: "Essendon",    startDate: "2026-06-16" },
-  { id: "s5", name: "Chloe Nguyen",   role: "Coordinator", base: "Launceston",  startDate: "2026-06-16" },
+  { id: "s1", name: "Sarah Mitchell", role: "Team Lead",            base: "Dubbo",       startDate: "2026-06-02" },
+  { id: "s2", name: "James Okafor",   role: "Dispatcher",           base: "Broken Hill", startDate: "2026-06-02" },
+  { id: "s3", name: "Priya Sharma",   role: "Dispatcher",           base: "Bankstown",   startDate: "2026-06-09" },
+  { id: "s4", name: "Tom Harding",    role: "Coordinator",          base: "Essendon",    startDate: "2026-06-16" },
+  { id: "s5", name: "Chloe Nguyen",   role: "Coordinator",          base: "Launceston",  startDate: "2026-06-16" },
+  { id: "s6", name: "Karen Barlow",   role: "Senior Flight Nurse",  base: "Dubbo",       startDate: "2026-06-02" },
 ];
 
 const TRAINING_PROGRAM: TrainingWeek[] = [
@@ -603,7 +616,7 @@ function weekLabelForModuleId(moduleId: string): string {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CheckTraining({ role }: Props) {
-  const [activeTab, setActiveTab]               = useState<"forms" | "trainees" | "ops-staff" | "theory">("forms");
+  const [activeTab, setActiveTab]               = useState<"forms" | "trainees" | "ops-staff" | "theory" | "cbt">("forms");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedTrainee, setSelectedTrainee]   = useState<TraineeRecord>(TRAINEES[0]);
   const [traineeTab, setTraineeTab]             = useState<"overview" | "approaches" | "milestones">("overview");
@@ -906,6 +919,18 @@ export default function CheckTraining({ role }: Props) {
           <Brain size={14} />
           Theory Knowledge Testing
           <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">12 Exams</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("cbt")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+            activeTab === "cbt"
+              ? "border-orange-400 text-orange-400"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <BookMarked size={14} />
+          CBT Library
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-300 font-semibold">21 Modules</span>
         </button>
       </div>
 
@@ -1953,6 +1978,177 @@ export default function CheckTraining({ role }: Props) {
       {/* ═══════════════ THEORY KNOWLEDGE TESTING TAB ═══════════════ */}
       {activeTab === "theory" && <TheoryKnowledgeSection />}
 
+      {/* ═══════════════ CBT LIBRARY TAB ═══════════════ */}
+      {activeTab === "cbt" && (
+        <CBTLibrary />
+      )}
+
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CBT LIBRARY — Routes between King Air B200, B350 Systems CBTs and Pro Line 21 CBT
+// ─────────────────────────────────────────────────────────────────────────────
+function CBTLibrary() {
+  const [activeCBT, setActiveCBT] = useState<"select" | "b200" | "b350" | "proline21" | "erp">("select");
+
+  const CBT_OPTIONS = [
+    {
+      id: "b200" as const,
+      title: "King Air B200 Systems",
+      subtitle: "Flight Controls · Powerplant · Electrical · Pressurisation · Fuel & Avionics",
+      modules: 5,
+      slides: 35,
+      color: "text-cyan-400",
+      bg: "bg-cyan-500/5",
+      border: "border-cyan-500/30",
+      badge: "bg-cyan-500/20 text-cyan-300",
+      icon: <Plane size={20} />,
+    },
+    {
+      id: "b350" as const,
+      title: "King Air B350 Systems",
+      subtitle: "Flight Controls · Powerplant · Electrical · Pressurisation · Fuel & Avionics + B350 vs B200",
+      modules: 5,
+      slides: 35,
+      color: "text-purple-400",
+      bg: "bg-purple-500/5",
+      border: "border-purple-500/30",
+      badge: "bg-purple-500/20 text-purple-300",
+      icon: <Plane size={20} />,
+    },
+    {
+      id: "proline21" as const,
+      title: "Collins Pro Line 21 / TCAS-4000",
+      subtitle: "System Overview · Traffic Symbology · Normal Procedures · RA Types · Emergency & Limitations",
+      modules: 5,
+      slides: 34,
+      color: "text-orange-400",
+      bg: "bg-orange-500/5",
+      border: "border-orange-500/30",
+      badge: "bg-orange-500/20 text-orange-300",
+      icon: <Radio size={20} />,
+    },
+    {
+      id: "erp" as const,
+      title: "Emergency Response Plan",
+      subtitle: "ERP Foundations · Codes & Notification · Ops Centre · IAT · ECC · Media & SARWATCH",
+      modules: 6,
+      slides: 36,
+      color: "text-red-400",
+      bg: "bg-red-500/5",
+      border: "border-red-500/30",
+      badge: "bg-red-500/20 text-red-300",
+      icon: <Shield size={20} />,
+    },
+  ];
+
+  if (activeCBT === "b200") {
+    return (
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-0">
+          <button
+            onClick={() => setActiveCBT("select")}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft size={13} /> CBT Library
+          </button>
+        </div>
+        <CBTB200Systems />
+      </div>
+    );
+  }
+
+  if (activeCBT === "b350") {
+    return (
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-0">
+          <button
+            onClick={() => setActiveCBT("select")}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft size={13} /> CBT Library
+          </button>
+        </div>
+        <CBTB350Systems />
+      </div>
+    );
+  }
+
+  if (activeCBT === "proline21") {
+    return (
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-0">
+          <button
+            onClick={() => setActiveCBT("select")}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft size={13} /> CBT Library
+          </button>
+        </div>
+        <CBTProLine21 />
+      </div>
+    );
+  }
+
+  if (activeCBT === "erp") {
+    return (
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="flex items-center gap-2 px-4 pt-4 pb-0">
+          <button
+            onClick={() => setActiveCBT("select")}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronLeft size={13} /> CBT Library
+          </button>
+        </div>
+        <CBTEmergencyResponsePlan />
+      </div>
+    );
+  }
+
+  // ── SELECTION SCREEN ──
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h2 className="text-xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+          CBT Library
+        </h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Computer Based Training — select a course to begin
+        </p>
+      </div>
+
+      <div className="grid gap-4">
+        {CBT_OPTIONS.map(opt => (
+          <button
+            key={opt.id}
+            onClick={() => setActiveCBT(opt.id)}
+            className={`w-full text-left p-5 rounded-xl border transition-all hover:scale-[1.01] ${opt.bg} ${opt.border}`}
+          >
+            <div className="flex items-start gap-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${opt.bg} ${opt.color} border ${opt.border}`}>
+                {opt.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${opt.badge}`}>{opt.modules} Modules · {opt.slides} Slides</span>
+                </div>
+                <p className="text-sm font-bold leading-snug">{opt.title}</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-snug">{opt.subtitle}</p>
+              </div>
+              <ChevronRight size={18} className="text-muted-foreground flex-shrink-0 mt-1" />
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <div className="p-3 rounded-xl bg-muted/20 border border-border">
+        <p className="text-xs text-muted-foreground">
+          <strong className="text-foreground">21 modules · 140 slides</strong> — all content sourced from RFDS SE approved documentation: Pilot Training Manuals, AFMs, QRHs, FAA-Approved Flight Manual Supplements, and ERP001 V4.7.
+        </p>
+      </div>
     </div>
   );
 }
@@ -1969,12 +2165,13 @@ interface ExamResult {
   passed: boolean;
   answers: (number | null)[];
   date: string;
+  expiredCount?: number;  // drill mode: questions where time ran out
 }
 
 // Best result keyed by examId
 type BestScores = Record<string, { score: number; total: number; passed: boolean; date: string }>;
 
-type ExamMode = "b200" | "b350" | "ops-staff" | "ifr-sim" | "b200-systems" | "b350-systems";
+type ExamMode = "b200" | "b350" | "ops-staff" | "ifr-sim" | "b200-systems" | "b350-systems" | "erp" | "proline21";
 
 const EXAM_MODE_CONFIG: Record<ExamMode, {
   label: string;
@@ -2060,6 +2257,30 @@ const EXAM_MODE_CONFIG: Record<ExamMode, {
     dedicatedLabel: "B350 System Exams — One System Per Exam",
     mixedLabel: "B350 Systems Mixed",
   },
+  "erp": {
+    label: "ERP — Emergency Response",
+    description: "ERP001 V4.7 — Codes, IAT/ECC, notification & scenario drills",
+    accent: "text-rose-400",
+    accentBg: "bg-rose-500/5",
+    accentBorder: "border-rose-500/20",
+    accentBar: "bg-rose-500",
+    accentCard: "hover:border-rose-500/40 hover:bg-rose-500/5",
+    exams: EXAMS_ERP,
+    dedicatedLabel: "ERP Exams — By Tier & Topic",
+    mixedLabel: "ERP Mixed — Combined All Tiers",
+  },
+  "proline21": {
+    label: "Pro Line 21 / TCAS-4000",
+    description: "Collins TCAS-4000 AFMS — Traffic types, RA/TA, procedures & limitations",
+    accent: "text-orange-400",
+    accentBg: "bg-orange-500/5",
+    accentBorder: "border-orange-500/20",
+    accentBar: "bg-orange-500",
+    accentCard: "hover:border-orange-500/40 hover:bg-orange-500/5",
+    exams: EXAMS_PROLINE21,
+    dedicatedLabel: "Pro Line 21 / TCAS-4000 — One Section Per Exam",
+    mixedLabel: "Pro Line 21 Mixed — All Sections Combined",
+  },
 };
 
 function TheoryKnowledgeSection() {
@@ -2075,8 +2296,15 @@ function TheoryKnowledgeSection() {
   const [results, setResults]           = useState<ExamResult[]>([]);
   const [bestScores, setBestScores]     = useState<BestScores>({});
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isDrillMode, setIsDrillMode]   = useState(false);
+  const [drillTimeLeft, setDrillTimeLeft] = useState(45);
+  const DRILL_SECONDS = 45;
   const timerRef                        = useRef<ReturnType<typeof setInterval> | null>(null);
+  const drillTimerRef                   = useRef<ReturnType<typeof setInterval> | null>(null);
   const answersRef                      = useRef<(number | null)[]>([]);
+  const expiredCountRef                 = useRef(0);
+  const isDrillRef                      = useRef(false);
+  const showAnswerRef                   = useRef(false);
 
   const cfg = EXAM_MODE_CONFIG[examMode];
   // Active exam bank — driven by mode config
@@ -2085,6 +2313,8 @@ function TheoryKnowledgeSection() {
 
   useEffect(() => { answersRef.current = answers; }, [answers]);
   useEffect(() => { questionsRef.current = questions; }, [questions]);
+  useEffect(() => { isDrillRef.current = isDrillMode; }, [isDrillMode]);
+  useEffect(() => { showAnswerRef.current = showAnswer; }, [showAnswer]);
 
   useEffect(() => {
     if (phase !== "in-progress") { if (timerRef.current) clearInterval(timerRef.current); return; }
@@ -2102,6 +2332,36 @@ function TheoryKnowledgeSection() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // ── Drill per-question countdown ──────────────────────────────────────────
+  // Restarts whenever currentQ changes (nextDrillQuestion resets drillTimeLeft)
+  useEffect(() => {
+    if (!isDrillMode || phase !== "in-progress") {
+      if (drillTimerRef.current) clearInterval(drillTimerRef.current);
+      return;
+    }
+    setDrillTimeLeft(DRILL_SECONDS);
+    drillTimerRef.current = setInterval(() => {
+      setDrillTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(drillTimerRef.current!);
+          // Auto-advance: mark as expired (null answer = wrong) if not yet answered
+          if (!showAnswerRef.current) {
+            expiredCountRef.current += 1;
+            // Force show answer with null selection so explanation appears
+            const newAnswers = [...answersRef.current];
+            // leave as null (wrong), just reveal answer
+            answersRef.current = newAnswers;
+            nextQuestionRef.current(true);
+          }
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => { if (drillTimerRef.current) clearInterval(drillTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentQ, isDrillMode, phase]);
+
   function shuffleArray<T>(arr: T[]): T[] {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
@@ -2113,6 +2373,7 @@ function TheoryKnowledgeSection() {
 
   function startExam(exam: Exam) {
     const shuffled = shuffleArray(exam.questions);
+    const drill = exam.id.startsWith("erp-tier3");
     setSelectedExam(exam);
     setQuestions(shuffled);
     setCurrentQ(0);
@@ -2120,6 +2381,10 @@ function TheoryKnowledgeSection() {
     setAnswers(initAnswers);
     setShowAnswer(false);
     setTimeLeft(EXAM_DURATION_MINUTES * 60);
+    setIsDrillMode(drill);
+    isDrillRef.current = drill;
+    expiredCountRef.current = 0;
+    setDrillTimeLeft(DRILL_SECONDS);
     setPhase("in-progress");
   }
 
@@ -2131,17 +2396,25 @@ function TheoryKnowledgeSection() {
     setShowAnswer(true);
   }
 
-  function nextQuestion() {
+  // nextQuestion accepts an optional forceFinish flag (used by drill auto-advance)
+  function nextQuestion(expired = false) {
+    if (drillTimerRef.current) clearInterval(drillTimerRef.current);
     setShowAnswer(false);
+    // Use answersRef.current so drill auto-advance has latest state
+    const latestAnswers = answersRef.current;
     if (currentQ < questions.length - 1) {
       setCurrentQ(q => q + 1);
     } else {
-      finishExam(answers, questions);
+      finishExam(latestAnswers, questions);
     }
   }
 
+  const nextQuestionRef = useRef(nextQuestion);
+  useEffect(() => { nextQuestionRef.current = nextQuestion; });
+
   function finishExam(finalAnswers: (number | null)[], qs: ExamQuestion[]) {
     if (timerRef.current) clearInterval(timerRef.current);
+    if (drillTimerRef.current) clearInterval(drillTimerRef.current);
     let score = 0;
     finalAnswers.forEach((ans, i) => { if (ans === qs[i]?.correctIndex) score++; });
     const res: ExamResult = {
@@ -2151,6 +2424,7 @@ function TheoryKnowledgeSection() {
       passed: (score / qs.length) * 100 >= PASS_MARK,
       answers: finalAnswers,
       date: new Date().toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" }),
+      expiredCount: isDrillRef.current ? expiredCountRef.current : undefined,
     };
     setResult(res);
     setResults(prev => [res, ...prev.slice(0, 19)]);
@@ -2161,6 +2435,7 @@ function TheoryKnowledgeSection() {
       }
       return prev;
     });
+    setIsDrillMode(false);
     setPhase("results");
   }
 
@@ -2451,9 +2726,18 @@ function TheoryKnowledgeSection() {
                   )}
 
                   {!best && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                      <CheckSquare size={11} /> <span>20 questions</span>
-                      <Timer size={11} className="ml-1" /> <span>30 min</span>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <CheckSquare size={11} /> <span>{exam.questions.length} questions</span>
+                      {exam.id.startsWith('erp-tier3') ? (
+                        <>
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                            <Timer size={9} /> {DRILL_SECONDS}s/q
+                          </span>
+                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Drill</span>
+                        </>
+                      ) : (
+                        <><Timer size={11} className="ml-1" /> <span>30 min</span></>
+                      )}
                     </div>
                   )}
 
@@ -2527,9 +2811,18 @@ function TheoryKnowledgeSection() {
                   )}
 
                   {!best && (
-                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                      <CheckSquare size={11} /> <span>20 questions</span>
-                      <Timer size={11} className="ml-1" /> <span>30 min</span>
+                    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <CheckSquare size={11} /> <span>{exam.questions.length} questions</span>
+                      {exam.id.startsWith('erp-tier3') ? (
+                        <>
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                            <Timer size={9} /> {DRILL_SECONDS}s/q
+                          </span>
+                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Drill</span>
+                        </>
+                      ) : (
+                        <><Timer size={11} className="ml-1" /> <span>30 min</span></>
+                      )}
                     </div>
                   )}
                 </button>
@@ -2551,23 +2844,79 @@ function TheoryKnowledgeSection() {
     const progressPct = Math.round(((currentQ + (showAnswer ? 1 : 0)) / questions.length) * 100);
     const timerWarn = timeLeft < 300;
 
+    // Drill countdown ring values
+    const drillRadius = 20;
+    const drillCircumference = 2 * Math.PI * drillRadius;
+    const drillProgress = drillTimeLeft / DRILL_SECONDS;
+    const drillDash = drillCircumference * drillProgress;
+    const drillGap = drillCircumference - drillDash;
+    const drillCritical = drillTimeLeft <= 10;
+    const drillWarn = drillTimeLeft <= 20;
+    const expired = drillTimeLeft === 0 && isDrillMode;
+
     return (
       <div className="p-4 max-w-3xl mx-auto space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div>
-            <p className="font-bold text-sm">{selectedExam.title}</p>
+          <div className="min-w-0 flex-1 pr-4">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-sm truncate">{selectedExam.title}</p>
+              {isDrillMode && (
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/30">
+                  DRILL MODE
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">{selectedExam.subtitle}</p>
           </div>
-          <div className={`flex items-center gap-2 font-bold text-lg tabular-nums ${
-            timerWarn ? "text-red-400 animate-pulse" : "text-emerald-400"
-          }`}>
-            <Timer size={16} />
-            {formatTime(timeLeft)}
-          </div>
+
+          {/* Timer — drill shows circular countdown; standard shows hh:mm */}
+          {isDrillMode ? (
+            <div className="relative shrink-0 flex items-center justify-center" style={{ width: 56, height: 56 }}>
+              <svg width={56} height={56} className="-rotate-90 absolute inset-0">
+                {/* Track */}
+                <circle cx={28} cy={28} r={drillRadius} fill="none" stroke="currentColor"
+                  className="text-border" strokeWidth={3} />
+                {/* Progress arc */}
+                <circle cx={28} cy={28} r={drillRadius} fill="none"
+                  stroke={drillCritical ? "#f87171" : drillWarn ? "#fb923c" : "#34d399"}
+                  strokeWidth={3.5}
+                  strokeDasharray={`${drillDash} ${drillGap}`}
+                  strokeLinecap="round"
+                  style={{ transition: "stroke-dasharray 0.9s linear, stroke 0.3s" }}
+                />
+              </svg>
+              <span className={`relative z-10 font-bold tabular-nums text-sm ${
+                drillCritical ? "text-red-400" + (drillTimeLeft % 2 === 0 ? " opacity-60" : "") : drillWarn ? "text-orange-400" : "text-emerald-400"
+              }`}>
+                {drillTimeLeft}s
+              </span>
+            </div>
+          ) : (
+            <div className={`flex items-center gap-2 font-bold text-lg tabular-nums ${
+              timerWarn ? "text-red-400 animate-pulse" : "text-emerald-400"
+            }`}>
+              <Timer size={16} />
+              {formatTime(timeLeft)}
+            </div>
+          )}
         </div>
 
-        {/* Progress bar */}
+        {/* Drill urgency banner — appears at 10s */}
+        {isDrillMode && drillCritical && !showAnswer && (
+          <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 flex items-center gap-2">
+            <span className="text-red-400 font-bold text-xs uppercase tracking-wider animate-pulse">⚠ Time critical — respond now</span>
+          </div>
+        )}
+
+        {/* Expired banner */}
+        {isDrillMode && expired && !showAnswer && (
+          <div className="rounded-lg border border-orange-500/40 bg-orange-500/10 px-4 py-2.5">
+            <p className="text-orange-300 font-bold text-xs">TIME EXPIRED — Moving to next question</p>
+          </div>
+        )}
+
+        {/* Progress bar — drill uses rose accent */}
         <div className="space-y-1">
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>Question {currentQ + 1} of {questions.length}</span>
@@ -2575,14 +2924,18 @@ function TheoryKnowledgeSection() {
           </div>
           <div className="h-1.5 rounded-full bg-border">
             <div
-              className="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                isDrillMode ? "bg-rose-500" : "bg-emerald-500"
+              }`}
               style={{ width: `${progressPct}%` }}
             />
           </div>
         </div>
 
         {/* Question card */}
-        <div className="rounded-xl border border-border bg-card p-5">
+        <div className={`rounded-xl border bg-card p-5 ${
+          isDrillMode && drillCritical && !showAnswer ? "border-red-500/40" : "border-border"
+        }`}>
           <p className="font-semibold text-sm leading-relaxed mb-4">{q.question}</p>
 
           <div className="space-y-2">
@@ -2615,17 +2968,28 @@ function TheoryKnowledgeSection() {
           {/* Answer explanation */}
           {showAnswer && (
             <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-4 space-y-2">
-              <span className={`font-bold text-sm ${isCorrect ? "text-emerald-400" : "text-red-400"}`}>
-                {isCorrect ? "✓ Correct" : "✗ Incorrect"}
-              </span>
+              <div className="flex items-center justify-between">
+                <span className={`font-bold text-sm ${isCorrect ? "text-emerald-400" : "text-red-400"}`}>
+                  {isCorrect ? "✓ Correct" : "✗ Incorrect"}
+                </span>
+                {isDrillMode && chosen === null && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-orange-400 bg-orange-500/10 border border-orange-500/30 rounded-full px-2 py-0.5">
+                    Time expired
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-foreground leading-relaxed">{q.explanation}</p>
               <div className="flex items-start gap-2 pt-1">
                 <BookMarked size={11} className="text-muted-foreground shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground italic">{q.source}</p>
               </div>
               <button
-                onClick={nextQuestion}
-                className="mt-2 w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm py-2.5 transition-colors"
+                onClick={() => nextQuestion()}
+                className={`mt-2 w-full rounded-lg font-semibold text-sm py-2.5 transition-colors text-white ${
+                  isDrillMode
+                    ? "bg-rose-600 hover:bg-rose-500"
+                    : "bg-emerald-600 hover:bg-emerald-500"
+                }`}
               >
                 {currentQ < questions.length - 1 ? "Next Question →" : "Finish Exam"}
               </button>
@@ -2655,6 +3019,25 @@ function TheoryKnowledgeSection() {
           <p className="text-sm text-muted-foreground">
             {result.score} of {result.total} correct · Pass mark {PASS_MARK}%
           </p>
+          {result.expiredCount !== undefined && (
+            <div className="mt-2 flex items-center justify-center gap-3 flex-wrap">
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                DRILL MODE
+              </span>
+              {result.expiredCount > 0 ? (
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-orange-500/10 border border-orange-500/30 text-orange-400">
+                  {result.expiredCount} time{result.expiredCount !== 1 ? "s" : ""} expired
+                </span>
+              ) : (
+                <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                  All answered within time ✓
+                </span>
+              )}
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-muted/30 border border-border text-muted-foreground">
+                {DRILL_SECONDS}s per question
+              </span>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground mt-1">{selectedExam.title} · {result.date}</p>
         </div>
 

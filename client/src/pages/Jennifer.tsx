@@ -64,7 +64,7 @@ const VIDEOS = [
     color: "from-teal-900/60 to-slate-900",
     accent: "border-teal-400/40",
     videoSrc: `/video/05_lordhowe.mp4`,
-    backdropSrc: "/lordhowe_bg.jpg",
+    backdropSrc: "/bg_05_lordhowe_frame.jpg",
   },
   {
     id: 6,
@@ -124,7 +124,7 @@ const VIDEOS = [
     color: "from-cyan-900/60 to-slate-900",
     accent: "border-cyan-400/40",
     videoSrc: `/video/10_nept.mp4`,
-    backdropSrc: "/medivac_comms_bg.jpg",
+    backdropSrc: "/bg_10_nept.png",
   },
   {
     id: 11,
@@ -136,7 +136,7 @@ const VIDEOS = [
     color: "from-violet-900/60 to-slate-900",
     accent: "border-violet-400/40",
     videoSrc: `/video/11_optimiser.mp4`,
-    backdropSrc: "/medivac_comms_bg.jpg",
+    backdropSrc: "/bg_11_optimiser.png",
   },
   {
     id: 12,
@@ -148,7 +148,19 @@ const VIDEOS = [
     color: "from-emerald-900/60 to-slate-900",
     accent: "border-emerald-400/40",
     videoSrc: `/video/12_analyst.mp4`,
-    backdropSrc: "/medivac_comms_bg.jpg",
+    backdropSrc: "/bg_12_analyst.png",
+  },
+  {
+    id: 13,
+    title: "International Organ & Insurance Transfer",
+    duration: "2:08",
+    section: "Special Missions",
+    desc: "Jennifer covers the full workflow for cross-border organ retrieval and insurance repatriation flights — international clearances, ANZOD coordination, cold ischaemia time monitoring, customs, and CASA Part 121 compliance.",
+    thumbSrc: "/thumb_13_international.png",
+    color: "from-indigo-900/60 to-slate-900",
+    accent: "border-indigo-400/40",
+    videoSrc: `/video/13_international_v2.mp4`,
+    backdropSrc: "/bg_13_international.png",
   },
 ];
 
@@ -257,6 +269,7 @@ export default function Jennifer({ role }: Props) {
   // Other
   const [videoError, setVideoError] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const autoPlayRef = useRef(false); // set true when tile clicked — auto-play after load
   const canvasRef = useRef<HTMLCanvasElement | null>(null); // kept for type compat, unused
   const miniCanvasRef = useRef<HTMLCanvasElement | null>(null); // kept for type compat, unused
   const backdropImgRef = useRef<HTMLImageElement | null>(null); // kept for type compat, unused
@@ -268,25 +281,39 @@ export default function Jennifer({ role }: Props) {
     return `${m}:${sec.toString().padStart(2, "0")}`;
   }
 
-  // Auto-scroll chat
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-scroll chat — scroll only the chat container, not the whole page
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [chatLog, thinking]);
 
   // Canvas refs retained for backward compat but no longer used — layout uses CSS backdrop + video mask instead
 
-  // When active video changes, reload
+  // When active video changes, reload — auto-play if tile was clicked
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     video.pause();
     video.src = activeVideo.videoSrc;
-    video.load();
     setPlaying(false);
     setProgress(0);
     setCurrentTime("0:00");
     setTotalTime("0:00");
     setVideoError("");
+    video.load();
+    if (autoPlayRef.current) {
+      autoPlayRef.current = false;
+      const onCanPlay = () => {
+        video.removeEventListener("canplay", onCanPlay);
+        video.play().then(() => setVideoError("")).catch((err: Error) => {
+          setVideoError(err.message || "Playback blocked — tap Play to start.");
+        });
+      };
+      video.addEventListener("canplay", onCanPlay);
+    }
   }, [activeVideo]);
 
   // Wire video events
@@ -336,9 +363,16 @@ export default function Jennifer({ role }: Props) {
     }
   }
 
+  const pageTopRef = useRef<HTMLDivElement | null>(null);
+
   function handleVideoSelect(v: typeof VIDEOS[0]) {
+    autoPlayRef.current = true;
     videoRef.current?.pause();
     setActiveVideo(v);
+    // Scroll back to top so presenter card is visible
+    setTimeout(() => {
+      pageTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   }
 
   function handleProgressClick(e: React.MouseEvent<HTMLDivElement>) {
@@ -349,6 +383,7 @@ export default function Jennifer({ role }: Props) {
   }
 
   function handleNext() {
+    autoPlayRef.current = true;
     videoRef.current?.pause();
     setActiveVideo(VIDEOS[(VIDEOS.indexOf(activeVideo) + 1) % VIDEOS.length]);
   }
@@ -475,203 +510,47 @@ export default function Jennifer({ role }: Props) {
   }, [listening, apiHistory, chatLog]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" ref={pageTopRef}>
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Jennifer — AI Presenter</h1>
         <p className="text-sm text-muted-foreground mt-0.5">Real voice narration · Live AI Q&A · Typed or spoken questions</p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-        {/* ── Left: Avatar + Chat ── */}
-        <div className="xl:col-span-1 space-y-4">
-
-          {/* Avatar card */}
-          <div className="bg-card rounded-xl border border-cyan-500/20 p-4">
-            <div className="relative mx-auto w-40 h-40 rounded-2xl overflow-hidden mb-4 border border-cyan-500/30 bg-[#0a1628]">
-              {/* Mini avatar — backdrop as background, small Jennifer video panel */}
-              <div className="absolute inset-0" style={{ backgroundImage: `url(${activeVideo.backdropSrc})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'brightness(0.5)' }} />
-              <video
-                className="absolute inset-0 w-full h-full object-cover object-center"
-                src={playing ? activeVideo.videoSrc : undefined}
-                autoPlay={playing}
-                muted
-                playsInline
-                style={{ opacity: playing ? 1 : 0 }}
-              />
-              <div className="absolute top-2 left-2 px-2 py-0.5 bg-cyan-500/20 border border-cyan-400/30 rounded-full">
-                <span className="text-[8px] font-bold text-cyan-400">RFDS AI</span>
-              </div>
-              <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/60 rounded-full px-2 py-0.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${speaking ? "bg-cyan-400 animate-pulse" : playing ? "bg-red-400 animate-pulse" : "bg-green-400"}`} />
-                <span className={`text-[8px] font-medium ${speaking ? "text-cyan-400" : playing ? "text-red-400" : "text-green-400"}`}>
-                  {speaking ? "SPEAKING" : playing ? "PRESENTING" : "READY"}
-                </span>
-              </div>
-            </div>
-
-            <h2 className="text-base font-bold text-center" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Jennifer</h2>
-            <p className="text-xs text-muted-foreground text-center mt-0.5 mb-4">Medivac.ai AI Presenter<br />Claude AI · Live Q&A enabled</p>
-
-            <div className="flex justify-center mb-3">
-              <WaveformBars active={speaking || playing} />
-            </div>
-
-            {videoError && (
-              <div className="mb-2 px-2.5 py-1.5 bg-orange-500/10 border border-orange-400/30 rounded-lg text-[10px] text-orange-400 text-center">
-                {videoError}
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={handleVoiceInput}
-                data-testid="button-voice-input"
-                className={`flex items-center justify-center gap-1.5 p-2 border rounded-lg text-xs font-semibold transition-all ${
-                  listening
-                    ? "bg-red-500/20 border-red-400/50 text-red-400 animate-pulse"
-                    : "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20"
-                }`}
-              >
-                {listening ? <><MicOff size={12} /> Stop</> : <><Mic size={12} /> Mic</>}
-              </button>
-              <button
-                onClick={() => {
-                  if (speaking) { stopSpeaking(); } else { setTtsEnabled(v => !v); }
-                }}
-                data-testid="button-tts-toggle"
-                className={`flex items-center justify-center gap-1.5 p-2 border rounded-lg text-xs font-semibold transition-all ${
-                  ttsEnabled
-                    ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20"
-                    : "bg-muted border-card-border text-muted-foreground hover:border-cyan-400/20"
-                }`}
-              >
-                {speaking ? <><VolumeX size={12} /> Stop</> : ttsEnabled ? <><Volume2 size={12} /> Voice On</> : <><VolumeX size={12} /> Voice Off</>}
-              </button>
-            </div>
-
-            <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500/5 border border-cyan-400/10 rounded-lg">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-              <span className="text-[9px] text-muted-foreground">Live AI — Claude · Medivac.ai knowledge base</span>
-            </div>
-          </div>
-
-          {/* Chat panel */}
-          <div className="bg-card rounded-xl border border-card-border flex flex-col" style={{ minHeight: 380 }}>
-            <div className="px-3 py-2 border-b border-card-border flex items-center gap-2">
-              <MessageCircle size={12} className="text-cyan-400" />
-              <span className="text-xs font-semibold text-cyan-400">Ask Jennifer</span>
-              <span className="ml-auto text-[9px] text-muted-foreground">Type or speak — she'll answer</span>
-            </div>
-
-            <div className="flex-1 p-3 space-y-2 overflow-y-auto" style={{ maxHeight: 280 }}>
-              {chatLog.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[88%] p-2.5 rounded-xl text-xs leading-relaxed ${msg.role === "user" ? "bg-cyan-400/20 text-cyan-100" : "bg-background border border-card-border"}`}>
-                    {msg.role === "ai" && <span className="text-cyan-400 font-bold text-[10px] mr-1 block mb-0.5">Jennifer</span>}
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-              {thinking && (
-                <div className="flex justify-start">
-                  <div className="bg-background border border-card-border p-2.5 rounded-xl text-xs text-muted-foreground flex items-center gap-2">
-                    <span className="text-cyan-400 font-bold text-[10px]">Jennifer</span>
-                    <span className="flex gap-0.5">
-                      {[0,1,2].map(i => (
-                        <span key={i} className="w-1 h-1 rounded-full bg-cyan-400/60 animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                      ))}
-                    </span>
-                  </div>
-                </div>
-              )}
-              {(listening || voiceError) && (
-                <div className={`mx-0 px-2.5 py-1.5 rounded-lg text-[10px] flex items-center gap-1.5 ${
-                  listening
-                    ? "bg-red-500/10 border border-red-400/30 text-red-400"
-                    : "bg-orange-500/10 border border-orange-400/30 text-orange-400"
-                }`}>
-                  {listening ? (
-                    <><span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse inline-block" /> Listening — speak now</>
-                  ) : voiceError}
-                </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Quick starters */}
-            <div className="px-3 pt-2 flex flex-wrap gap-1">
-              {STARTERS.slice(0, 4).map(s => (
-                <button key={s} onClick={() => sendMessage(s)}
-                  className="px-2 py-0.5 bg-background border border-card-border hover:border-cyan-400/40 rounded-full text-[9px] transition-colors truncate max-w-[140px]">
-                  {s}
-                </button>
-              ))}
-            </div>
-
-            <div className="px-3 py-2 border-t border-card-border mt-2">
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && sendMessage(chatInput)}
-                  placeholder={listening ? "Listening..." : "Ask Jennifer anything about Medivac.ai..."}
-                  disabled={thinking || listening}
-                  data-testid="input-jennifer-chat"
-                  className="flex-1 bg-background border border-card-border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-cyan-400/50 disabled:opacity-50"
-                />
-                <button
-                  onClick={() => sendMessage(chatInput)}
-                  disabled={thinking || !chatInput.trim()}
-                  data-testid="button-send-message"
-                  className="px-3 py-1.5 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors disabled:opacity-40"
-                >
-                  <Send size={11} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── Right: Main video player + library ── */}
-        <div className="xl:col-span-2 space-y-4">
+      {/* ── Full-width Video Player ── */}
+      <div className="space-y-4">
           <div className="bg-card rounded-xl border border-card-border overflow-hidden">
             <div
               className="relative w-full bg-[#0a1628] overflow-hidden"
               style={{ aspectRatio: '16/9' }}
             >
-              {/* Full-bleed subject backdrop */}
+              {/* Full-bleed scenic backdrop — always visible, video overlays on top */}
               {activeVideo.backdropSrc && (
                 <div
                   className="absolute inset-0"
                   style={{
                     backgroundImage: `url(${activeVideo.backdropSrc})`,
-                    backgroundSize: 'cover',
+                    backgroundSize: '100% 100%',
                     backgroundPosition: 'center',
                   }}
                 />
               )}
-              {/* Dark gradient — left side for text legibility, blends into backdrop */}
-              <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(5,13,26,0.75) 0%, rgba(5,13,26,0.2) 45%, rgba(5,13,26,0.0) 60%)' }} />
-              {/* Jennifer video — only shown when playing, masked from left so backdrop shows on left */}
+              {/* Bottom gradient only when paused */}
+              {!playing && (
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(5,13,26,0.75) 0%, rgba(5,13,26,0.1) 50%, rgba(5,13,26,0.0) 70%)' }} />
+              )}
+              {/* Jennifer video — full width, no blend */}
               <video
                 ref={videoRef}
-                className="absolute"
+                className="absolute inset-0"
                 src={activeVideo.videoSrc}
                 playsInline
                 preload="auto"
                 style={{
-                  right: 0,
-                  top: 0,
+                  width: '100%',
                   height: '100%',
-                  width: '58%',
-                  objectFit: 'cover',
-                  objectPosition: '40% top',
+                  objectFit: 'fill',
                   display: playing ? 'block' : 'none',
-                  maskImage: 'linear-gradient(to right, transparent 0%, black 22%)',
-                  WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 22%)',
                 }}
               />
 
@@ -726,18 +605,17 @@ export default function Jennifer({ role }: Props) {
               </div>
             </div>
           </div>
+      </div>
 
-          {/* Video library */}
-          <div>
-            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Explainer Library — {VIDEOS.length} narrated modules
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {VIDEOS.map(v => (
-                <VideoThumb key={v.id} video={v} active={activeVideo.id === v.id} onClick={() => handleVideoSelect(v)} />
-              ))}
-            </div>
-          </div>
+      {/* ── Full-width Video Library below ── */}
+      <div>
+        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+          Explainer Library — {VIDEOS.length} narrated modules
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {VIDEOS.map(v => (
+            <VideoThumb key={v.id} video={v} active={activeVideo.id === v.id} onClick={() => handleVideoSelect(v)} />
+          ))}
         </div>
       </div>
     </div>

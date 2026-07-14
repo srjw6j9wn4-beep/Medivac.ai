@@ -1,17 +1,20 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   calculateQuote, fmtCents, AIRCRAFT, loadLiveRates, getRatesLastChecked,
   type AircraftKey, type LegInput, type CrewConfig, type QuoteInput, type QuoteCostBreakdown,
-  type GroundTransportType, type LiveQuoteRate,
+  CL60_CAPTAINS, CL60_FIRST_OFFICERS, PC12_CAPTAINS,
+  INTL_AIRPORTS, INTL_OVERFLIGHT_FEES, calculateIntlCharges, USD_TO_AUD,
+  type IntlAirportInfo, type IntlChargesSummary,
+  type GroundTransportType, type LiveQuoteRate, type LegOvernight,
 } from "@/lib/quoteEngine";
 import { generateCharterQuotePDF } from "@/lib/generateCharterQuotePDF";
-import { AirportLegPicker } from "@/components/AirportSearch";
-import { type Airport } from "@/lib/airportData";
+import { AirportLegPicker, IntlAirportSearch } from "@/components/AirportSearch";
+import { type Airport, distanceNm as calcDistanceNm } from "@/lib/airportData";
 import {
   Plane, Plus, Trash2, Calculator, Save, FileDown, RotateCcw,
-  AlertTriangle, ChevronDown, ChevronUp, Users, MapPin, Hotel, Percent, Eye, Edit3,
+  AlertTriangle, ChevronDown, ChevronUp, Users, MapPin, Globe, Building2, AlertCircle, Info, Hotel, Percent, Eye, Edit3,
   DollarSign, RefreshCw, Pencil, Check, X, ArrowUp, ArrowDown, Loader2,
 } from "lucide-react";
 
@@ -34,6 +37,7 @@ interface CharterQuoteRecord {
   marginPercent: number;
   finalQuote: number;
   status: QuoteStatus;
+  autoInvoice?: number;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -211,18 +215,463 @@ const CORPORATE_TRAVELLER_ACCOM: AccomLocation[] = [
       { name: "ibis Styles Cairns", chain: "Accor", stars: 3, approxRateAUD: 149, phone: "+61 7 4031 0300", bookingUrl: "https://all.accor.com/hotel/9157" },
     ],
   },
+  // ── International destinations ───────────────────────────────────────────
+  {
+    label: "Auckland, New Zealand",
+    icaoCodes: ["NZAA"],
+    hotels: [
+      { name: "Sofitel Auckland Viaduct Harbour", chain: "Accor", stars: 5, approxRateAUD: 520, phone: "+64 9 909 9000", bookingUrl: "https://all.accor.com/hotel/A0Q1" },
+      { name: "Pullman Auckland Hotel & Apartments", chain: "Accor", stars: 5, approxRateAUD: 480, phone: "+64 9 353 1000", bookingUrl: "https://all.accor.com/hotel/1098" },
+      { name: "Novotel Auckland Airport", chain: "Accor", stars: 4, approxRateAUD: 360, phone: "+64 9 275 9191", bookingUrl: "https://all.accor.com/hotel/4408" },
+      { name: "ibis Auckland Airport", chain: "Accor", stars: 3, approxRateAUD: 235, phone: "+64 9 256 8880", bookingUrl: "https://all.accor.com/hotel/5987" },
+    ],
+  },
+  {
+    label: "Wellington, New Zealand",
+    icaoCodes: ["NZWN"],
+    hotels: [
+      { name: "InterContinental Wellington", chain: "IHG", stars: 5, approxRateAUD: 495, phone: "+64 4 472 2722", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/wellington" },
+      { name: "Sofitel Wellington", chain: "Accor", stars: 5, approxRateAUD: 465, phone: "+64 4 901 9000", bookingUrl: "https://all.accor.com/hotel/D3B4" },
+      { name: "Novotel Wellington", chain: "Accor", stars: 4, approxRateAUD: 320, phone: "+64 4 918 1900", bookingUrl: "https://all.accor.com/hotel/3000" },
+    ],
+  },
+  {
+    label: "Christchurch, New Zealand",
+    icaoCodes: ["NZCH"],
+    hotels: [
+      { name: "The George Christchurch", chain: "Independent", stars: 5, approxRateAUD: 490, phone: "+64 3 379 4560", bookingUrl: "https://www.thegeorge.com" },
+      { name: "Novotel Christchurch Airport", chain: "Accor", stars: 4, approxRateAUD: 295, phone: "+64 3 357 7400", bookingUrl: "https://all.accor.com/hotel/9167" },
+      { name: "Crowne Plaza Christchurch", chain: "IHG", stars: 4, approxRateAUD: 340, phone: "+64 3 365 0600", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/christchurch" },
+    ],
+  },
+  {
+    label: "Singapore",
+    icaoCodes: ["WSSS"],
+    hotels: [
+      { name: "Crowne Plaza Changi Airport", chain: "IHG", stars: 5, approxRateAUD: 580, phone: "+65 6823 5300", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/singapore" },
+      { name: "InterContinental Singapore", chain: "IHG", stars: 5, approxRateAUD: 640, phone: "+65 6338 7600", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/singapore" },
+      { name: "Novotel Singapore on Stevens", chain: "Accor", stars: 4, approxRateAUD: 380, phone: "+65 6589 7888", bookingUrl: "https://all.accor.com/hotel/5987" },
+    ],
+  },
+  {
+    label: "Hong Kong",
+    icaoCodes: ["VHHH"],
+    hotels: [
+      { name: "Regal Airport Hotel Hong Kong", chain: "Regal Hotels", stars: 5, approxRateAUD: 610, phone: "+852 2286 8888", bookingUrl: "https://www.regalhotel.com/regal-airport-hotel" },
+      { name: "Novotel Hong Kong Airport", chain: "Accor", stars: 4, approxRateAUD: 490, phone: "+852 3893 8888", bookingUrl: "https://all.accor.com/hotel/7185" },
+      { name: "ibis Hong Kong Central & Sheung Wan", chain: "Accor", stars: 3, approxRateAUD: 295, phone: "+852 2252 9888", bookingUrl: "https://all.accor.com/hotel/6899" },
+    ],
+  },
+  {
+    label: "Tokyo (Haneda), Japan",
+    icaoCodes: ["RJTT"],
+    hotels: [
+      { name: "Tokyo Haneda Excel Hotel Tokyu", chain: "Tokyu Hotels", stars: 4, approxRateAUD: 450, phone: "+81 3 5756 6000", bookingUrl: "https://www.tokyuhotels.co.jp/haneda-e/index.html" },
+      { name: "Haneda Excel Hotel Tokyu (ANA InterContinental)", chain: "IHG", stars: 5, approxRateAUD: 520, phone: "+81 3 5756 5600", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/tokyo" },
+      { name: "Sheraton Grand Tokyo Bay Hotel", chain: "Marriott", stars: 4, approxRateAUD: 410, phone: "+81 47 355 5555", bookingUrl: "https://www.marriott.com/en-us/hotels/tyosg-sheraton-grand-tokyo-bay-hotel" },
+    ],
+  },
+  {
+    label: "Bangkok, Thailand",
+    icaoCodes: ["VTBS"],
+    hotels: [
+      { name: "Novotel Bangkok Suvarnabhumi Airport", chain: "Accor", stars: 4, approxRateAUD: 310, phone: "+66 2 131 1111", bookingUrl: "https://all.accor.com/hotel/5779" },
+      { name: "Pullman Bangkok Hotel G", chain: "Accor", stars: 5, approxRateAUD: 390, phone: "+66 2 238 1991", bookingUrl: "https://all.accor.com/hotel/6979" },
+      { name: "Courtyard Bangkok Airport", chain: "Marriott", stars: 4, approxRateAUD: 285, phone: "+66 2 034 1888", bookingUrl: "https://www.marriott.com/en-us/hotels/bkkcy-courtyard-bangkok-airport" },
+    ],
+  },
+  {
+    label: "Bali (Denpasar), Indonesia",
+    icaoCodes: ["WADD"],
+    hotels: [
+      { name: "InterContinental Bali Resort", chain: "IHG", stars: 5, approxRateAUD: 520, phone: "+62 361 701888", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/bali" },
+      { name: "Novotel Bali Ngurah Rai Airport", chain: "Accor", stars: 4, approxRateAUD: 295, phone: "+62 361 930 6400", bookingUrl: "https://all.accor.com/hotel/B3M8" },
+      { name: "Pullman Bali Legian Beach", chain: "Accor", stars: 5, approxRateAUD: 445, phone: "+62 361 762 888", bookingUrl: "https://all.accor.com/hotel/8634" },
+    ],
+  },
+  {
+    label: "Port Moresby, Papua New Guinea",
+    icaoCodes: ["AYPY"],
+    hotels: [
+      { name: "Airways Hotel Port Moresby", chain: "Independent", stars: 5, approxRateAUD: 520, phone: "+675 324 5200", bookingUrl: "https://www.airwayshotel.com" },
+      { name: "Holiday Inn Port Moresby", chain: "IHG", stars: 4, approxRateAUD: 390, phone: "+675 303 2000", bookingUrl: "https://www.ihg.com/holidayinn/hotels/au/en/port-moresby" },
+      { name: "Crowne Plaza Port Moresby", chain: "IHG", stars: 5, approxRateAUD: 480, phone: "+675 309 3000", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/port-moresby" },
+    ],
+  },
+  {
+    label: "Nadi, Fiji",
+    icaoCodes: ["NFFN"],
+    hotels: [
+      { name: "Sofitel Fiji Resort & Spa", chain: "Accor", stars: 5, approxRateAUD: 490, phone: "+679 675 1111", bookingUrl: "https://all.accor.com/hotel/9167" },
+      { name: "Novotel Nadi", chain: "Accor", stars: 4, approxRateAUD: 310, phone: "+679 672 2000", bookingUrl: "https://all.accor.com/hotel/3636" },
+      { name: "Holiday Inn Resort Vanuatu", chain: "IHG", stars: 4, approxRateAUD: 295, phone: "+679 672 2766", bookingUrl: "https://www.ihg.com/holidayinnresorts/hotels/au/en/fiji" },
+    ],
+  },
+  {
+    label: "Suva, Fiji",
+    icaoCodes: ["NFSU"],
+    hotels: [
+      { name: "Holiday Inn Suva", chain: "IHG", stars: 4, approxRateAUD: 290, phone: "+679 330 0600", bookingUrl: "https://www.ihg.com/holidayinn/hotels/au/en/suva" },
+      { name: "Grand Pacific Hotel Suva", chain: "Independent", stars: 5, approxRateAUD: 370, phone: "+679 322 2000", bookingUrl: "https://www.grandpacifichotel.com.fj" },
+    ],
+  },
+  {
+    label: "Port Vila, Vanuatu",
+    icaoCodes: ["NVVF"],
+    hotels: [
+      { name: "Iririki Island Resort & Spa", chain: "Independent", stars: 4, approxRateAUD: 340, phone: "+678 23388", bookingUrl: "https://www.iririki.com" },
+      { name: "Holiday Inn Resort Vanuatu", chain: "IHG", stars: 4, approxRateAUD: 310, phone: "+678 22040", bookingUrl: "https://www.ihg.com/holidayinnresorts/hotels/au/en/vanuatu" },
+      { name: "Warwick Le Lagon Resort & Spa", chain: "Warwick Hotels", stars: 4, approxRateAUD: 290, phone: "+678 22313", bookingUrl: "https://www.warwickhotels.com/le-lagon" },
+    ],
+  },
+  {
+    label: "Noumea, New Caledonia",
+    icaoCodes: ["NWWW", "NWWM"],
+    hotels: [
+      { name: "Le Méridien Noumea", chain: "Marriott", stars: 5, approxRateAUD: 420, phone: "+687 26 50 00", bookingUrl: "https://www.marriott.com/en-us/hotels/numlc-le-meridien-noumea" },
+      { name: "Hilton Noumea La Promenade Residences", chain: "Hilton", stars: 4, approxRateAUD: 380, phone: "+687 23 73 00", bookingUrl: "https://www.hilton.com/en/hotels/nouhnhi-hilton-noumea-la-promenade-residences" },
+      { name: "Ramada Resort by Wyndham Noumea", chain: "Wyndham", stars: 4, approxRateAUD: 310, phone: "+687 26 22 00", bookingUrl: "https://www.wyndhamhotels.com/ramada/noumea" },
+    ],
+  },
+  {
+    label: "Dubai, UAE",
+    icaoCodes: ["OMDB"],
+    hotels: [
+      { name: "Crowne Plaza Dubai Airport", chain: "IHG", stars: 5, approxRateAUD: 590, phone: "+971 4 282 9999", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/dubai" },
+      { name: "Novotel Dubai Al Barsha", chain: "Accor", stars: 4, approxRateAUD: 380, phone: "+971 4 399 9999", bookingUrl: "https://all.accor.com/hotel/7448" },
+      { name: "InterContinental Dubai Festival City", chain: "IHG", stars: 5, approxRateAUD: 620, phone: "+971 4 701 1111", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/dubai" },
+    ],
+  },
+  {
+    label: "Nuku'alofa, Tonga",
+    icaoCodes: ["NFTF"],
+    hotels: [
+      { name: "Scenic Hotel Tonga", chain: "Scenic Hotel Group", stars: 4, approxRateAUD: 285, phone: "+676 23 344", bookingUrl: "https://www.scenichotelgroup.co.nz/tonga" },
+      { name: "Hilton Garden Inn Tonga Nuku'alofa", chain: "Hilton", stars: 4, approxRateAUD: 320, phone: "+676 25 555", bookingUrl: "https://www.hilton.com/en/hotels/nunlpgi-hilton-garden-inn-tonga" },
+    ],
+  },
+  {
+    label: "Honiara, Solomon Islands",
+    icaoCodes: ["AGGH"],
+    hotels: [
+      { name: "Heritage Park Hotel Honiara", chain: "Independent", stars: 4, approxRateAUD: 320, phone: "+677 36 100", bookingUrl: "https://www.heritageparkhotel.com.sb" },
+      { name: "Coral Sea Resort Honiara", chain: "Independent", stars: 4, approxRateAUD: 295, phone: "+677 21 333", bookingUrl: "https://www.coralsearesort.com.sb" },
+    ],
+  },
+  {
+    label: "Papeete, French Polynesia",
+    icaoCodes: ["NTAA"],
+    hotels: [
+      { name: "InterContinental Tahiti Resort & Spa", chain: "IHG", stars: 5, approxRateAUD: 680, phone: "+689 40 86 51 10", bookingUrl: "https://www.ihg.com/intercontinental/hotels/au/en/tahiti" },
+      { name: "Sofitel Tahiti Maeva Beach Resort", chain: "Accor", stars: 4, approxRateAUD: 540, phone: "+689 40 42 80 42", bookingUrl: "https://all.accor.com/hotel/0561" },
+    ],
+  },
+  {
+    label: "Apia, Samoa",
+    icaoCodes: ["NSFA"],
+    hotels: [
+      { name: "Sheraton Samoa Aggie Grey's Hotel", chain: "Marriott", stars: 4, approxRateAUD: 350, phone: "+685 22 880", bookingUrl: "https://www.marriott.com/en-us/hotels/apwsi-sheraton-samoa-aggie-greys-hotel" },
+      { name: "Samoa Sinalei Reef Resort & Spa", chain: "Independent", stars: 4, approxRateAUD: 320, phone: "+685 25 191", bookingUrl: "https://www.sinalei.com" },
+    ],
+  },
+  {
+    label: "Manila, Philippines",
+    icaoCodes: ["RPLL"],
+    hotels: [
+      { name: "Sofitel Philippine Plaza Manila", chain: "Accor", stars: 5, approxRateAUD: 410, phone: "+63 2 8551 5555", bookingUrl: "https://all.accor.com/hotel/1466" },
+      { name: "Holiday Inn Manila Galleria", chain: "IHG", stars: 4, approxRateAUD: 290, phone: "+63 2 8633 7777", bookingUrl: "https://www.ihg.com/holidayinn/hotels/au/en/manila" },
+      { name: "Novotel Manila Araneta City", chain: "Accor", stars: 4, approxRateAUD: 270, phone: "+63 2 8990 7888", bookingUrl: "https://all.accor.com/hotel/A3V1" },
+      { name: "Crowne Plaza Manila Galleria", chain: "IHG", stars: 5, approxRateAUD: 360, phone: "+63 2 8633 7777", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/manila" },
+    ],
+  },
+  {
+    label: "Jakarta, Indonesia",
+    icaoCodes: ["WIII"],
+    hotels: [
+      { name: "Pullman Jakarta Indonesia", chain: "Accor", stars: 5, approxRateAUD: 390, phone: "+62 21 3192 1111", bookingUrl: "https://all.accor.com/hotel/1320" },
+      { name: "Novotel Jakarta Cikini", chain: "Accor", stars: 4, approxRateAUD: 265, phone: "+62 21 2314 1234", bookingUrl: "https://all.accor.com/hotel/6827" },
+      { name: "Crowne Plaza Jakarta", chain: "IHG", stars: 5, approxRateAUD: 370, phone: "+62 21 5268 833", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/jakarta" },
+      { name: "ibis Jakarta Slipi", chain: "Accor", stars: 3, approxRateAUD: 155, phone: "+62 21 5366 4600", bookingUrl: "https://all.accor.com/hotel/6531" },
+    ],
+  },
+  {
+    label: "Los Angeles, USA",
+    icaoCodes: ["KLAX"],
+    hotels: [
+      { name: "Crowne Plaza LAX", chain: "IHG", stars: 4, approxRateAUD: 590, phone: "+1 310 642 7500", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/los-angeles" },
+      { name: "Westin Los Angeles Airport", chain: "Marriott", stars: 4, approxRateAUD: 620, phone: "+1 310 216 7100", bookingUrl: "https://www.marriott.com/en-us/hotels/laxwi-the-westin-los-angeles-airport" },
+      { name: "Hilton Los Angeles Airport", chain: "Hilton", stars: 4, approxRateAUD: 560, phone: "+1 310 410 4000", bookingUrl: "https://www.hilton.com/en/hotels/laxahhh-hilton-los-angeles-airport" },
+    ],
+  },
 ];
 
-function getRelevantAccomLocations(legs: LegInput[]): AccomLocation[] {
-  const icaoSet = new Set<string>();
-  legs.forEach(l => {
-    if (l.toICAO) icaoSet.add(l.toICAO.toUpperCase());
-  });
-  if (icaoSet.size === 0) return CORPORATE_TRAVELLER_ACCOM; // show all if no route set
-  const matched = CORPORATE_TRAVELLER_ACCOM.filter(loc =>
-    loc.icaoCodes.some(code => icaoSet.has(code))
-  );
-  return matched.length > 0 ? matched : CORPORATE_TRAVELLER_ACCOM;
+// ─── Extended 4★+ Accommodation (regional / non-CT locations) ────────────────
+// Covers all major RFDS aerodromes not in the CT preferred-partner list.
+// All properties are 4 stars or above, sourced from Booking.com / property websites.
+const EXTENDED_ACCOM: AccomLocation[] = [
+  {
+    label: "Tamworth NSW",
+    icaoCodes: ["YSTW"],
+    hotels: [
+      { name: "Powerhouse Hotel Tamworth", chain: "Independent", stars: 4, approxRateAUD: 175, phone: "+61 2 6766 7000", bookingUrl: "https://www.powerhousehoteltamworth.com.au" },
+      { name: "Quality Hotel Tamworth", chain: "Choice Hotels", stars: 4, approxRateAUD: 160, phone: "+61 2 6768 4444", bookingUrl: "https://www.choicehotels.com/new-south-wales/tamworth" },
+    ],
+  },
+  {
+    label: "Armidale NSW",
+    icaoCodes: ["YARM"],
+    hotels: [
+      { name: "Armidale Motel", chain: "Independent", stars: 4, approxRateAUD: 155, phone: "+61 2 6772 8799", bookingUrl: "https://www.booking.com/city/au/armidale.html" },
+      { name: "Armidale City Motel", chain: "Independent", stars: 4, approxRateAUD: 145, phone: "+61 2 6772 4477", bookingUrl: "https://www.booking.com/city/au/armidale.html" },
+    ],
+  },
+  {
+    label: "Wagga Wagga NSW",
+    icaoCodes: ["YSWG"],
+    hotels: [
+      { name: "Mercure Wagga Wagga", chain: "Accor", stars: 4, approxRateAUD: 175, phone: "+61 2 6932 7878", bookingUrl: "https://all.accor.com/hotel/1611" },
+      { name: "Quality Hotel Menzies Wagga Wagga", chain: "Choice Hotels", stars: 4, approxRateAUD: 165, phone: "+61 2 6921 4444", bookingUrl: "https://www.choicehotels.com/new-south-wales/wagga-wagga" },
+    ],
+  },
+  {
+    label: "Albury NSW",
+    icaoCodes: ["YMAY"],
+    hotels: [
+      { name: "Mantra Albury", chain: "Accor", stars: 4, approxRateAUD: 180, phone: "+61 2 6058 5100", bookingUrl: "https://all.accor.com/hotel/6996" },
+      { name: "Rydges Albury", chain: "Rydges", stars: 4, approxRateAUD: 175, phone: "+61 2 6021 5366", bookingUrl: "https://www.rydges.com/accommodation/albury-nsw/rydges-albury" },
+    ],
+  },
+  {
+    label: "Orange NSW",
+    icaoCodes: ["YORG"],
+    hotels: [
+      { name: "Mercure Orange", chain: "Accor", stars: 4, approxRateAUD: 170, phone: "+61 2 6362 5000", bookingUrl: "https://all.accor.com/hotel/2044" },
+      { name: "Duntryleague Guesthouse", chain: "Independent", stars: 4, approxRateAUD: 185, phone: "+61 2 6362 2877", bookingUrl: "https://www.duntryleague.com.au" },
+    ],
+  },
+  {
+    label: "Bathurst NSW",
+    icaoCodes: ["YBTH"],
+    hotels: [
+      { name: "Quality Hotel Rothbury Bathurst", chain: "Choice Hotels", stars: 4, approxRateAUD: 160, phone: "+61 2 6333 1800", bookingUrl: "https://www.choicehotels.com/new-south-wales/bathurst" },
+      { name: "Panorama Motor Inn Bathurst", chain: "Independent", stars: 4, approxRateAUD: 145, phone: "+61 2 6331 2666", bookingUrl: "https://www.booking.com/city/au/bathurst.html" },
+    ],
+  },
+  {
+    label: "Griffith NSW",
+    icaoCodes: ["YGTH"],
+    hotels: [
+      { name: "Acacia Holiday Units Griffith", chain: "Independent", stars: 4, approxRateAUD: 150, phone: "+61 2 6964 2322", bookingUrl: "https://www.booking.com/city/au/griffith.html" },
+      { name: "Quality Hotel Griffith", chain: "Choice Hotels", stars: 4, approxRateAUD: 165, phone: "+61 2 6964 3844", bookingUrl: "https://www.choicehotels.com/new-south-wales/griffith" },
+    ],
+  },
+  {
+    label: "Moree NSW",
+    icaoCodes: ["YMOR"],
+    hotels: [
+      { name: "Quality Inn Moree", chain: "Choice Hotels", stars: 4, approxRateAUD: 155, phone: "+61 2 6752 1866", bookingUrl: "https://www.choicehotels.com/new-south-wales/moree" },
+      { name: "Gwydir Hotel Moree", chain: "Independent", stars: 4, approxRateAUD: 140, phone: "+61 2 6752 1855", bookingUrl: "https://www.booking.com/city/au/moree.html" },
+    ],
+  },
+  {
+    label: "Narrabri NSW",
+    icaoCodes: ["YNBR"],
+    hotels: [
+      { name: "Crossroads Motor Inn Narrabri", chain: "Independent", stars: 4, approxRateAUD: 145, phone: "+61 2 6792 6233", bookingUrl: "https://www.booking.com/city/au/narrabri.html" },
+    ],
+  },
+  {
+    label: "Parkes NSW",
+    icaoCodes: ["YPKS"],
+    hotels: [
+      { name: "Quality Inn Parkes International", chain: "Choice Hotels", stars: 4, approxRateAUD: 155, phone: "+61 2 6862 8111", bookingUrl: "https://www.choicehotels.com/new-south-wales/parkes" },
+    ],
+  },
+  {
+    label: "Forbes NSW",
+    icaoCodes: ["YFBS"],
+    hotels: [
+      { name: "Forbes RSL Club & Motel", chain: "Independent", stars: 4, approxRateAUD: 135, phone: "+61 2 6852 2966", bookingUrl: "https://www.booking.com/city/au/forbes.html" },
+    ],
+  },
+  {
+    label: "Mudgee NSW",
+    icaoCodes: ["YMDG"],
+    hotels: [
+      { name: "Rydges Mudgee", chain: "Rydges", stars: 4, approxRateAUD: 175, phone: "+61 2 6372 1555", bookingUrl: "https://www.rydges.com/accommodation/mudgee-nsw/rydges-mudgee" },
+    ],
+  },
+  {
+    label: "Narrandera NSW",
+    icaoCodes: ["YNAR"],
+    hotels: [
+      { name: "Narrandera Motor Inn", chain: "Independent", stars: 4, approxRateAUD: 135, phone: "+61 2 6959 1100", bookingUrl: "https://www.booking.com/city/au/narrandera.html" },
+    ],
+  },
+  {
+    label: "Coffs Harbour NSW",
+    icaoCodes: ["YCFS"],
+    hotels: [
+      { name: "Opal Cove Resort", chain: "Independent", stars: 4, approxRateAUD: 199, phone: "+61 2 6651 0510", bookingUrl: "https://www.opalcove.com.au" },
+      { name: "Mantra Coffs Harbour", chain: "Accor", stars: 4, approxRateAUD: 185, phone: "+61 2 6651 0111", bookingUrl: "https://all.accor.com/hotel/6994" },
+    ],
+  },
+  {
+    label: "Port Macquarie NSW",
+    icaoCodes: ["YPMQ"],
+    hotels: [
+      { name: "Rydges Port Macquarie", chain: "Rydges", stars: 4, approxRateAUD: 195, phone: "+61 2 6583 1200", bookingUrl: "https://www.rydges.com/accommodation/port-macquarie-nsw/rydges-port-macquarie" },
+      { name: "Mantra Quayside Port Macquarie", chain: "Accor", stars: 4, approxRateAUD: 185, phone: "+61 2 6584 0400", bookingUrl: "https://all.accor.com/hotel/6998" },
+    ],
+  },
+  {
+    label: "Newcastle NSW",
+    icaoCodes: ["YWLM"],
+    hotels: [
+      { name: "Crowne Plaza Newcastle", chain: "IHG", stars: 5, approxRateAUD: 265, phone: "+61 2 4907 5000", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/newcastle" },
+      { name: "Novotel Newcastle Beach", chain: "Accor", stars: 4, approxRateAUD: 229, phone: "+61 2 4032 3700", bookingUrl: "https://all.accor.com/hotel/9003" },
+      { name: "Rydges Newcastle", chain: "Rydges", stars: 4, approxRateAUD: 195, phone: "+61 2 4926 3777", bookingUrl: "https://www.rydges.com/accommodation/newcastle-nsw/rydges-newcastle" },
+    ],
+  },
+  {
+    label: "Hobart TAS",
+    icaoCodes: ["YMHB"],
+    hotels: [
+      { name: "Mövenpick Hotel Hobart", chain: "Accor", stars: 5, approxRateAUD: 289, phone: "+61 3 6210 7600", bookingUrl: "https://all.accor.com/hotel/B3U1" },
+      { name: "Hotel Grand Chancellor Hobart", chain: "Independent", stars: 5, approxRateAUD: 275, phone: "+61 3 6235 4535", bookingUrl: "https://www.grandchancellorhotels.com/hotel-grand-chancellor-hobart" },
+      { name: "Crowne Plaza Hobart", chain: "IHG", stars: 5, approxRateAUD: 269, phone: "+61 3 6220 0000", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/hobart" },
+      { name: "Novotel Hobart", chain: "Accor", stars: 4, approxRateAUD: 229, phone: "+61 3 6220 7700", bookingUrl: "https://all.accor.com/hotel/2130" },
+    ],
+  },
+  {
+    label: "Townsville QLD",
+    icaoCodes: ["YBTL"],
+    hotels: [
+      { name: "Rydges Southbank Townsville", chain: "Rydges", stars: 4, approxRateAUD: 199, phone: "+61 7 4726 7800", bookingUrl: "https://www.rydges.com/accommodation/townsville-qld/rydges-southbank-townsville" },
+      { name: "DoubleTree by Hilton Townsville", chain: "Hilton", stars: 4, approxRateAUD: 219, phone: "+61 7 4753 6000", bookingUrl: "https://www.hilton.com/en/hotels/tsvdidi-doubletree-townsville" },
+      { name: "Hotel Grand Chancellor Townsville", chain: "Independent", stars: 4, approxRateAUD: 189, phone: "+61 7 4729 2000", bookingUrl: "https://www.grandchancellorhotels.com/hotel-grand-chancellor-townsville" },
+    ],
+  },
+  {
+    label: "Rockhampton QLD",
+    icaoCodes: ["YBRK"],
+    hotels: [
+      { name: "Crowne Plaza Rockhampton", chain: "IHG", stars: 4, approxRateAUD: 199, phone: "+61 7 4927 8855", bookingUrl: "https://www.ihg.com/crowneplaza/hotels/au/en/rockhampton" },
+    ],
+  },
+  {
+    label: "Mount Isa QLD",
+    icaoCodes: ["YBMA"],
+    hotels: [
+      { name: "ibis Styles Mount Isa Verona", chain: "Accor", stars: 4, approxRateAUD: 175, phone: "+61 7 4743 3024", bookingUrl: "https://all.accor.com/hotel/6847" },
+    ],
+  },
+  {
+    label: "Longreach QLD",
+    icaoCodes: ["YLRE"],
+    hotels: [
+      { name: "ibis Styles Longreach", chain: "Accor", stars: 4, approxRateAUD: 179, phone: "+61 7 4658 2322", bookingUrl: "https://all.accor.com/hotel/7153" },
+    ],
+  },
+  {
+    label: "Charleville QLD",
+    icaoCodes: ["YBCV"],
+    hotels: [
+      { name: "Charleville Motor Inn", chain: "Independent", stars: 4, approxRateAUD: 155, phone: "+61 7 4654 1566", bookingUrl: "https://www.booking.com/city/au/charleville.html" },
+    ],
+  },
+  {
+    label: "Coober Pedy SA",
+    icaoCodes: ["YCBP"],
+    hotels: [
+      { name: "Desert Cave Hotel", chain: "Independent", stars: 4, approxRateAUD: 195, phone: "+61 8 8672 5688", bookingUrl: "https://www.desertcave.com.au" },
+    ],
+  },
+  {
+    label: "Broome WA",
+    icaoCodes: ["YBRM"],
+    hotels: [
+      { name: "Cable Beach Club Resort & Spa", chain: "Independent", stars: 5, approxRateAUD: 399, phone: "+61 8 9192 0400", bookingUrl: "https://www.cablebeachclub.com" },
+      { name: "Mercure Broome", chain: "Accor", stars: 4, approxRateAUD: 215, phone: "+61 8 9192 1303", bookingUrl: "https://all.accor.com/hotel/0745" },
+      { name: "Mantra Frangipani Broome", chain: "Accor", stars: 4, approxRateAUD: 199, phone: "+61 8 9193 7700", bookingUrl: "https://all.accor.com/hotel/8534" },
+    ],
+  },
+  {
+    label: "Yulara (Uluru) NT",
+    icaoCodes: ["YAYE"],
+    hotels: [
+      { name: "Sails in the Desert Hotel", chain: "Ayers Rock Resort", stars: 5, approxRateAUD: 425, phone: "+61 2 8296 8010", bookingUrl: "https://www.ayersrockresort.com.au/accommodation/sails-in-the-desert" },
+      { name: "Desert Gardens Hotel", chain: "Ayers Rock Resort", stars: 4, approxRateAUD: 299, phone: "+61 2 8296 8010", bookingUrl: "https://www.ayersrockresort.com.au/accommodation/desert-gardens-hotel" },
+    ],
+  },
+  {
+    label: "Lord Howe Island NSW",
+    icaoCodes: ["YLHI"],
+    hotels: [
+      { name: "Capella Lodge", chain: "Independent", stars: 5, approxRateAUD: 895, phone: "+61 2 9918 4355", bookingUrl: "https://www.lordhowe.com" },
+      { name: "Pinetrees Lodge", chain: "Independent", stars: 4, approxRateAUD: 475, phone: "+61 2 6563 2177", bookingUrl: "https://www.pinetrees.com.au" },
+    ],
+  },
+  {
+    label: "Gold Coast QLD",
+    icaoCodes: ["YBCG"],
+    hotels: [
+      { name: "Marriott Resort & Spa Gold Coast", chain: "Marriott", stars: 5, approxRateAUD: 329, phone: "+61 7 5592 9800", bookingUrl: "https://www.marriott.com/en-us/hotels/oolmc-surfers-paradise-marriott-resort-and-spa" },
+      { name: "Palazzo Versace Gold Coast", chain: "Independent", stars: 5, approxRateAUD: 489, phone: "+61 7 5509 8000", bookingUrl: "https://www.palazzoversace.com.au" },
+      { name: "Vibe Hotel Gold Coast", chain: "TFE Hotels", stars: 4, approxRateAUD: 219, phone: "+61 7 5538 2000", bookingUrl: "https://www.vibehotels.com/hotels/gold-coast" },
+    ],
+  },
+  {
+    label: "Sunshine Coast QLD",
+    icaoCodes: ["YBSU"],
+    hotels: [
+      { name: "Sofitel Noosa Pacific Resort", chain: "Accor", stars: 5, approxRateAUD: 349, phone: "+61 7 5449 4888", bookingUrl: "https://all.accor.com/hotel/1068" },
+      { name: "Novotel Sunshine Coast Resort", chain: "Accor", stars: 4, approxRateAUD: 249, phone: "+61 7 5473 3797", bookingUrl: "https://all.accor.com/hotel/6577" },
+    ],
+  },
+  {
+    // Best available in remote outback — no 4★ hotels exist in Walgett
+    label: "Walgett NSW",
+    icaoCodes: ["YWLG"],
+    hotels: [
+      { name: "Coolabah Motel Walgett", chain: "Independent", stars: 3, approxRateAUD: 140, phone: "02 6828 1366", bookingUrl: "https://www.coolabahwalgett.com.au" },
+      { name: "Gateway Hotel Motel", chain: "Independent", stars: 2, approxRateAUD: 110, phone: "02 6828 1563", bookingUrl: "https://thegatewaywalgett.com.au" },
+    ],
+  },
+  {
+    // Best available in remote outback — no 4★ hotels exist in Wilcannia
+    label: "Wilcannia NSW",
+    icaoCodes: ["YWCA"],
+    hotels: [
+      { name: "Graham's Motel", chain: "Independent", stars: 2, approxRateAUD: 110, phone: "08 8091 5957", bookingUrl: "https://www.thedarlingriverrun.com.au/directory/liberty-roadhouse-and-grahams-motel/" },
+      { name: "Ampol Roadhouse Motel", chain: "Independent", stars: 2, approxRateAUD: 95, phone: "08 8091 5957", bookingUrl: "https://wilcanniatourism.com.au/directory/accommodation" },
+    ],
+  },
+];
+
+/**
+ * Returns CT hotels for a specific ICAO, split into 4★+ and below-4★ groups.
+ * Also returns extended 4★+ hotels (non-CT) for that ICAO.
+ * Never returns hotels from other locations.
+ */
+function getAccomForICAO(icao: string): {
+  ctFourPlus: AccomProperty[];
+  ctBelow4: AccomProperty[];
+  extended: AccomProperty[];
+  locationLabel: string | null;
+  hasCtMatch: boolean;
+} {
+  const code = icao.toUpperCase();
+  const ctLoc = CORPORATE_TRAVELLER_ACCOM.find(loc => loc.icaoCodes.includes(code));
+  const extLoc = EXTENDED_ACCOM.find(loc => loc.icaoCodes.includes(code));
+
+  return {
+    ctFourPlus: ctLoc ? ctLoc.hotels.filter(h => h.stars >= 4).sort((a, b) => b.stars - a.stars || b.approxRateAUD - a.approxRateAUD) : [],
+    ctBelow4: ctLoc ? ctLoc.hotels.filter(h => h.stars < 4) : [],
+    extended: extLoc ? extLoc.hotels.filter(h => h.stars >= 4).sort((a, b) => b.stars - a.stars || b.approxRateAUD - a.approxRateAUD) : [],
+    locationLabel: ctLoc?.label ?? extLoc?.label ?? null,
+    hasCtMatch: !!ctLoc,
+  };
 }
 
 function StarRating({ stars }: { stars: number }) {
@@ -263,6 +712,185 @@ function StatusBadge({ status }: { status: QuoteStatus }) {
   );
 }
 
+
+// ─── Airport Curfew Database ─────────────────────────────────────────────────
+// Sources: ERSA, AIP Australia, Airport Operating Manuals
+// Times are LOCAL. Medivac/aeromedical flights are exempt from noise curfews
+// under relevant State legislation and Airport Regulations.
+interface CurfewRule {
+  start: number;  // hour (24h) curfew begins
+  end: number;    // hour (24h) curfew ends (exclusive — i.e. ops resume at this hour)
+  label: string;
+  statutory: boolean;  // true = legislated, false = voluntary noise abatement
+  medicExempt: boolean;
+}
+const AIRPORT_CURFEWS: Record<string, CurfewRule> = {
+  YSSY: { start: 23, end: 6,  label: "Sydney Kingsford Smith", statutory: true,  medicExempt: true  },
+  YPPH: { start: 22, end: 6,  label: "Perth International",    statutory: true,  medicExempt: true  },
+  YMEN: { start: 21, end: 7,  label: "Essendon Airport",       statutory: true,  medicExempt: true  },
+  YSCB: { start: 23, end: 6,  label: "Canberra Airport",       statutory: false, medicExempt: true  },
+  YBCG: { start: 23, end: 6,  label: "Gold Coast Airport",     statutory: false, medicExempt: true  },
+  YBBN: { start: 23, end: 6,  label: "Brisbane Airport",       statutory: false, medicExempt: true  },
+};
+
+function isInCurfew(hhmm: string, rule: CurfewRule): boolean {
+  if (!hhmm) return false;
+  const [h, m] = hhmm.split(":").map(Number);
+  const mins = h * 60 + m;
+  const startMins = rule.start * 60;
+  const endMins = rule.end * 60;
+  if (startMins > endMins) {
+    // Spans midnight e.g. 23:00–06:00
+    return mins >= startMins || mins < endMins;
+  }
+  return mins >= startMins && mins < endMins;
+}
+
+function addMinsToHHMM(hhmm: string, mins: number): string {
+  if (!hhmm || !hhmm.includes(":")) return hhmm;
+  const [h, m] = hhmm.split(":").map(Number);
+  const total = ((h * 60 + m + mins) % (24 * 60) + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function timeDiffMins(from: string, to: string): number {
+  const [fh, fm] = from.split(":").map(Number);
+  const [th, tm] = to.split(":").map(Number);
+  const diff = (th * 60 + tm) - (fh * 60 + fm);
+  return diff < 0 ? diff + 24 * 60 : diff;
+}
+
+interface RestCalcProps {
+  arrivalTime: string;          // HH:MM
+  departureICAO: string;        // next departure (= this arrival airport)
+  isMedivac: boolean;
+  crewType: "multi" | "single"; // multi = 10hr rest, single = 8hr
+}
+
+function RestCalculator({ arrivalTime, departureICAO, isMedivac, crewType }: RestCalcProps) {
+  const minRestMins = crewType === "multi" ? 10 * 60 : 8 * 60;
+  const minRestLabel = crewType === "multi" ? "10 hrs (CAO 48.1 multi-crew)" : "8 hrs (CAO 48.1 single-pilot)";
+  const earliestDep = addMinsToHHMM(arrivalTime, minRestMins);
+
+  const curfewRule = AIRPORT_CURFEWS[departureICAO];
+  const curfewActive = curfewRule && isInCurfew(earliestDep, curfewRule);
+  const exemptApplies = curfewActive && isMedivac && curfewRule.medicExempt;
+
+  // If curfew applies and no exemption, find first minute curfew lifts
+  let blockedUntil: string | null = null;
+  let actualEarliestDep = earliestDep;
+  if (curfewActive && !exemptApplies) {
+    blockedUntil = `${String(curfewRule.end).padStart(2, "0")}:00`;
+    actualEarliestDep = blockedUntil;
+    // If blocked-until is earlier than rest-end, use rest-end instead
+    if (timeDiffMins(earliestDep, blockedUntil) > 12 * 60) {
+      // blockedUntil is actually TOMORROW — happens when curfew spans midnight
+      // and earliest dep is in the curfew window before midnight
+      // actual departure is next day at curfew end
+      blockedUntil = `${String(curfewRule.end).padStart(2, "0")}:00 (+1 day)`;
+      actualEarliestDep = `${String(curfewRule.end).padStart(2, "0")}:00`;
+    }
+  }
+
+  const totalWaitMins = timeDiffMins(arrivalTime, actualEarliestDep);
+  const waitHrs = Math.floor(totalWaitMins / 60);
+  const waitMins = totalWaitMins % 60;
+
+  return (
+    <div className="mt-3 rounded-lg border border-blue-400/20 bg-blue-500/5 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-blue-400/15 bg-blue-500/8">
+        <Clock size={12} className="text-blue-400 flex-shrink-0" />
+        <span className="text-[10px] font-semibold text-blue-300 uppercase tracking-wider">Crew Rest Calculator</span>
+        <span className="ml-auto text-[9px] text-blue-400/60">CASA CAO 48.1</span>
+      </div>
+
+      <div className="px-3 py-2.5 space-y-2">
+        {/* Rest timeline */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="text-center">
+            <div className="text-[8px] text-muted-foreground uppercase tracking-wider mb-0.5">Arrival</div>
+            <div className="text-sm font-bold text-foreground font-mono">{arrivalTime}</div>
+            <div className="text-[8px] text-muted-foreground">rest begins</div>
+          </div>
+          <div className="flex items-center justify-center">
+            <div className="text-center">
+              <div className="text-[8px] text-blue-400 font-semibold">{minRestMins / 60} hrs min</div>
+              <div className="w-full h-px bg-blue-400/30 my-1 relative">
+                <div className="absolute inset-y-0 left-0 bg-blue-400/60" style={{ width: "100%" }} />
+              </div>
+              <div className="text-[8px] text-muted-foreground">required rest</div>
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-[8px] text-muted-foreground uppercase tracking-wider mb-0.5">Rest Complete</div>
+            <div className="text-sm font-bold text-blue-300 font-mono">{earliestDep}</div>
+            <div className="text-[8px] text-muted-foreground">earliest legal dep</div>
+          </div>
+        </div>
+
+        {/* Curfew status */}
+        {curfewRule ? (
+          <div className={`flex items-start gap-2 px-2.5 py-2 rounded-md text-[10px] ${
+            curfewActive && !exemptApplies
+              ? "bg-red-500/10 border border-red-400/30 text-red-300"
+              : curfewActive && exemptApplies
+              ? "bg-amber-500/10 border border-amber-400/30 text-amber-300"
+              : "bg-green-500/10 border border-green-400/30 text-green-300"
+          }`}>
+            <div className="mt-0.5 flex-shrink-0">
+              {curfewActive && !exemptApplies ? "🔴" : curfewActive && exemptApplies ? "🟡" : "🟢"}
+            </div>
+            <div className="flex-1">
+              {!curfewActive && (
+                <span><strong>{departureICAO}</strong> — No curfew conflict. Earliest departure <strong className="font-mono">{earliestDep}</strong> is clear.</span>
+              )}
+              {curfewActive && exemptApplies && (
+                <span><strong>{departureICAO}</strong> curfew {String(curfewRule.start).padStart(2,"0")}:00–{String(curfewRule.end).padStart(2,"0")}:00 applies at earliest rest-complete time. <strong>Medivac exemption applies</strong> — aeromedical operations are exempt. Departure at <strong className="font-mono">{earliestDep}</strong> permitted.</span>
+              )}
+              {curfewActive && !exemptApplies && (
+                <span><strong>{departureICAO}</strong> curfew {String(curfewRule.start).padStart(2,"0")}:00–{String(curfewRule.end).padStart(2,"0")}:00 blocks departure at {earliestDep}. Earliest permitted departure: <strong className="font-mono">{blockedUntil}</strong>.</span>
+              )}
+              {!curfewRule.statutory && (
+                <span className="block text-[9px] opacity-70 mt-0.5">Voluntary noise abatement — not a statutory curfew.</span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-green-500/8 border border-green-400/20 text-[10px] text-green-400">
+            <span>🟢</span>
+            <span><strong>{departureICAO}</strong> — No curfew restrictions. Departure from <strong className="font-mono">{earliestDep}</strong> permitted.</span>
+          </div>
+        )}
+
+        {/* Actual earliest departure summary */}
+        <div className="flex items-center justify-between px-2.5 py-2 rounded-md bg-background border border-card-border">
+          <div>
+            <div className="text-[9px] text-muted-foreground">Earliest Permitted Departure</div>
+            <div className="text-base font-bold font-mono text-foreground">{actualEarliestDep}</div>
+            <div className="text-[9px] text-muted-foreground">{waitHrs > 0 ? `${waitHrs}h ${waitMins}m` : `${waitMins}m`} from arrival · {minRestLabel}</div>
+          </div>
+          {curfewActive && exemptApplies && (
+            <div className="px-2 py-1 bg-amber-500/15 border border-amber-400/30 rounded text-[9px] text-amber-300 font-semibold text-right">
+              Medivac<br/>Exempt
+            </div>
+          )}
+          {curfewActive && !exemptApplies && (
+            <div className="px-2 py-1 bg-red-500/15 border border-red-400/30 rounded text-[9px] text-red-300 font-semibold text-right">
+              Curfew<br/>Applies
+            </div>
+          )}
+          {!curfewActive && (
+            <div className="px-2 py-1 bg-green-500/15 border border-green-400/30 rounded text-[9px] text-green-300 font-semibold text-right">
+              Rest<br/>Clear
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CharterQuote() {
   const qc = useQueryClient();
 
@@ -272,22 +900,44 @@ export default function CharterQuote() {
   const [purpose, setPurpose] = useState<Purpose>("medevac_charter");
   const [departureDate, setDepartureDate] = useState(todayISO());
   const [aircraftType, setAircraftType] = useState<AircraftKey>("B200");
+
+  // International charges state (per leg index)
+  const [intlDestICAO, setIntlDestICAO] = useState<Record<number, string>>({});
+  const [intlParkingHrs, setIntlParkingHrs] = useState<Record<number, number>>({});
+  const [intlPaxCount, setIntlPaxCount] = useState<Record<number, number>>({});
+  const [intlCrewNights, setIntlCrewNights] = useState<Record<number, number>>({});
+  const [intlOverflights, setIntlOverflights] = useState<Record<number, string[]>>({});
   const [legs, setLegs] = useState<LegInput[]>([emptyLeg()]);
   // Airport objects parallel to legs[] — for autocomplete selection
   const [legAirports, setLegAirports] = useState<Array<{ id: string; from: Airport | null; to: Airport | null }>>([{ id: crypto.randomUUID(), from: null, to: null }]);
   const [includeReturnLeg, setIncludeReturnLeg] = useState(false);
   const [crew, setCrew] = useState<CrewConfig>({
     captain: true, firstOfficer: false, flightNurse: false, flightParamedic: false, icuDoctor: false, count: 1,
+    captainName: '', firstOfficerName: '',
   });
-  const [accommodationNights, setAccommodationNights] = useState<number | "">(0);
-  const [accomSearch, setAccomSearch] = useState("");
-  const [selectedHotel, setSelectedHotel] = useState<AccomProperty | null>(null);
+  // Per-leg overnight stays
+  const [legOvernights, setLegOvernights] = useState<Record<number, { nights: number | ""; hotel: AccomProperty | null; search: string }>>({});
+
+  function getLegOvernight(idx: number) {
+    return legOvernights[idx] ?? { nights: 0, hotel: null, search: "" };
+  }
+  function setLegNights(idx: number, nights: number | "") {
+    setLegOvernights(prev => ({ ...prev, [idx]: { ...getLegOvernight(idx), nights } }));
+  }
+  function setLegHotel(idx: number, hotel: AccomProperty | null) {
+    setLegOvernights(prev => ({ ...prev, [idx]: { ...getLegOvernight(idx), hotel } }));
+  }
+  function setLegSearch(idx: number, search: string) {
+    setLegOvernights(prev => ({ ...prev, [idx]: { ...getLegOvernight(idx), search } }));
+  }
   const [marginPercent, setMarginPercent] = useState(15);
   const [notes, setNotes] = useState("");
+  const [autoInvoice, setAutoInvoice] = useState(false);
 
   const [breakdown, setBreakdown] = useState<QuoteCostBreakdown | null>(null);
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
   const [viewingQuote, setViewingQuote] = useState<CharterQuoteRecord | null>(null);
+  const pageTopRef = useRef<HTMLDivElement>(null);
 
   // ─── Live rate loading ───────────────────────────────────────────────
   const [ratesLoading, setRatesLoading] = useState(true);
@@ -418,18 +1068,63 @@ export default function CharterQuote() {
     setLegs(prev => prev.map((l, i) => i === idx ? { ...l, distanceNm: nm } : l));
   }, []);
 
+  // Auto-calculate distance when international destination is selected
+  useEffect(() => {
+    Object.entries(intlDestICAO).forEach(([idxStr, intlICAO]) => {
+      const idx = Number(idxStr);
+      if (!intlICAO) return;
+      const intlAp = INTL_AIRPORTS.find(a => a.icao === intlICAO);
+      if (!intlAp) return;
+      const fromAp = legAirports[idx]?.from;
+      if (fromAp?.lat == null || fromAp?.lon == null) return;
+      const nm = Math.round(calcDistanceNm(fromAp.lat, fromAp.lon, intlAp.lat, intlAp.lon));
+      if (nm > 0) setLegDistance(idx, nm);
+    });
+  }, [intlDestICAO, legAirports, setLegDistance]);
+
   // ─── Calculate ────────────────────────────────────────────────────────────
   function handleCalculate() {
+    // Build per-leg overnight array for the engine
+    const ovEntries: LegOvernight[] = Object.entries(legOvernights)
+      .map(([idxStr, ov]) => ({
+        legIdx: Number(idxStr),
+        nights: ov.nights === "" ? 0 : (ov.nights as number),
+        ratePerPersonAUD: ov.hotel?.approxRateAUD ?? 180,
+        hotelName: ov.hotel?.name,
+        locationLabel: undefined,
+      }))
+      .filter(ov => ov.nights > 0);
+
     const input: QuoteInput = {
       aircraftType,
       legs,
       crew: { ...crew, count: crewCount },
       marginPercent,
-      accommodationNights: accommodationNights === "" ? 0 : accommodationNights,
+      accommodationNights: 0, // unused when legOvernights supplied
+      legOvernights: ovEntries.length > 0 ? ovEntries : undefined,
       includeReturnLeg,
     };
-    const result = calculateQuote(input);
-    setBreakdown(result);
+    // Sum all international charges across all legs (AUD dollars — converted to cents inside engine)
+    let totalIntlAUD = 0;
+    for (let li = 0; li < legs.length; li++) {
+      const destICAO = intlDestICAO[li] || legs[li].toICAO || "";
+      const ap = INTL_AIRPORTS.find(a => a.icao === destICAO);
+      if (ap && (aircraftType === "CL60" || aircraftType === "PC12")) {
+        const pkHrs = intlParkingHrs[li] ?? 2;
+        const pax   = intlPaxCount[li] ?? 2;
+        const nights = intlCrewNights[li] ?? 0;
+        const overflights = intlOverflights[li] ?? [];
+        const charges = calculateIntlCharges(destICAO, pkHrs, pax, nights, crewCount, overflights);
+        if (charges) totalIntlAUD += charges.totalAUD;
+      }
+    }
+    try {
+      const result = calculateQuote({ ...input, intlChargesAUD: totalIntlAUD });
+      setBreakdown(result);
+    } catch (e) {
+      console.error("calculateQuote failed:", e);
+      alert("Quote calculation failed — check console for details.");
+    }
   }
 
   function handleStartNew() {
@@ -437,8 +1132,8 @@ export default function CharterQuote() {
     setDepartureDate(todayISO()); setAircraftType("B200"); setLegs([emptyLeg()]);
     setLegAirports([{ id: crypto.randomUUID(), from: null, to: null }]);
     setIncludeReturnLeg(false);
-    setCrew({ captain: true, firstOfficer: false, flightNurse: false, flightParamedic: false, icuDoctor: false, count: 1 });
-    setAccommodationNights(0); setMarginPercent(15); setNotes("");
+    setCrew({ captain: true, firstOfficer: false, flightNurse: false, flightParamedic: false, icuDoctor: false, count: 1, captainName: '', firstOfficerName: '' });
+    setLegOvernights({}); setMarginPercent(15); setNotes("");
     setBreakdown(null);
     setViewingQuote(null);
   }
@@ -446,6 +1141,25 @@ export default function CharterQuote() {
   function handleSaveQuote() {
     if (!breakdown) return;
     const quoteNumber = nextNumberData?.quoteNumber || "CQ-2026-0001";
+    // Build intlLegs for persistence
+    const intlLegsForSave: Array<{legIdx:number;destICAO:string;destName:string;destCountry:string;landingAUD:number;parkingAUD:number;handlingAUD:number;facilityAUD:number;overnightAUD:number;overflightAUD:number;totalAUD:number}> = [];
+    if (aircraftType === "CL60" || aircraftType === "PC12") {
+      for (let li = 0; li < legs.length; li++) {
+        const destICAO = intlDestICAO[li] || legs[li].toICAO || "";
+        const ap = INTL_AIRPORTS.find(a => a.icao === destICAO);
+        if (ap) {
+          const pkHrs = intlParkingHrs[li] ?? 2;
+          const pax   = intlPaxCount[li] ?? 2;
+          const nights = intlCrewNights[li] ?? 0;
+          const overflights = intlOverflights[li] ?? [];
+          const charges = calculateIntlCharges(destICAO, pkHrs, pax, nights, crewCount, overflights);
+          if (charges) intlLegsForSave.push({ legIdx: li, destICAO: ap.icao, destName: ap.name, destCountry: ap.country,
+            landingAUD: charges.landingFeeAUD, parkingAUD: charges.parkingFeeAUD, handlingAUD: charges.handlingFeeAUD,
+            facilityAUD: charges.facilityChargeAUD, overnightAUD: charges.overnightAUD, overflightAUD: charges.overflightFeesAUD,
+            totalAUD: charges.totalAUD, customsNote: ap.customsNote || "" });
+        }
+      }
+    }
     saveMutation.mutate({
       quoteNumber,
       clientName: clientName || "Unnamed Client",
@@ -461,12 +1175,44 @@ export default function CharterQuote() {
       finalQuote: breakdown.finalQuote,
       status: "draft",
       notes: notes || null,
+      autoInvoice: autoInvoice ? 1 : 0,
+      legOvernights: JSON.stringify(legOvernights),
+      intlLegs: intlLegsForSave.length > 0 ? JSON.stringify(intlLegsForSave) : null,
     });
   }
 
   function handleExportPDF() {
     if (!breakdown) return;
     const quoteNumber = nextNumberData?.quoteNumber || "CQ-2026-0001";
+    // Build per-leg international charges detail for the PDF table
+    const intlLegsData: Array<{legIdx:number;destICAO:string;destName:string;destCountry:string;landingAUD:number;parkingAUD:number;handlingAUD:number;facilityAUD:number;overnightAUD:number;overflightAUD:number;totalAUD:number}> = [];
+    if (aircraftType === "CL60" || aircraftType === "PC12") {
+      for (let li = 0; li < legs.length; li++) {
+        const destICAO = intlDestICAO[li] || legs[li].toICAO || "";
+        const ap = INTL_AIRPORTS.find(a => a.icao === destICAO);
+        if (ap) {
+          const pkHrs = intlParkingHrs[li] ?? 2;
+          const pax   = intlPaxCount[li] ?? 2;
+          const nights = intlCrewNights[li] ?? 0;
+          const overflights = intlOverflights[li] ?? [];
+          const charges = calculateIntlCharges(destICAO, pkHrs, pax, nights, crewCount, overflights);
+          if (charges) intlLegsData.push({
+            legIdx: li,
+            destICAO: ap.icao,
+            destName: ap.name,
+            destCountry: ap.country,
+            landingAUD: charges.landingFeeAUD,
+            parkingAUD: charges.parkingFeeAUD,
+            handlingAUD: charges.handlingFeeAUD,
+            facilityAUD: charges.facilityChargeAUD,
+            overnightAUD: charges.overnightAUD,
+            overflightAUD: charges.overflightFeesAUD,
+            totalAUD: charges.totalAUD,
+            customsNote: ap.customsNote || "",
+          });
+        }
+      }
+    }
     generateCharterQuotePDF({
       quoteNumber,
       clientName: clientName || "Unnamed Client",
@@ -478,6 +1224,8 @@ export default function CharterQuote() {
       crew: { ...crew, count: crewCount },
       marginPercent,
       notes,
+      legOvernights,
+      intlLegs: intlLegsData.length > 0 ? intlLegsData : undefined,
     }, breakdown);
   }
 
@@ -497,7 +1245,10 @@ export default function CharterQuote() {
       setMarginPercent(q.marginPercent);
       setNotes(q.notes || "");
       setBreakdown(parsedCosts);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      // Scroll the page container into view (works inside iframe; window.scrollTo doesn't)
+      setTimeout(() => {
+        pageTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
     } catch (e) {
       console.error("Failed to parse quote", e);
     }
@@ -508,6 +1259,14 @@ export default function CharterQuote() {
       const parsedLegs: LegInput[] = JSON.parse(q.legs);
       const parsedCrew: CrewConfig = JSON.parse(q.crew);
       const parsedCosts: QuoteCostBreakdown = JSON.parse(q.costs);
+      let parsedLegOvernights: Record<number, { nights: number | ""; hotel: AccomProperty | null; search: string }> | undefined;
+      try { parsedLegOvernights = (q as any).legOvernights ? JSON.parse((q as any).legOvernights) : undefined; } catch (_) {}
+      // Reconstruct intlLegs from saved costs if available
+      let parsedIntlLegs: Array<{legIdx:number;destICAO:string;destName:string;destCountry:string;landingAUD:number;parkingAUD:number;handlingAUD:number;facilityAUD:number;overnightAUD:number;overflightAUD:number;totalAUD:number}> | undefined;
+      try {
+        const savedIntlLegs = (q as any).intlLegs ? JSON.parse((q as any).intlLegs) : undefined;
+        if (savedIntlLegs) parsedIntlLegs = savedIntlLegs;
+      } catch (_) {}
       generateCharterQuotePDF({
         quoteNumber: q.quoteNumber,
         clientName: q.clientName,
@@ -519,6 +1278,8 @@ export default function CharterQuote() {
         crew: parsedCrew,
         marginPercent: q.marginPercent,
         notes: q.notes,
+        legOvernights: parsedLegOvernights,
+        intlLegs: parsedIntlLegs,
       }, parsedCosts);
     } catch (e) {
       console.error("Failed to export PDF", e);
@@ -528,12 +1289,15 @@ export default function CharterQuote() {
   const routeSummary = legs.filter(l => l.fromICAO && l.toICAO)
     .map(l => `${l.fromICAO}→${l.toICAO}`).join(", ");
 
-  const fdpWarningLevel = breakdown
+  // FDP warning only applies within a single continuous duty period.
+  // When the return sector is ticked it is for costing only — crew overnight at destination,
+  // so outbound and return are separate duty days and no combined FDP warning is raised.
+  const fdpWarningLevel = breakdown && !includeReturnLeg
     ? breakdown.totalFdpHours > 14 ? "red" : breakdown.totalFdpHours > 12 ? "yellow" : null
     : null;
 
   return (
-    <div className="p-4 lg:p-6 max-w-[1600px] mx-auto">
+    <div className="p-4 lg:p-6 max-w-[1600px] mx-auto" ref={pageTopRef}>
       <div className="flex items-center gap-2 mb-1">
         <Calculator size={20} style={{ color: TEAL }} />
         <h1 className="text-xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Charter Quick Quote</h1>
@@ -541,6 +1305,21 @@ export default function CharterQuote() {
       <p className="text-sm text-muted-foreground mb-5">
         Instantly quote a charter flight from scratch — Operations &amp; Dispatch
       </p>
+
+      {/* Viewing banner — shown when a saved quote is loaded */}
+      {viewingQuote && (
+        <div className="flex items-center justify-between mb-4 px-4 py-2.5 rounded-xl border text-sm"
+          style={{ backgroundColor: `${TEAL}18`, borderColor: `${TEAL}40` }}>
+          <span style={{ color: TEAL }} className="font-semibold">
+            Viewing saved quote: <span className="font-bold">{viewingQuote.quoteNumber}</span>
+            {viewingQuote.clientName ? <span className="text-muted-foreground font-normal"> — {viewingQuote.clientName}</span> : null}
+          </span>
+          <button onClick={() => { setViewingQuote(null); setBreakdown(null); }}
+            className="text-xs text-muted-foreground hover:text-foreground ml-4 flex items-center gap-1">
+            <X size={13} /> Clear
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* ══════════════════ LEFT PANEL — INPUT FORM (40%) ══════════════════ */}
@@ -593,13 +1372,65 @@ export default function CharterQuote() {
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">MTOW {a.mtow}t</span>
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">{a.tasKts}kt TAS</span>
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">{a.fuelBurnKgHr}kg/hr</span>
+                          {key === "PC12" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">DIRT OK</span>}
+                          {key === "PC12" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">CLINIC</span>}
                         </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
+
+              {/* Part 121 compliance warning for Challenger */}
+              {AIRCRAFT[aircraftType]?.part121 && (
+                <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+                  <AlertTriangle size={14} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-xs font-bold text-amber-300">CASA Part 121 — Large Aircraft AOC Required</div>
+                    <div className="text-[11px] text-amber-200/80 mt-0.5 leading-relaxed">
+                      The Challenger 604/605 (MTOW &gt;8,618 kg) operates under <strong>CASA Part 121</strong>, not Part 135.
+                      Confirm your AOC, crew type ratings, MEL, and maintenance release are compliant with Part 121 requirements before dispatch.
+                      Flight and duty limits under <strong>CAO 48.1 Schedule 1 (Large)</strong> apply.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
+
+            {/* PC12 clinic-only advisory */}
+            {aircraftType === "PC12" && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-green-500/30 bg-green-500/8 px-3 py-2.5">
+                <Plane size={14} className="text-green-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-green-300">PC-12 — Clinic Runs · Dubbo · Broken Hill · Bankstown</div>
+                  <div className="text-[11px] text-green-200/80 mt-0.5 leading-relaxed">
+                    The Pilatus PC-12/47E is approved for <strong>clinic day-runs</strong> out of Dubbo (YSDU), Broken Hill (YBHI) and Bankstown (YSBK).
+                    Single-engine turboprop — <strong>dirt and gravel strips certified</strong> (min 2,650 ft / 808 m). Single-pilot IFR rated under CASA Part 135.
+                    Engine: PT6A-67P · 1,200 SHP · Fuel: Jet-A1 · Max cruise 285 KTAS · Ceiling FL300.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PC12 pilot selector */}
+            {aircraftType === "PC12" && (
+              <div className="mt-3 p-3 bg-green-500/5 border border-green-500/20 rounded-lg space-y-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-green-400">PC-12 Pilot (Single-Pilot IFR)</div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground block mb-1">Assigned Captain</label>
+                  <select
+                    value={crew.captainName || ""}
+                    onChange={e => setCrew(c => ({ ...c, captainName: e.target.value }))}
+                    className="w-full text-xs bg-card border border-green-500/30 rounded px-2 py-1.5 focus:outline-none focus:border-green-400/50"
+                  >
+                    <option value="">— Select Captain —</option>
+                    {PC12_CAPTAINS.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Rate Card — live monitored rates */}
@@ -644,6 +1475,38 @@ export default function CharterQuote() {
                       onToChange={ap => setLegTo(idx, ap)}
                       onDistanceCalculated={nm => setLegDistance(idx, nm)}
                     />
+                    {/* International arrival selector — inline under the To (arrival) field */}
+                    {(aircraftType === "CL60" || aircraftType === "PC12") && (() => {
+                      const destICAO = intlDestICAO[idx] || leg.toICAO || "";
+                      // PC12 range: Pacific/NZ airports only — filter by ICAO prefix
+                      const PC12_ICAO_PREFIXES = ["NZ","NF","NW","NV","AG","AY","NS","NT"];
+                      const filteredAirports = aircraftType === "PC12"
+                        ? INTL_AIRPORTS.filter(a => PC12_ICAO_PREFIXES.some(p => a.icao.startsWith(p)))
+                        : INTL_AIRPORTS;
+                      return (
+                        <div className="mt-1.5 pl-[calc(50%+4px)]">
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <Globe size={10} className="text-indigo-400" />
+                            <label className="text-[10px] text-indigo-400 font-semibold">International Arrival</label>
+                            {aircraftType === "PC12" && <span className="text-[9px] px-1 py-0.5 rounded bg-green-500/20 text-green-400 font-semibold">Pacific / NZ</span>}
+                          </div>
+                          <IntlAirportSearch
+                            value={destICAO}
+                            onChange={icao => {
+                              setIntlDestICAO(prev => ({ ...prev, [idx]: icao }));
+                              // Keep leg.toICAO in sync so route summary and calculations work
+                              const apInfo = INTL_AIRPORTS.find(a => a.icao === icao);
+                              updateLeg(idx, {
+                                toICAO: icao || '',
+                                toName: apInfo ? `${apInfo.city} (${apInfo.country})` : icao,
+                              });
+                            }}
+                            airports={filteredAirports}
+                            placeholder="City, ICAO or country…"
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Distance (auto-filled or manual override) + departure time */}
@@ -651,8 +1514,10 @@ export default function CharterQuote() {
                     <div>
                       <label className="text-[10px] text-muted-foreground block mb-0.5">
                         Distance (nm)
-                        {leg.distanceNm > 0 && legAirports[idx]?.from?.lat && legAirports[idx]?.to?.lat && (
-                          <span className="ml-1 text-[#4F98A3]">· auto</span>
+                        {leg.distanceNm > 0 && legAirports[idx]?.from?.lat && (
+                          (legAirports[idx]?.to?.lat || intlDestICAO[idx]) && (
+                            <span className="ml-1 text-[#4F98A3]">· auto</span>
+                          )
                         )}
                       </label>
                       <input
@@ -696,6 +1561,257 @@ export default function CharterQuote() {
                         className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none" />
                     </div>
                   </div>
+
+                  {/* ── International Airport Panel (CL60 + PC12) ──────── */}
+                  {(aircraftType === "CL60" || aircraftType === "PC12") && (() => {
+                    const destICAO = intlDestICAO[idx] || leg.toICAO || "";
+                    const parkingHrs = intlParkingHrs[idx] ?? 2;
+                    const paxCount = intlPaxCount[idx] ?? 2;
+                    const crewNights = intlCrewNights[idx] ?? 0;
+                    const overflights = intlOverflights[idx] ?? [];
+                    const charges = destICAO ? calculateIntlCharges(destICAO, parkingHrs, paxCount, crewNights, crewCount, overflights) : null;
+                    const apInfo = charges?.airport ?? INTL_AIRPORTS.find(a => a.icao === destICAO);
+
+                    return (
+                      <div className="mt-3 p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-lg space-y-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                          <Globe size={11} /> International Airport Charges — Leg {idx + 1}
+                          {aircraftType === "PC12" && <span className="ml-2 text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-semibold">PC-12 · Pacific / NZ within range</span>}
+                        </div>
+
+                        {apInfo && (
+                          <>
+                            {/* Airport info row */}
+                            <div className="grid grid-cols-2 gap-2 text-[10px]">
+                              <div className="p-2 bg-card rounded border border-card-border">
+                                <div className="text-muted-foreground mb-0.5">Country / Currency</div>
+                                <div className="font-semibold text-foreground">{apInfo.country} · {apInfo.currency}</div>
+                              </div>
+                              <div className="p-2 bg-card rounded border border-card-border">
+                                <div className="text-muted-foreground mb-0.5">Timezone</div>
+                                <div className="font-semibold text-foreground">{apInfo.timezone}</div>
+                              </div>
+                              {apInfo.fuelAvailable && apInfo.jetFuelPriceApproxAUD && (
+                                <div className="p-2 bg-card rounded border border-card-border">
+                                  <div className="text-muted-foreground mb-0.5">Jet-A1 (approx)</div>
+                                  <div className="font-semibold text-cyan-400">${apInfo.jetFuelPriceApproxAUD.toFixed(2)}/L AUD</div>
+                                </div>
+                              )}
+                              <div className="p-2 bg-card rounded border border-card-border">
+                                <div className="text-muted-foreground mb-0.5">Fuel Available</div>
+                                <div className={`font-semibold ${apInfo.fuelAvailable ? 'text-green-400' : 'text-red-400'}`}>{apInfo.fuelAvailable ? 'Yes — Jet-A1' : 'No'}</div>
+                              </div>
+                            </div>
+
+                            {/* Customs note */}
+                            <div className="p-2 bg-amber-500/5 border border-amber-500/20 rounded text-[10px] text-amber-300 flex gap-1.5">
+                              <Info size={11} className="flex-shrink-0 mt-0.5" />
+                              <span>{apInfo.customsNote}</span>
+                            </div>
+
+                            {/* Charge inputs */}
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-[10px] text-muted-foreground block mb-1">Parking (hrs)</label>
+                                <input type="number" min={0} step={0.5} value={parkingHrs}
+                                  onChange={e => setIntlParkingHrs(prev => ({ ...prev, [idx]: parseFloat(e.target.value) || 0 }))}
+                                  className="w-full text-xs bg-card border border-card-border rounded px-2 py-1 focus:outline-none" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground block mb-1">Pax count</label>
+                                <input type="number" min={0} value={paxCount}
+                                  onChange={e => setIntlPaxCount(prev => ({ ...prev, [idx]: parseInt(e.target.value) || 0 }))}
+                                  className="w-full text-xs bg-card border border-card-border rounded px-2 py-1 focus:outline-none" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground block mb-1">Crew nights</label>
+                                <input type="number" min={0} value={crewNights}
+                                  onChange={e => setIntlCrewNights(prev => ({ ...prev, [idx]: parseInt(e.target.value) || 0 }))}
+                                  className="w-full text-xs bg-card border border-card-border rounded px-2 py-1 focus:outline-none" />
+                              </div>
+                            </div>
+
+                            {/* Overflight selector */}
+                            <div>
+                              <label className="text-[10px] text-muted-foreground block mb-1">Overflight countries (select all that apply)</label>
+                              <div className="grid grid-cols-2 gap-1 max-h-52 overflow-y-auto pr-1">
+                                {Object.entries(INTL_OVERFLIGHT_FEES)
+                              .filter(([cc]) => aircraftType !== "PC12" || ["NC","WS","NZ","VU","SB","FJ","PG","TO","PF"].includes(cc))
+                              .map(([cc, info]) => (
+                                  <label key={cc} className="flex items-start gap-1.5 text-[10px] cursor-pointer p-1.5 rounded hover:bg-card">
+                                    <input type="checkbox"
+                                      checked={overflights.includes(cc)}
+                                      onChange={e => {
+                                        const next = e.target.checked
+                                          ? [...overflights, cc]
+                                          : overflights.filter(x => x !== cc);
+                                        setIntlOverflights(prev => ({ ...prev, [idx]: next }));
+                                      }}
+                                      className="mt-0.5 flex-shrink-0"
+                                    />
+                                    <span><span className="font-semibold text-foreground">{info.country}</span><br /><span className="text-muted-foreground">${(info.feeUSD * USD_TO_AUD).toFixed(0)} AUD</span></span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Charges breakdown */}
+                            {charges && (
+                              <div className="border-t border-indigo-500/15 pt-2 space-y-1">
+                                <div className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider mb-1">Estimated International Charges</div>
+                                {[
+                                  { label: `Landing fee (${apInfo.icao})`, val: charges.landingFeeAUD },
+                                  { label: `Parking (${parkingHrs} hrs)`, val: charges.parkingFeeAUD },
+                                  { label: "Ground handling / agent", val: charges.handlingFeeAUD },
+                                  { label: `Facility charges (${paxCount} pax)`, val: charges.facilityChargeAUD },
+                                  ...(charges.overflightFeesAUD > 0 ? [{ label: "Overflight permits", val: charges.overflightFeesAUD }] : []),
+                                  ...(charges.overnightAUD > 0 ? [{ label: `Crew accommodation (${crewNights}n × ${crewCount} crew)`, val: charges.overnightAUD }] : []),
+                                ].map(row => (
+                                  <div key={row.label} className="flex justify-between text-[10px]">
+                                    <span className="text-muted-foreground">{row.label}</span>
+                                    <span className="font-semibold text-foreground">${row.val.toFixed(0)} AUD</span>
+                                  </div>
+                                ))}
+                                <div className="flex justify-between text-[10px] pt-1 border-t border-indigo-500/15 mt-1">
+                                  <span className="font-bold text-indigo-300">Total intl charges (this leg)</span>
+                                  <span className="font-bold text-indigo-300">${charges.totalAUD.toFixed(0)} AUD</span>
+                                </div>
+                                <div className="text-[9px] text-muted-foreground mt-1">USD rates converted at 1 USD = {USD_TO_AUD} AUD · Approximate only — confirm with handling agent</div>
+                              </div>
+                            )}
+
+                            {/* ── Intl Crew Accommodation ────────────────────────── */}
+                            {(() => {
+                              const intlICAO = intlDestICAO[idx];
+                              const intlAccom = intlICAO ? getAccomForICAO(intlICAO) : null;
+                              const intlOv = getLegOvernight(idx);
+                              const intlNights = typeof intlOv.nights === 'number' ? intlOv.nights : 0;
+                              const intlHasNights = intlNights > 0;
+                              const allIntlHotels = [
+                                ...(intlAccom?.ctFourPlus ?? []),
+                                ...(intlAccom?.ctBelow4 ?? []),
+                                ...(intlAccom?.extended ?? []),
+                              ];
+                              const intlSearchLc = intlOv.search.toLowerCase();
+                              const intlShown = intlSearchLc
+                                ? allIntlHotels.filter(h =>
+                                    h.name.toLowerCase().includes(intlSearchLc) ||
+                                    h.chain.toLowerCase().includes(intlSearchLc)
+                                  )
+                                : allIntlHotels;
+
+                              if (!intlICAO) return null;
+
+                              return (
+                                <div className="mt-3 border-t border-indigo-500/15 pt-3">
+                                  <div className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <Hotel size={10} />
+                                    Crew Accommodation — {intlICAO}
+                                  </div>
+
+                                  {/* Nights selector */}
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <label className="text-[10px] text-muted-foreground">Nights at destination</label>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={intlOv.nights}
+                                      onChange={e => {
+                                        const raw = e.target.value;
+                                        if (raw === "") { setLegNights(idx, ""); }
+                                        else { const n = parseInt(raw, 10); setLegNights(idx, isNaN(n) ? 0 : Math.max(0, n)); }
+                                      }}
+                                      onBlur={() => { if (intlOv.nights === "") setLegNights(idx, 0); }}
+                                      onMouseDown={e => e.stopPropagation()}
+                                      className="w-14 text-xs text-center bg-background border border-indigo-500/30 rounded px-2 py-1 focus:outline-none"
+                                    />
+                                  </div>
+
+                                  {intlHasNights && (
+                                    <>
+                                      {/* Selected hotel summary */}
+                                      {intlOv.hotel && (
+                                        <div className="mb-2 flex items-start gap-2 bg-indigo-500/10 border border-indigo-500/30 rounded-lg px-2.5 py-2">
+                                          <Hotel size={11} className="mt-0.5 shrink-0 text-indigo-400" />
+                                          <div className="flex-1 min-w-0">
+                                            <div className="text-[11px] font-semibold truncate">{intlOv.hotel.name}</div>
+                                            <div className="text-[10px] text-muted-foreground">{intlOv.hotel.chain} · <StarRating stars={intlOv.hotel.stars} /> · ${intlOv.hotel.approxRateAUD}/room/nt</div>
+                                            <div className="text-[10px] mt-0.5 font-semibold text-indigo-300">
+                                              {crewCount} room{crewCount !== 1 ? 's' : ''} × {intlNights} night{intlNights !== 1 ? 's' : ''} = ~${intlOv.hotel.approxRateAUD * crewCount * intlNights} AUD
+                                            </div>
+                                            <div className="text-[10px] mt-0.5">
+                                              <span className="text-muted-foreground">{intlOv.hotel.phone}</span>
+                                              {" · "}
+                                              <a href={intlOv.hotel.bookingUrl} target="_blank" rel="noreferrer"
+                                                className="underline text-indigo-400">Book</a>
+                                            </div>
+                                          </div>
+                                          <button onClick={() => setLegHotel(idx, null)} className="text-muted-foreground hover:text-white shrink-0">
+                                            <X size={11} />
+                                          </button>
+                                        </div>
+                                      )}
+
+                                      {/* Hotel list or fallback */}
+                                      {allIntlHotels.length === 0 ? (
+                                        <div className="text-[11px] text-muted-foreground text-center py-3 space-y-2">
+                                          <p>No pre-loaded hotels for <strong>{intlICAO}</strong>.</p>
+                                          <a
+                                            href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(intlICAO)}&nflt=class%3D4%3Bclass%3D5`}
+                                            target="_blank" rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-[11px] underline text-indigo-400">
+                                            Search 4★+ on Booking.com →
+                                          </a>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <input
+                                            type="text"
+                                            value={intlOv.search}
+                                            onChange={e => setLegSearch(idx, e.target.value)}
+                                            onMouseDown={e => e.stopPropagation()}
+                                            placeholder="Search hotels or chains..."
+                                            className="w-full text-xs bg-background border border-indigo-500/20 rounded px-2 py-1 focus:outline-none mb-2"
+                                          />
+                                          <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
+                                            {intlShown.map(hotel => (
+                                              <button
+                                                key={hotel.name}
+                                                type="button"
+                                                onClick={() => setLegHotel(idx, hotel.name === intlOv.hotel?.name ? null : hotel)}
+                                                className={`w-full text-left rounded-lg px-2.5 py-2 border transition-colors ${
+                                                  intlOv.hotel?.name === hotel.name
+                                                    ? "border-indigo-500/50 bg-indigo-500/10"
+                                                    : "border-card-border hover:border-white/20 bg-background/60"
+                                                }`}
+                                              >
+                                                <div className="flex items-center justify-between gap-2">
+                                                  <span className="text-[11px] font-medium truncate">{hotel.name}</span>
+                                                  <span className="text-[11px] font-semibold shrink-0 text-indigo-300">${hotel.approxRateAUD}/rm/nt</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                  <span className="text-[10px] text-muted-foreground">{hotel.chain}</span>
+                                                  <StarRating stars={hotel.stars} />
+                                                  <a href={hotel.bookingUrl} target="_blank" rel="noreferrer"
+                                                    onClick={e => e.stopPropagation()}
+                                                    className="text-[10px] underline ml-auto shrink-0 text-indigo-400">Book →</a>
+                                                </div>
+                                              </button>
+                                            ))}
+                                          </div>
+                                          <p className="text-[9px] text-muted-foreground opacity-60 mt-1">Indicative rates — confirm with Corporate Traveller / booking agent.</p>
+                                        </>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -716,14 +1832,63 @@ export default function CharterQuote() {
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
               <Users size={13} /> 3. Crew Configuration
             </h2>
+
+            {/* CL60 — named Part 121 crew selectors */}
+            {aircraftType === "CL60" && (
+              <div className="mb-4 space-y-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-indigo-400 mb-1">
+                  Part 121 Type-Rated Crew
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Captain</label>
+                  <select
+                    value={crew.captainName ?? ''}
+                    onChange={e => setCrew(c => ({ ...c, captainName: e.target.value }))}
+                    className="w-full bg-card border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400/40"
+                  >
+                    <option value="">— Select Captain —</option>
+                    {CL60_CAPTAINS.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">First Officer</label>
+                  <select
+                    value={crew.firstOfficerName ?? ''}
+                    onChange={e => setCrew(c => ({ ...c, firstOfficerName: e.target.value, firstOfficer: !!e.target.value }))}
+                    className="w-full bg-card border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-400/40"
+                  >
+                    <option value="">— Select First Officer —</option>
+                    {CL60_FIRST_OFFICERS.map(name => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="border-t border-card-border pt-2 mt-1" />
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm opacity-60">
                 <input type="checkbox" checked disabled />
-                Captain <span className="text-[10px] text-muted-foreground">(always required)</span>
+                Captain {aircraftType === "CL60" && crew.captainName ? (
+                  <span className="text-indigo-300 font-medium">— {crew.captainName}</span>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">(always required)</span>
+                )}
               </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input type="checkbox" checked={crew.firstOfficer} onChange={e => setCrew(c => ({ ...c, firstOfficer: e.target.checked }))} />
-                First Officer
+              <label className={`flex items-center gap-2 text-sm ${aircraftType === "CL60" ? "opacity-60" : "cursor-pointer"}`}>
+                <input
+                  type="checkbox"
+                  checked={crew.firstOfficer}
+                  disabled={aircraftType === "CL60"}
+                  onChange={e => setCrew(c => ({ ...c, firstOfficer: e.target.checked }))}
+                />
+                First Officer {aircraftType === "CL60" && crew.firstOfficerName ? (
+                  <span className="text-indigo-300 font-medium">— {crew.firstOfficerName}</span>
+                ) : null}
+                {aircraftType === "CL60" && <span className="text-[10px] text-muted-foreground">(select above)</span>}
               </label>
               <label className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={crew.flightNurse} onChange={e => setCrew(c => ({ ...c, flightNurse: e.target.checked }))} />
@@ -749,146 +1914,223 @@ export default function CharterQuote() {
               <Hotel size={13} /> 4. Additional Costs
             </h2>
             <div className="space-y-3">
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">Accommodation Nights</label>
-                <input
-                  type="number"
-                  min={0}
-                  value={accommodationNights}
-                  onChange={e => {
-                    const raw = e.target.value;
-                    if (raw === "" || raw === "-") {
-                      setAccommodationNights("");
-                    } else {
-                      const n = parseInt(raw, 10);
-                      setAccommodationNights(isNaN(n) ? "" : Math.max(0, n));
-                    }
-                  }}
-                  onBlur={() => {
-                    if (accommodationNights === "") setAccommodationNights(0);
-                  }}
-                  onMouseDown={e => e.stopPropagation()}
-                  className="w-full text-sm bg-background border border-card-border rounded-md px-3 py-1.5 focus:outline-none"
-                />
-                {breakdown?.accommodationRequired && (
-                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 rounded px-2 py-1">
-                    <AlertTriangle size={11} />
-                    FDP exceeds 12hrs — accommodation likely required
-                  </div>
-                )}
-              </div>
+              {/* FDP advisory */}
+              {breakdown?.accommodationRequired && (
+                <div className="flex items-center gap-1.5 text-[11px] text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 rounded px-2 py-1">
+                  <AlertTriangle size={11} />
+                  FDP exceeds 12hrs — accommodation likely required
+                </div>
+              )}
 
-              {/* Corporate Traveller Accommodation Panel */}
-              {accommodationNights > 0 && (() => {
-                const relevantLocs = getRelevantAccomLocations(legs);
-                const searchLc = accomSearch.toLowerCase();
-                const filteredLocs = relevantLocs.map(loc => ({
-                  ...loc,
-                  hotels: loc.hotels.filter(h =>
-                    !searchLc ||
-                    h.name.toLowerCase().includes(searchLc) ||
-                    h.chain.toLowerCase().includes(searchLc) ||
-                    loc.label.toLowerCase().includes(searchLc)
-                  ),
-                })).filter(loc => loc.hotels.length > 0);
+              {/* Per-leg overnight selector */}
+              <div className="space-y-2">
+                <label className="text-xs text-muted-foreground block">Overnight Stays — select which sector(s) require accommodation</label>
+                {legs.map((leg, idx) => {
+                  const destLabel = leg.toName || leg.toICAO || `Leg ${idx + 1} destination`;
+                  const destICAO = leg.toICAO;
+                  const ov = getLegOvernight(idx);
+                  const nights = ov.nights;
+                  const hasNights = typeof nights === 'number' ? nights > 0 : false;
 
-                return (
-                  <div className="border border-card-border rounded-xl p-3 bg-background/40">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: TEAL }}>
-                        <Hotel size={11} className="inline mr-1" />
-                        Accommodation — via Corporate Traveller
-                      </span>
-                      <a
-                        href="https://www.corporatetraveller.com.au"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[10px] underline opacity-60 hover:opacity-100"
+                  // Pull hotels ONLY for this leg's destination
+                  const accom = destICAO ? getAccomForICAO(destICAO) : null;
+                  const searchLc = ov.search.toLowerCase();
+
+                  function filterHotels(hotels: AccomProperty[]) {
+                    if (!searchLc) return hotels;
+                    return hotels.filter(h =>
+                      h.name.toLowerCase().includes(searchLc) ||
+                      h.chain.toLowerCase().includes(searchLc)
+                    );
+                  }
+
+                  const shownCtFourPlus = accom ? filterHotels(accom.ctFourPlus) : [];
+                  const shownExtended = accom ? filterHotels(accom.extended) : [];
+                  // Only show below-4★ CT if no 4★+ exist and no extended options exist
+                  const shownCtBelow4 = (accom && accom.ctFourPlus.length === 0 && accom.extended.length === 0)
+                    ? filterHotels(accom.ctBelow4)
+                    : [];
+                  const totalShown = shownCtFourPlus.length + shownExtended.length + shownCtBelow4.length;
+                  const noMatch = !accom || (!accom.hasCtMatch && accom.extended.length === 0);
+                  // Label for extended section — "Best Available" when no 4★+ exist in that location
+                  const allExtendedAreBelow4 = accom ? accom.extended.every(h => h.stars < 4) : false;
+                  const extendedSectionLabel = (shownCtFourPlus.length === 0 && allExtendedAreBelow4)
+                    ? "Best Available Options"
+                    : "Other 4★+ Options";
+
+                  function HotelButton({ hotel }: { hotel: AccomProperty }) {
+                    return (
+                      <button
+                        key={hotel.name}
+                        type="button"
+                        onClick={() => setLegHotel(idx, hotel.name === ov.hotel?.name ? null : hotel)}
+                        className={`w-full text-left rounded-lg px-2.5 py-2 border transition-colors ${
+                          ov.hotel?.name === hotel.name
+                            ? "border-teal-500/50 bg-teal-500/10"
+                            : "border-card-border hover:border-white/20 bg-background/60"
+                        }`}
                       >
-                        corporatetraveller.com.au
-                      </a>
-                    </div>
-
-                    {/* Search */}
-                    <input
-                      type="text"
-                      value={accomSearch}
-                      onChange={e => setAccomSearch(e.target.value)}
-                      onMouseDown={e => e.stopPropagation()}
-                      placeholder="Search hotels or chains..."
-                      className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none mb-2"
-                    />
-
-                    {/* Selected hotel summary */}
-                    {selectedHotel && (
-                      <div className="mb-2 flex items-start gap-2 bg-teal-500/10 border border-teal-500/30 rounded-lg px-2.5 py-2">
-                        <Hotel size={12} className="mt-0.5 shrink-0" style={{ color: TEAL }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[11px] font-semibold truncate">{selectedHotel.name}</div>
-                          <div className="text-[10px] text-muted-foreground">{selectedHotel.chain} · <StarRating stars={selectedHotel.stars} /> · ~${selectedHotel.approxRateAUD}/night</div>
-                          <div className="text-[10px] mt-0.5">
-                            <span className="text-muted-foreground">{selectedHotel.phone}</span>
-                            {" · "}
-                            <a href={selectedHotel.bookingUrl} target="_blank" rel="noreferrer"
-                              className="underline" style={{ color: TEAL }}>Book via CT</a>
-                          </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-medium truncate">{hotel.name}</span>
+                          <span className="text-[11px] font-semibold shrink-0" style={{ color: TEAL }}>${hotel.approxRateAUD}/room/nt</span>
                         </div>
-                        <button onClick={() => setSelectedHotel(null)} className="text-muted-foreground hover:text-white shrink-0">
-                          <X size={11} />
-                        </button>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-muted-foreground">{hotel.chain}</span>
+                          <StarRating stars={hotel.stars} />
+                          <a href={hotel.bookingUrl} target="_blank" rel="noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="text-[10px] underline ml-auto shrink-0"
+                            style={{ color: TEAL }}>Book →</a>
+                        </div>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <div key={idx} className="border border-card-border rounded-xl p-3 bg-background/40">
+                      {/* Leg header + nights spinner */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <MapPin size={11} className="shrink-0" style={{ color: TEAL }} />
+                        <span className="text-[11px] font-semibold flex-1 truncate">
+                          After Leg {idx + 1}{destICAO ? ` — ${destICAO}` : ''}
+                          {destLabel && destLabel !== destICAO ? <span className="text-muted-foreground font-normal"> ({destLabel})</span> : null}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <label className="text-[10px] text-muted-foreground">Nights</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={ov.nights}
+                            onChange={e => {
+                              const raw = e.target.value;
+                              if (raw === "" || raw === "-") { setLegNights(idx, ""); }
+                              else { const n = parseInt(raw, 10); setLegNights(idx, isNaN(n) ? 0 : Math.max(0, n)); }
+                            }}
+                            onBlur={() => { if (ov.nights === "") setLegNights(idx, 0); }}
+                            onMouseDown={e => e.stopPropagation()}
+                            className="w-14 text-xs text-center bg-background border border-card-border rounded px-2 py-1 focus:outline-none"
+                          />
+                        </div>
                       </div>
-                    )}
 
-                    {/* Hotel list by location */}
-                    <div className="space-y-3 max-h-72 overflow-y-auto pr-0.5">
-                      {filteredLocs.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground text-center py-2">No results — try a different search</p>
-                      ) : filteredLocs.map(loc => (
-                        <div key={loc.label}>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{loc.label}</div>
-                          <div className="space-y-1">
-                            {loc.hotels.map(hotel => (
-                              <button
-                                key={hotel.name}
-                                type="button"
-                                onClick={() => setSelectedHotel(hotel === selectedHotel ? null : hotel)}
-                                className={`w-full text-left rounded-lg px-2.5 py-2 border transition-colors ${
-                                  selectedHotel?.name === hotel.name
-                                    ? "border-teal-500/50 bg-teal-500/10"
-                                    : "border-card-border hover:border-white/20 bg-background/60"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-[11px] font-medium truncate">{hotel.name}</span>
-                                  <span className="text-[11px] font-semibold shrink-0" style={{ color: TEAL }}>${hotel.approxRateAUD}/nt</span>
+                      {/* Hotel picker — shown only when nights > 0 */}
+                      {hasNights && (
+                        <div>
+                          {/* Selected hotel summary */}
+                          {ov.hotel && (
+                            <div className="mb-2 flex items-start gap-2 bg-teal-500/10 border border-teal-500/30 rounded-lg px-2.5 py-2">
+                              <Hotel size={11} className="mt-0.5 shrink-0" style={{ color: TEAL }} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[11px] font-semibold truncate">{ov.hotel.name}</div>
+                                <div className="text-[10px] text-muted-foreground">{ov.hotel.chain} · <StarRating stars={ov.hotel.stars} /> · ${ov.hotel.approxRateAUD}/room/nt</div>
+                                <div className="text-[10px] mt-0.5 font-semibold" style={{ color: TEAL }}>
+                                  {crewCount} room{crewCount !== 1 ? 's' : ''} × {typeof ov.nights === 'number' && ov.nights > 0 ? ov.nights : 1} night{(typeof ov.nights === 'number' && ov.nights > 0 ? ov.nights : 1) !== 1 ? 's' : ''} = ~${ov.hotel.approxRateAUD * crewCount * (typeof ov.nights === 'number' && ov.nights > 0 ? ov.nights : 1)} AUD
                                 </div>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="text-[10px] text-muted-foreground">{hotel.chain}</span>
-                                  <StarRating stars={hotel.stars} />
-                                  <a
-                                    href={hotel.bookingUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    onClick={e => e.stopPropagation()}
-                                    className="text-[10px] underline ml-auto shrink-0"
-                                    style={{ color: TEAL }}
-                                  >
-                                    Book →
-                                  </a>
+                                <div className="text-[10px] mt-0.5">
+                                  <span className="text-muted-foreground">{ov.hotel.phone}</span>
+                                  {" · "}
+                                  <a href={ov.hotel.bookingUrl} target="_blank" rel="noreferrer"
+                                    className="underline" style={{ color: TEAL }}>Book</a>
                                 </div>
+                              </div>
+                              <button onClick={() => setLegHotel(idx, null)} className="text-muted-foreground hover:text-white shrink-0">
+                                <X size={11} />
                               </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                            </div>
+                          )}
 
-                    <p className="text-[9px] text-muted-foreground mt-2 opacity-60">
-                      Rates are indicative corporate rates via Corporate Traveller preferred partners (Accor, IHG, TFE Hotels, Choice Hotels). Book directly through Corporate Traveller for negotiated pricing.
-                    </p>
-                  </div>
-                );
-              })()}
+                          {/* No match at all — show Booking.com link */}
+                          {noMatch ? (
+                            <div className="text-[11px] text-muted-foreground text-center py-3 space-y-2">
+                              <p>No pre-loaded accommodation for <strong>{destICAO}</strong>.</p>
+                              <a
+                                href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(leg.toName || destICAO || '')}&nflt=class%3D4%3Bclass%3D5`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] underline"
+                                style={{ color: TEAL }}
+                              >
+                                Search 4★+ on Booking.com →
+                              </a>
+                            </div>
+                          ) : (
+                            <>
+                              {/* Search */}
+                              <input
+                                type="text"
+                                value={ov.search}
+                                onChange={e => setLegSearch(idx, e.target.value)}
+                                onMouseDown={e => e.stopPropagation()}
+                                placeholder="Search hotels or chains..."
+                                className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none mb-2"
+                              />
+
+                              <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+                                {/* Corporate Traveller 4★+ block */}
+                                {shownCtFourPlus.length > 0 && (
+                                  <div>
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: TEAL }}>
+                                        Corporate Traveller — 4★+
+                                      </span>
+                                      <a href="https://www.corporatetraveller.com.au" target="_blank" rel="noreferrer"
+                                        className="text-[9px] underline opacity-50 hover:opacity-100">CT ↗</a>
+                                    </div>
+                                    <div className="space-y-1">
+                                      {shownCtFourPlus.map(h => <HotelButton key={h.name} hotel={h} />)}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Extended 4★+ block */}
+                                {shownExtended.length > 0 && (
+                                  <div>
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                                      {extendedSectionLabel}
+                                    </div>
+                                    <div className="space-y-1">
+                                      {shownExtended.map(h => <HotelButton key={h.name} hotel={h} />)}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Below-4★ CT fallback (only when no 4★+ exist at all) */}
+                                {shownCtBelow4.length > 0 && (
+                                  <div>
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                                      Corporate Traveller — 3★ &amp; Below
+                                    </div>
+                                    <div className="space-y-1">
+                                      {shownCtBelow4.map(h => <HotelButton key={h.name} hotel={h} />)}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {totalShown === 0 && (
+                                  <p className="text-[11px] text-muted-foreground text-center py-2">No results — try a different search</p>
+                                )}
+                              </div>
+
+                              {/* Booking.com fallback link */}
+                              <div className="mt-2 pt-2 border-t border-card-border/50 flex items-center justify-between">
+                                <p className="text-[9px] text-muted-foreground opacity-60">Indicative rates via Corporate Traveller preferred partners.</p>
+                                <a
+                                  href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(leg.toName || destICAO || '')}&nflt=class%3D4%3Bclass%3D5`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[9px] underline shrink-0 ml-2"
+                                  style={{ color: TEAL }}
+                                >More on Booking.com →</a>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                  {/* end legs.map */}
+              </div>
               <div>
                 <label className="text-xs text-muted-foreground block mb-1 flex items-center gap-1"><Percent size={11}/> Margin %</label>
                 <input type="number" min={0} max={100} value={marginPercent}
@@ -942,8 +2184,41 @@ export default function CharterQuote() {
                 </div>
               )}
 
+              {/* ── Crew Rest Calculator — per sector ─────────────────────── */}
+              {breakdown.legs.length > 0 && (() => {
+                const isMedivacFlight = purpose === "medevac_charter" || purpose.startsWith("clinic_");
+                const isMultiCrew = crew.firstOfficer || crew.flightNurse || crew.flightParamedic || crew.icuDoctor;
+                // For each leg, show a rest calculator at destination (except the last leg — no onward rest needed unless return sector)
+                const legsToShow = includeReturnLeg ? breakdown.legs : breakdown.legs.slice(0, -1);
+                if (legsToShow.length === 0) return null;
+                return (
+                  <div className="mb-4">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Clock size={11} />
+                      Crew Rest &amp; Curfew
+                    </div>
+                    {legsToShow.map((lb, i) => (
+                      <div key={i} className="mb-2">
+                        <div className="text-[9px] text-muted-foreground font-medium mb-1">
+                          After Sector {i + 1}: {lb.leg.fromICAO} → {lb.leg.toICAO}
+                          <span className="ml-2 text-foreground/50">
+                            (arrives {lb.arrivalTime} local · {lb.flightHours.toFixed(1)} hrs flight)
+                          </span>
+                        </div>
+                        <RestCalculator
+                          arrivalTime={lb.arrivalTime}
+                          departureICAO={lb.leg.toICAO}
+                          isMedivac={isMedivacFlight}
+                          crewType={isMultiCrew ? "multi" : "single"}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <CostLineGroup title="Aircraft Costs">
-                <CostLine label="Aircraft hourly rate" value={breakdown.aircraftCost}
+                <CostLine label={`Aircraft Flight Cost (${fmtCents(AIRCRAFT[aircraftType].hourlyRate)}/hr)`} value={breakdown.aircraftCost}
                   detail={`${breakdown.totalFlightHours.toFixed(1)} hrs @ ${fmtCents(AIRCRAFT[aircraftType].hourlyRate)}/hr`}
                   expandKey="aircraft" expanded={expandedLine} onToggle={setExpandedLine} />
                 <CostLine label="Fuel (Jet-A1 @ $1.92/L)" value={breakdown.subtotals.fuel}
@@ -969,8 +2244,23 @@ export default function CharterQuote() {
               </CostLineGroup>
 
               <CostLineGroup title="Ground & Logistics">
+                {breakdown.subtotals.intlCharges > 0 && (
+                  <CostLine label="Intl airport + overflight charges" value={breakdown.subtotals.intlCharges}
+                    detail={`Landing, parking, handling, facility, overflight fees — converted AUD`}
+                    expandKey="intl" expanded={expandedLine} onToggle={setExpandedLine} />
+                )}
                 <CostLine label="Ground transport" value={breakdown.subtotals.groundTransport} expandKey="ground" expanded={expandedLine} onToggle={setExpandedLine} />
-                <CostLine label={`Accommodation (${accommodationNights} nights)`} value={breakdown.subtotals.accommodation} expandKey="accom" expanded={expandedLine} onToggle={setExpandedLine} />
+                <CostLine
+                  label={(() => {
+                    const totalNights = Object.values(legOvernights).reduce((sum, ov) => sum + (typeof ov.nights === 'number' ? ov.nights : 0), 0);
+                    const hotelsSelected = Object.values(legOvernights).filter(ov => ov.hotel).length;
+                    return `Accommodation — ${crewCount} room${crewCount !== 1 ? 's' : ''} × ${totalNights} night${totalNights !== 1 ? 's' : ''}${hotelsSelected > 0 ? ` (${hotelsSelected} hotel${hotelsSelected !== 1 ? 's' : ''})` : ''}`;
+                  })()}
+                  value={breakdown.subtotals.accommodation}
+                  expandKey="accom"
+                  expanded={expandedLine}
+                  onToggle={setExpandedLine}
+                />
               </CostLineGroup>
 
               {/* Expanded per-leg detail */}
@@ -1023,6 +2313,16 @@ export default function CharterQuote() {
                   style={{ backgroundColor: TEAL }}>
                   <Save size={13} /> {saveMutation.isPending ? "Saving..." : "Save Quote"}
                 </button>
+                <label className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-md border border-card-border cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoInvoice}
+                    onChange={(e) => setAutoInvoice(e.target.checked)}
+                    className="accent-current"
+                    style={{ accentColor: TEAL }}
+                  />
+                  Auto-invoice on acceptance
+                </label>
                 <button onClick={handleExportPDF}
                   className="flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-md border border-card-border hover:border-white/30">
                   <FileDown size={13} /> Export PDF

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { type UserRole } from "@/lib/data";
-import { Radio, MapPin, AlertTriangle, CheckCircle, X, Plane, UserPlus, Trash2, ChevronDown, Send } from "lucide-react";
+import { Radio, MapPin, AlertTriangle, CheckCircle, X, Plane, UserPlus, Trash2, ChevronDown, Send, Moon, Wrench } from "lucide-react";
+import { useLocation } from "wouter";
 import { ERSA_AERODROMES, getAerodrome, type ERSAAerodrome } from "@/data/ersa-airports";
 
 interface Props { role: UserRole; }
@@ -77,6 +78,7 @@ interface CreatedMission {
 }
 
 export default function Dispatch({ role }: Props) {
+  const [, navigate] = useLocation();
   const [missionType, setMissionType] = useState("Medivac");
   const [from, setFrom]               = useState("YSDU");
   const [to, setTo]                   = useState("YSSY");
@@ -656,6 +658,35 @@ export default function Dispatch({ role }: Props) {
               </div>
             </div>
           )}
+
+          {/* ── Unplanned overnight / AOG shortcut ──────────────────────── */}
+          <div className="bg-card border border-card-border rounded-xl p-4">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Moon size={11} /> Unplanned Overnight
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mb-3">
+              Use the <strong className="text-foreground">Crew Rest Calculator</strong> when an
+              unplanned overnight occurs — AOG, FDP limit reached, weather diversion, or Dispatcher
+              direction. It calculates minimum rest, earliest departure, and curfew status instantly.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => navigate("/rest-calculator")}
+                className="flex items-center justify-center gap-1.5 text-[10px] font-semibold py-2 rounded-lg text-white"
+                style={{ backgroundColor: "#01696F" }}
+                data-testid="button-aog-rest-calc"
+              >
+                <Wrench size={11} /> AOG Overnight
+              </button>
+              <button
+                onClick={() => navigate("/rest-calculator")}
+                className="flex items-center justify-center gap-1.5 text-[10px] font-semibold py-2 rounded-lg border border-orange-400/40 text-orange-300 bg-orange-500/8"
+                data-testid="button-fdp-rest-calc"
+              >
+                <Moon size={11} /> FDP Exceeded
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,16 +1,32 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import type { UserRole } from "@/lib/data";
 
 interface Props { role: UserRole }
 
+interface FuelReceipt {
+  id: number;
+  receiptRef: string;
+  entryMethod: string;
+  aircraftReg: string;
+  airportIcao: string;
+  upliftDate: string;
+  upliftLb: number;
+  pricePerLb: number;
+  totalAud: number;
+  supplier: string;
+  invoiceRef: string | null;
+  scanImageUrl: string | null;
+  reconStatus: string;
+  reconBatchId: string | null;
+  notes: string | null;
+  enteredBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // All fuel in pounds (lb) for King Air
-const FUEL_LOG = [
-  { id: "F001", date: "05 Jun 2026", aircraft: "VH-MVW", airport: "YSDU", uplift: 1840, unit: "lb", price: 1.42, total: 2612.80, supplier: "Viva Energy", receipt: "VE-20260605-001" },
-  { id: "F002", date: "05 Jun 2026", aircraft: "VH-XYR", airport: "YBHI", uplift: 2120, unit: "lb", price: 1.55, total: 3286.00, supplier: "Puma Energy", receipt: "PE-20260605-044" },
-  { id: "F003", date: "04 Jun 2026", aircraft: "VH-XYJ", airport: "YSSY", uplift: 980, unit: "lb", price: 1.68, total: 1646.40, supplier: "BP Aviation", receipt: "BP-20260604-887" },
-  { id: "F004", date: "04 Jun 2026", aircraft: "VH-XYU", airport: "YSDU", uplift: 3200, unit: "lb", price: 1.42, total: 4544.00, supplier: "Viva Energy", receipt: "VE-20260604-072" },
-  { id: "F005", date: "03 Jun 2026", aircraft: "VH-XYR", airport: "YMOR", uplift: 1460, unit: "lb", price: 1.61, total: 2350.60, supplier: "Airtac", receipt: "AT-20260603-012" },
-];
 
 const MONTHLY_BUDGET = [
   { month: "Jan", budget: 38000, actual: 35200 },
@@ -30,33 +46,117 @@ const INVOICES = [
 
 const invStatus = (s: string) => s === "Paid" ? "status-green" : s === "Awaiting Approval" ? "status-yellow" : s === "Overdue" ? "status-red" : "status-gray";
 
-const totalFuel = FUEL_LOG.reduce((a, b) => a + b.uplift, 0);
-const totalCost = FUEL_LOG.reduce((a, b) => a + b.total, 0);
 const mtdFuel = MONTHLY_BUDGET[MONTHLY_BUDGET.length - 1].actual;
 const mtdBudget = MONTHLY_BUDGET[MONTHLY_BUDGET.length - 1].budget;
 
 const BAR_MAX = Math.max(...MONTHLY_BUDGET.map(m => Math.max(m.budget, m.actual)));
 
+const HEADING_FONT = { fontFamily: "'Cabinet Grotesk', sans-serif" };
+
+const emptyForm = {
+  aircraftReg: "",
+  airportIcao: "",
+  upliftDate: new Date().toISOString().slice(0, 10),
+  upliftLb: "",
+  pricePerLb: "",
+  supplier: "",
+  receiptRef: "",
+  notes: "",
+};
+
 export default function FuelFinance({ role }: Props) {
-  const [tab, setTab] = useState<"fuel" | "budget" | "invoices">("fuel");
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<"fuel" | "reconciliation" | "budget" | "invoices">("fuel");
   const [filterAircraft, setFilterAircraft] = useState("All");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [queryNoteDrafts, setQueryNoteDrafts] = useState<Record<number, string>>({});
 
   const tabs = [
     { id: "fuel", label: "Fuel Uplift Log" },
+    { id: "reconciliation", label: "Reconciliation" },
     { id: "budget", label: "Budget vs Actual" },
     { id: "invoices", label: "Invoices" },
   ] as const;
 
-  const aircraft = ["All", ...Array.from(new Set(FUEL_LOG.map(f => f.aircraft)))];
-  const filtered = filterAircraft === "All" ? FUEL_LOG : FUEL_LOG.filter(f => f.aircraft === filterAircraft);
+  // ─── Live fuel receipts ─────────────────────────────────────────────────
+  const { data: receipts = [], isLoading } = useQuery<FuelReceipt[]>({
+    queryKey: ["/api/fuel-receipts"],
+    queryFn: () => apiRequest("GET", "/api/fuel-receipts").then(r => r.json()),
+    refetchInterval: 30000,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/fuel-receipts", data).then(r => {
+      if (!r.ok) throw new Error(`Server error ${r.status}`);
+      return r.json();
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/fuel-receipts"] });
+      setForm(emptyForm);
+      setShowAddForm(false);
+      setFormError(null);
+    },
+    onError: (err: any) => setFormError(err?.message ?? "Failed to save entry"),
+  });
+
+  const updateReconMutation = useMutation({
+    mutationFn: ({ id, updates }: { id: number; updates: any }) =>
+      apiRequest("PATCH", `/api/fuel-receipts/${id}`, updates).then(r => r.json()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/fuel-receipts"] }),
+  });
+
+  const aircraftOptions = ["All", ...Array.from(new Set(receipts.map(f => f.aircraftReg)))];
+  const filtered = filterAircraft === "All" ? receipts : receipts.filter(f => f.aircraftReg === filterAircraft);
+
+  const upliftLbNum = parseFloat(form.upliftLb) || 0;
+  const pricePerLbNum = parseFloat(form.pricePerLb) || 0;
+  const totalAud = upliftLbNum * pricePerLbNum;
+
+  // ─── Last 7 days live stats ─────────────────────────────────────────────
+  const { last7Lb, last7Cost } = useMemo(() => {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recent = receipts.filter(r => {
+      const t = new Date(r.upliftDate).getTime();
+      return !isNaN(t) && t >= cutoff;
+    });
+    return {
+      last7Lb: recent.reduce((a, b) => a + (b.upliftLb || 0), 0),
+      last7Cost: recent.reduce((a, b) => a + (b.totalAud || 0), 0),
+    };
+  }, [receipts]);
+
+  const pending = receipts.filter(r => r.reconStatus === "pending");
+  const pendingTotal = pending.reduce((a, b) => a + (b.totalAud || 0), 0);
+
+  function handleAddEntry() {
+    setFormError(null);
+    if (!form.aircraftReg || !form.airportIcao || !form.upliftDate || !form.upliftLb || !form.pricePerLb || !form.supplier) {
+      setFormError("Please fill in all required fields.");
+      return;
+    }
+    createMutation.mutate({
+      aircraftReg: form.aircraftReg.toUpperCase(),
+      airportIcao: form.airportIcao.toUpperCase(),
+      upliftDate: form.upliftDate,
+      upliftLb: upliftLbNum,
+      pricePerLb: pricePerLbNum,
+      totalAud,
+      supplier: form.supplier,
+      receiptRef: form.receiptRef || undefined,
+      notes: form.notes || null,
+      entryMethod: "manual",
+    });
+  }
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Fuel & Finance</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Fuel uplift tracking, budget monitoring, and invoice management — all fuel in lb</p>
+          <h1 className="text-2xl font-bold" style={HEADING_FONT}>Fuel & Finance</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Fuel uplift tracking, reconciliation, budget monitoring, and invoice management — all fuel in lb</p>
         </div>
         <div className="flex items-center gap-2 px-4 py-2 bg-amber-400/10 border border-amber-400/30 rounded-xl">
           <span className="text-amber-400 text-sm">⛽</span>
@@ -67,34 +167,37 @@ export default function FuelFinance({ role }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Fuel (5 days, lb)", value: totalFuel.toLocaleString(), color: "text-cyan-400" },
-          { label: "Fuel Cost (5 days)", value: `$${totalCost.toFixed(0)}`, color: "text-amber-400" },
+          { label: "Fuel (7 days, lb)", value: last7Lb.toLocaleString(), color: "text-cyan-400" },
+          { label: "Fuel Cost (7 days)", value: `$${last7Cost.toFixed(0)}`, color: "text-amber-400" },
           { label: "MTD Spend", value: `$${mtdFuel.toLocaleString()}`, color: "text-green-400" },
           { label: "MTD Budget Rem.", value: `$${(mtdBudget - mtdFuel).toLocaleString()}`, color: mtdFuel > mtdBudget ? "text-red-400" : "text-muted-foreground" },
         ].map(s => (
           <div key={s.label} className="bg-card border border-card-border rounded-xl p-4">
-            <div className={`text-2xl font-bold ${s.color}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{s.value}</div>
+            <div className={`text-2xl font-bold ${s.color}`} style={HEADING_FONT}>{s.value}</div>
             <div className="text-xs text-muted-foreground mt-0.5">{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-card border border-card-border rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-card border border-card-border rounded-xl p-1 w-fit flex-wrap">
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${tab === t.id ? "bg-cyan-400/20 text-cyan-400" : "text-muted-foreground hover:text-foreground"}`}>
             {t.label}
+            {t.id === "reconciliation" && pending.length > 0 && (
+              <span className="ml-1.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-amber-400/30 text-amber-300 text-[10px] font-bold">{pending.length}</span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Fuel Log */}
+      {/* Fuel Uplift Log */}
       {tab === "fuel" && (
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-muted-foreground">Filter aircraft:</span>
-            {aircraft.map(a => (
+            {aircraftOptions.map(a => (
               <button key={a} onClick={() => setFilterAircraft(a)}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${filterAircraft === a ? "bg-cyan-400/20 text-cyan-400 border border-cyan-400/30" : "bg-card border border-card-border text-muted-foreground hover:text-foreground"}`}>
                 {a}
@@ -112,48 +215,208 @@ export default function FuelFinance({ role }: Props) {
                     <th className="text-left p-3">Airport</th>
                     <th className="text-right p-3">Uplift (lb)</th>
                     <th className="text-right p-3">$/lb</th>
-                    <th className="text-right p-3">Total ($)</th>
+                    <th className="text-right p-3">Total (AUD)</th>
                     <th className="text-left p-3">Supplier</th>
                     <th className="text-left p-3">Receipt</th>
+                    <th className="text-left p-3">Recon</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {isLoading && (
+                    <tr><td colSpan={9} className="p-4 text-center text-muted-foreground">Loading fuel receipts…</td></tr>
+                  )}
+                  {!isLoading && filtered.length === 0 && (
+                    <tr><td colSpan={9} className="p-4 text-center text-muted-foreground">No fuel uplift entries yet.</td></tr>
+                  )}
                   {filtered.map(f => (
                     <tr key={f.id} className="border-b border-card-border/50 hover:bg-background/30 transition-colors">
-                      <td className="p-3">{f.date}</td>
-                      <td className="p-3 font-bold text-cyan-400">{f.aircraft}</td>
-                      <td className="p-3 font-mono">{f.airport}</td>
-                      <td className="p-3 text-right font-semibold">{f.uplift.toLocaleString()}</td>
-                      <td className="p-3 text-right">${f.price.toFixed(2)}</td>
-                      <td className="p-3 text-right font-semibold text-amber-400">${f.total.toFixed(2)}</td>
+                      <td className="p-3">{f.upliftDate}</td>
+                      <td className="p-3 font-bold text-cyan-400">{f.aircraftReg}</td>
+                      <td className="p-3 font-mono">{f.airportIcao}</td>
+                      <td className="p-3 text-right font-semibold">{f.upliftLb.toLocaleString()}</td>
+                      <td className="p-3 text-right">${f.pricePerLb.toFixed(2)}</td>
+                      <td className="p-3 text-right font-semibold text-amber-400">${f.totalAud.toFixed(2)}</td>
                       <td className="p-3">{f.supplier}</td>
-                      <td className="p-3 text-muted-foreground font-mono text-[10px]">{f.receipt}</td>
+                      <td className="p-3 text-muted-foreground font-mono text-[10px]">{f.receiptRef}</td>
+                      <td className="p-3">
+                        <span className={`badge ${f.reconStatus === "matched" ? "status-green" : f.reconStatus === "queried" ? "status-yellow" : "status-gray"}`}>{f.reconStatus}</span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="border-t border-card-border bg-background/20">
-                    <td colSpan={3} className="p-3 font-bold text-xs">Totals</td>
-                    <td className="p-3 text-right font-bold">{filtered.reduce((a, b) => a + b.uplift, 0).toLocaleString()} lb</td>
-                    <td className="p-3" />
-                    <td className="p-3 text-right font-bold text-amber-400">${filtered.reduce((a, b) => a + b.total, 0).toFixed(2)}</td>
-                    <td colSpan={2} className="p-3" />
-                  </tr>
-                </tfoot>
+                {filtered.length > 0 && (
+                  <tfoot>
+                    <tr className="border-t border-card-border bg-background/20">
+                      <td colSpan={3} className="p-3 font-bold text-xs">Totals</td>
+                      <td className="p-3 text-right font-bold">{filtered.reduce((a, b) => a + b.upliftLb, 0).toLocaleString()} lb</td>
+                      <td className="p-3" />
+                      <td className="p-3 text-right font-bold text-amber-400">${filtered.reduce((a, b) => a + b.totalAud, 0).toFixed(2)}</td>
+                      <td colSpan={3} className="p-3" />
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
 
-          <button className="px-4 py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
-            + Add Uplift Entry
+          <button onClick={() => setShowAddForm(v => !v)}
+            className="px-4 py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
+            {showAddForm ? "Cancel" : "+ Add Uplift Entry"}
           </button>
+
+          {showAddForm && (
+            <div className="bg-card border border-card-border rounded-xl p-5 space-y-4">
+              <div className="text-sm font-bold" style={HEADING_FONT}>New Fuel Uplift Entry</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Aircraft Reg *</label>
+                  <input value={form.aircraftReg} onChange={e => setForm(f => ({ ...f, aircraftReg: e.target.value.toUpperCase() }))}
+                    placeholder="VH-MVW" className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Airport ICAO *</label>
+                  <input value={form.airportIcao} onChange={e => setForm(f => ({ ...f, airportIcao: e.target.value.toUpperCase() }))}
+                    placeholder="YSDU" className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs uppercase" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Date *</label>
+                  <input type="date" value={form.upliftDate} onChange={e => setForm(f => ({ ...f, upliftDate: e.target.value }))}
+                    className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Uplift (lb) *</label>
+                  <input type="number" value={form.upliftLb} onChange={e => setForm(f => ({ ...f, upliftLb: e.target.value }))}
+                    placeholder="1840" className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Price per lb (AUD) *</label>
+                  <input type="number" step="0.01" value={form.pricePerLb} onChange={e => setForm(f => ({ ...f, pricePerLb: e.target.value }))}
+                    placeholder="1.42" className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Total (AUD, auto)</label>
+                  <div className="w-full bg-background/50 border border-card-border rounded-lg px-3 py-2 text-xs font-semibold text-amber-400">
+                    ${totalAud.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Supplier *</label>
+                  <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))}
+                    placeholder="Viva Energy" className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1">Receipt Ref (optional)</label>
+                  <input value={form.receiptRef} onChange={e => setForm(f => ({ ...f, receiptRef: e.target.value }))}
+                    placeholder="Auto-generated if blank" className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs" />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs text-muted-foreground mb-1">Notes (optional)</label>
+                  <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="Notes" className="w-full bg-background border border-card-border rounded-lg px-3 py-2 text-xs" />
+                </div>
+              </div>
+              {formError && <div className="text-xs text-red-400 font-medium">{formError}</div>}
+              <div className="flex gap-2">
+                <button onClick={handleAddEntry} disabled={createMutation.isPending}
+                  className="px-4 py-2 bg-cyan-400 text-black text-xs font-bold rounded-lg disabled:opacity-50">
+                  {createMutation.isPending ? "Saving…" : "Save Entry"}
+                </button>
+                <button onClick={() => { setShowAddForm(false); setForm(emptyForm); setFormError(null); }}
+                  className="px-4 py-2 bg-background border border-card-border text-xs font-semibold rounded-lg">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Reconciliation */}
+      {tab === "reconciliation" && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-card border border-card-border rounded-xl p-4">
+              <div className="text-2xl font-bold text-amber-400" style={HEADING_FONT}>{pending.length}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Pending Reconciliation</div>
+            </div>
+            <div className="bg-card border border-card-border rounded-xl p-4">
+              <div className="text-2xl font-bold text-amber-400" style={HEADING_FONT}>${pendingTotal.toFixed(2)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Pending Total (AUD)</div>
+            </div>
+          </div>
+
+          <div className="bg-card border border-card-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-card-border text-muted-foreground">
+                    <th className="text-left p-3">Date</th>
+                    <th className="text-left p-3">Aircraft</th>
+                    <th className="text-left p-3">Airport</th>
+                    <th className="text-right p-3">Total (AUD)</th>
+                    <th className="text-left p-3">Receipt</th>
+                    <th className="text-left p-3">Status</th>
+                    <th className="text-left p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receipts.length === 0 && (
+                    <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No fuel receipts to reconcile.</td></tr>
+                  )}
+                  {receipts.map(f => (
+                    <tr key={f.id} className="border-b border-card-border/50 hover:bg-background/30 transition-colors">
+                      <td className="p-3">{f.upliftDate}</td>
+                      <td className="p-3 font-bold text-cyan-400">{f.aircraftReg}</td>
+                      <td className="p-3 font-mono">{f.airportIcao}</td>
+                      <td className="p-3 text-right font-semibold text-amber-400">${f.totalAud.toFixed(2)}</td>
+                      <td className="p-3 text-muted-foreground font-mono text-[10px]">{f.receiptRef}</td>
+                      <td className="p-3">
+                        {f.reconStatus === "matched" ? (
+                          <span className="badge status-green">✓ Matched</span>
+                        ) : f.reconStatus === "queried" ? (
+                          <span className="badge status-yellow">Queried{f.notes ? `: ${f.notes}` : ""}</span>
+                        ) : (
+                          <span className="badge status-gray">Pending</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {f.reconStatus === "pending" && (
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex gap-1.5">
+                              <button onClick={() => updateReconMutation.mutate({ id: f.id, updates: { reconStatus: "matched" } })}
+                                className="px-2.5 py-1 bg-green-400/10 hover:bg-green-400/20 border border-green-400/30 text-green-400 text-[11px] font-semibold rounded-md">
+                                Mark Matched
+                              </button>
+                              <button onClick={() => {
+                                const note = queryNoteDrafts[f.id] || "Query raised";
+                                updateReconMutation.mutate({ id: f.id, updates: { reconStatus: "queried", notes: note } });
+                              }}
+                                className="px-2.5 py-1 bg-amber-400/10 hover:bg-amber-400/20 border border-amber-400/30 text-amber-400 text-[11px] font-semibold rounded-md">
+                                Query
+                              </button>
+                            </div>
+                            <input
+                              value={queryNoteDrafts[f.id] ?? ""}
+                              onChange={e => setQueryNoteDrafts(d => ({ ...d, [f.id]: e.target.value }))}
+                              placeholder="Query note (optional)"
+                              className="w-full bg-background border border-card-border rounded px-2 py-1 text-[11px]"
+                            />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Budget vs Actual */}
       {tab === "budget" && (
         <div className="bg-card border border-card-border rounded-xl p-5 space-y-5">
-          <div className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>2026 Fuel Budget vs Actual Spend</div>
+          <div className="text-sm font-bold" style={HEADING_FONT}>2026 Fuel Budget vs Actual Spend</div>
 
           {/* Bar chart */}
           <div className="space-y-3">
@@ -194,12 +457,12 @@ export default function FuelFinance({ role }: Props) {
             <div key={inv.id} className="bg-card border border-card-border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="text-2xl">🧾</div>
               <div className="flex-1">
-                <div className="text-sm font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{inv.vendor} — {inv.period}</div>
+                <div className="text-sm font-bold" style={HEADING_FONT}>{inv.vendor} — {inv.period}</div>
                 <div className="text-xs text-muted-foreground font-mono">{inv.id}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">Due: {inv.due}</div>
               </div>
               <div className="flex flex-col items-end gap-1.5">
-                <div className="text-lg font-bold text-amber-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>${inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                <div className="text-lg font-bold text-amber-400" style={HEADING_FONT}>${inv.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                 <span className={`badge ${invStatus(inv.status)}`}>{inv.status}</span>
               </div>
             </div>

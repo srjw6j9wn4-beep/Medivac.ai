@@ -18,6 +18,8 @@ export interface CharterQuotePDFData {
   crew: {
     captain: boolean;
     firstOfficer: boolean;
+    captainName?: string;
+    firstOfficerName?: string;
     flightNurse: boolean;
     flightParamedic: boolean;
     icuDoctor: boolean;
@@ -25,11 +27,29 @@ export interface CharterQuotePDFData {
   };
   marginPercent: number;
   notes?: string | null;
+  legOvernights?: Record<number, { nights: number | ""; hotel: { name: string; chain: string; stars: number; approxRateAUD: number; phone: string; bookingUrl: string } | null; search: string }>;
+  /** Per-leg international charges data for the PDF breakdown table */
+  intlLegs?: Array<{
+    legIdx: number;
+    destICAO: string;
+    destName: string;
+    destCountry: string;
+    landingAUD: number;
+    parkingAUD: number;
+    handlingAUD: number;
+    facilityAUD: number;
+    overnightAUD: number;
+    overflightAUD: number;
+    totalAUD: number;
+    customsNote: string;
+  }>;
 }
 
 const AIRCRAFT_LABEL: Record<string, string> = {
   B200: "King Air B200",
   B350: "King Air B350 (Super King Air)",
+  CL60: "Challenger 604/605",
+  PC12: "Pilatus PC-12/47E",
 };
 
 const PURPOSE_LABEL: Record<string, string> = {
@@ -62,11 +82,20 @@ export function generateCharterQuotePDF(quote: CharterQuotePDFData, breakdown: Q
 
   const validUntil = addDaysISO(new Date().toISOString().slice(0, 10), 30);
 
-  const crewList: string[] = ["Captain"];
-  if (quote.crew.firstOfficer) crewList.push("First Officer");
+  const crewList: string[] = [quote.crew.captainName ? `Captain — ${quote.crew.captainName}` : "Captain"];
+  if (quote.crew.firstOfficer) crewList.push(quote.crew.firstOfficerName ? `First Officer — ${quote.crew.firstOfficerName}` : "First Officer");
   if (quote.crew.flightNurse) crewList.push("Flight Nurse");
   if (quote.crew.flightParamedic) crewList.push("Flight Paramedic");
   if (quote.crew.icuDoctor) crewList.push("ICU Doctor");
+  const crewCount = crewList.length;
+
+  // Build overnight stays data
+  const overnightEntries = Object.entries(quote.legOvernights ?? {})
+    .map(([idxStr, ov]) => ({ legIdx: parseInt(idxStr), nights: typeof ov.nights === 'number' ? ov.nights : 0, hotel: ov.hotel }))
+    .filter(e => e.nights > 0);
+  const totalNights = overnightEntries.reduce((s, e) => s + e.nights, 0);
+  const totalRoomNights = totalNights * crewCount;
+  const totalAccomCost = overnightEntries.reduce((s, e) => s + e.nights * crewCount * (e.hotel?.approxRateAUD ?? 0), 0);
 
   const routeRows = breakdown.legs.map((lb, i) => `
     <tr>
@@ -293,6 +322,51 @@ export function generateCharterQuotePDF(quote: CharterQuotePDFData, breakdown: Q
     </div>
   </div>
 
+  ${overnightEntries.length > 0 ? `
+  <div class="section">
+    <div class="section-heading">Overnight Accommodation — Crew Rooms</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>After Leg</th><th>Destination</th><th>Hotel</th>
+          <th style="text-align:center">Nights</th>
+          <th style="text-align:center">Rooms</th>
+          <th style="text-align:right">Rate/Room/Nt</th>
+          <th style="text-align:right">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${overnightEntries.map(e => {
+          const leg = breakdown.legs[e.legIdx];
+          const dest = leg ? leg.leg.toICAO + (leg.leg.toName ? " — " + leg.leg.toName : "") : "—";
+          const hotelName = e.hotel ? e.hotel.name + " (" + e.hotel.chain + ", " + e.hotel.stars + "★)" : "— no hotel selected —";
+          const rate = e.hotel ? e.hotel.approxRateAUD : 0;
+          const subtotal = e.nights * crewCount * rate;
+          return `<tr>
+            <td>Leg ${e.legIdx + 1}</td>
+            <td>${dest}</td>
+            <td>${hotelName}</td>
+            <td style="text-align:center">${e.nights}</td>
+            <td style="text-align:center;font-weight:700;color:#01696F">${crewCount}</td>
+            <td style="text-align:right">${rate > 0 ? "$" + rate + " AUD" : "—"}</td>
+            <td style="text-align:right;font-weight:600">${rate > 0 ? "$" + subtotal.toLocaleString("en-AU") + " AUD" : "—"}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="background:#f0fdfb">
+          <td colspan="3" style="font-weight:700;color:#01696F">Total Accommodation</td>
+          <td style="text-align:center;font-weight:700">${totalNights}</td>
+          <td style="text-align:center;font-weight:700;color:#01696F">${crewCount} room${crewCount !== 1 ? "s" : ""} per night</td>
+          <td></td>
+          <td style="text-align:right;font-weight:800;color:#01696F">$${totalAccomCost.toLocaleString("en-AU")} AUD</td>
+        </tr>
+      </tfoot>
+    </table>
+    <p style="font-size:7.5pt;color:#64748b;margin-top:4px;">One room per crew member. Rates are indicative corporate rates — final rates subject to booking.</p>
+  </div>
+  ` : ""}
+
   <div class="section">
     <div class="section-heading">Route Summary</div>
     <table class="data-table">
@@ -361,10 +435,97 @@ export function generateCharterQuotePDF(quote: CharterQuotePDFData, breakdown: Q
 
     <div class="cost-section-title">Ground &amp; Logistics</div>
     <div class="cost-line"><span class="desc">Ground transport</span><span class="amt">${fmtCents(breakdown.subtotals.groundTransport)}</span></div>
-    <div class="cost-line"><span class="desc">Accommodation${breakdown.accommodationRequired ? " (FDP advisory triggered)" : ""}</span><span class="amt">${fmtCents(breakdown.subtotals.accommodation)}</span></div>
+    <div class="cost-line">
+      <span class="desc">
+        Accommodation${breakdown.accommodationRequired ? " (FDP advisory triggered)" : ""}
+        ${overnightEntries.length > 0 ? `— ${crewCount} room${crewCount !== 1 ? "s" : ""} × ${totalNights} night${totalNights !== 1 ? "s" : ""} (1 room per crew member)` : ""}
+      </span>
+      <span class="amt">${fmtCents(breakdown.subtotals.accommodation)}</span>
+    </div>
+
+
+    ${quote.intlLegs && quote.intlLegs.length > 0 ? `
+    </div><!-- /cost section — end page 2 content before intl page -->
+  </div><!-- /page 2 inner -->
+</div><!-- /page 2 -->
+
+<!-- ══════════════════════ PAGE 3 — INTERNATIONAL CHARGES ══════════════════════ -->
+<div class="page" style="display:flex;flex-direction:column;">
+  <div class="cover-header">
+    <div>
+      <div class="brand">Medivac<em>.ai</em></div>
+      <div style="font-size:8pt;color:#64748b;margin-top:2px;">Charter Quote \${quote.quoteNumber} — International Charges</div>
+    </div>
+    <div class="org-block">
+      <strong>Royal Flying Doctor Service — South Eastern Section</strong>
+      ABN: 18 123 456 789
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="cost-section-title" style="color:#0e7490;border-bottom:1px solid #cffafe;margin-top:4px;">International Charges</div>
+    <table class="data-table" style="font-size:7.5pt;margin-bottom:6px;">
+      <thead>
+        <tr style="background:#ecfeff;">
+          <th>Leg</th>
+          <th>Destination</th>
+          <th style="text-align:right">Landing</th>
+          <th style="text-align:right">Parking</th>
+          <th style="text-align:right">Handling</th>
+          <th style="text-align:right">Facility</th>
+          <th style="text-align:right">Crew Overnight</th>
+          <th style="text-align:right">Overflight</th>
+          <th style="text-align:right;font-weight:700">Leg Total (AUD)</th>
+          <th>Customs / Permits</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${quote.intlLegs.map(il => `
+        <tr>
+          <td>Leg ${il.legIdx + 1}</td>
+          <td>${il.destICAO} — ${il.destName}, ${il.destCountry}</td>
+          <td style="text-align:right">${il.landingAUD > 0 ? "$" + il.landingAUD.toLocaleString("en-AU", {minimumFractionDigits:0,maximumFractionDigits:0}) : "—"}</td>
+          <td style="text-align:right">${il.parkingAUD > 0 ? "$" + il.parkingAUD.toLocaleString("en-AU", {minimumFractionDigits:0,maximumFractionDigits:0}) : "—"}</td>
+          <td style="text-align:right">${il.handlingAUD > 0 ? "$" + il.handlingAUD.toLocaleString("en-AU", {minimumFractionDigits:0,maximumFractionDigits:0}) : "—"}</td>
+          <td style="text-align:right">${il.facilityAUD > 0 ? "$" + il.facilityAUD.toLocaleString("en-AU", {minimumFractionDigits:0,maximumFractionDigits:0}) : "—"}</td>
+          <td style="text-align:right">${il.overnightAUD > 0 ? "$" + il.overnightAUD.toLocaleString("en-AU", {minimumFractionDigits:0,maximumFractionDigits:0}) : "—"}</td>
+          <td style="text-align:right">${il.overflightAUD > 0 ? "$" + il.overflightAUD.toLocaleString("en-AU", {minimumFractionDigits:0,maximumFractionDigits:0}) : "—"}</td>
+          <td style="text-align:right;font-weight:700;color:#0e7490;">$${il.totalAUD.toLocaleString("en-AU", {minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+        </tr>`).join("")}
+      </tbody>
+      <tfoot>
+        <tr style="background:#ecfeff;">
+          <td colspan="9" style="font-weight:700;color:#0e7490;">Total International Charges (AUD inc. GST)</td>
+          <td style="text-align:right;font-weight:800;color:#0e7490;">$${quote.intlLegs.reduce((s,il)=>s+il.totalAUD,0).toLocaleString("en-AU",{minimumFractionDigits:0,maximumFractionDigits:0})}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <p style="font-size:7pt;color:#64748b;margin-top:2px;margin-bottom:8px;">All international charges converted at AUD/USD 1.55. Landing, parking &amp; handling fees are per-sector estimates — final charges confirmed with handling agent prior to departure. Overflight fees are per-sector ICAO-published rates.</p>
+  </div><!-- /section -->
+  <div style="margin-top:auto;padding-top:16px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;font-size:7pt;color:#94a3b8;">
+    <span>RFDS SE Section — Charter Quick Quote | International Charges | All charges include GST | Quote valid 30 days from issue</span>
+    <span>${quote.quoteNumber} · ${generated} AEST</span>
+  </div>
+</div><!-- /page 3 -->
+
+<!-- ══════════════ PAGE 2 CONTINUED — TOTALS ══════════════ -->
+<div class="page">
+  <div class="cover-header">
+    <div>
+      <div class="brand">Medivac<em>.ai</em></div>
+      <div style="font-size:8pt;color:#64748b;margin-top:2px;">Charter Quote \${quote.quoteNumber} — Cost Summary</div>
+    </div>
+    <div class="org-block">
+      <strong>Royal Flying Doctor Service — South Eastern Section</strong>
+      ABN: 18 123 456 789
+    </div>
+  </div>
+  <div class="section">
+    ` : ""}
 
     <div class="totals-box">
       <div class="totals-row"><span>Subtotal (incl. GST)</span><span>${fmtCents(breakdown.baseCost)}</span></div>
+      ${breakdown.subtotals.intlCharges > 0 ? `<div class="totals-row" style="color:#0e7490;font-size:8pt;"><span>  incl. International charges</span><span>${fmtCents(breakdown.subtotals.intlCharges)}</span></div>` : ""}
       <div class="totals-row"><span>Margin (${quote.marginPercent}%)</span><span>${fmtCents(breakdown.margin)}</span></div>
       <div class="totals-row grand"><span>Total Quote</span><span>${fmtCents(breakdown.finalQuote)}</span></div>
     </div>
@@ -408,22 +569,26 @@ export function generateCharterQuotePDF(quote: CharterQuotePDFData, breakdown: Q
 
   try {
     const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
+    const url  = URL.createObjectURL(blob);
     const safe = `RFDS_SE_CharterQuote_${quote.quoteNumber.replace(/[^\w-]/g, "_")}`;
 
-    const w = window.open(url, "_blank");
-    if (!w) {
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${safe}.html`;
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 2000);
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    // Primary: <a download> — works inside iframes where window.open is blocked
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${safe}.html`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 5000);
+
+    // Secondary: also try to open in a new tab so user can print directly
+    // (silent failure is fine — the download above already succeeded)
+    try { window.open(url, "_blank"); } catch (_) { /* popup blocked — download is enough */ }
   } catch (_) {
-    const w = window.open("", "_blank");
-    if (w) { w.document.write(html); w.document.close(); }
+    // Last resort: write directly to a new window
+    try {
+      const w = window.open("", "_blank");
+      if (w) { w.document.write(html); w.document.close(); }
+    } catch (__) { /* nothing more we can do */ }
   }
 }

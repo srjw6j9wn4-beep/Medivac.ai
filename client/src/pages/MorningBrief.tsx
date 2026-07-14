@@ -110,7 +110,7 @@ interface Aircraft {
   location: string;
   mel?: string;
   melRestriction?: string;   // "Nil" | "Restriction — see tech log" | free text
-  bisDate?: string;
+  rtsDate?: string;
   aogReason?: string;        // why it's AOG/U/S
   scheduledMaint?: string;   // e.g. "100hr due 28/07 @ YBHI"
 }
@@ -120,7 +120,7 @@ const DEFAULT_AIRCRAFT: Aircraft[] = [
   { rego: "VH-MQK", status: "green", location: "Essendon" },
   { rego: "VH-MVW", status: "green", location: "Dubbo", scheduledMaint: "Phase check due 15/08 @ YSDU" },
   { rego: "VH-MVX", status: "green", location: "Broken Hill", mel: "Cabin Alt Controller Exp 18/06" },
-  { rego: "VH-MWH", status: "red",   location: "Toowoomba",   bisDate: "24/06/26", aogReason: "Hydraulic system fault — LAME assessment pending" },
+  { rego: "VH-MWH", status: "red",   location: "Toowoomba",   rtsDate: "24/06/26", aogReason: "Hydraulic system fault — LAME assessment pending" },
   { rego: "VH-MWK", status: "green", location: "Broken Hill", mel: "COM2 Exp 27/07 · Headset squeal" },
   { rego: "VH-NAJ", status: "green", location: "Essendon" },
   { rego: "VH-RFD", status: "green", location: "Launceston",  mel: "MEL active" },
@@ -284,12 +284,13 @@ function parseActionItemsFromMinutes(minutesText: string): ActionItem[] {
 
 // ── Helper components ──────────────────────────────────────────────────────
 
-function StatusDot({ status, size = "sm" }: { status: "green" | "amber" | "red" | "offline"; size?: "sm" | "lg" }) {
+function StatusDot({ status, size = "sm" }: { status: "green" | "amber" | "red" | "offline" | "not_required"; size?: "sm" | "lg" }) {
   const dim = size === "lg" ? "w-4 h-4" : "w-3 h-3";
   const cls =
-    status === "green"  ? "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.7)]" :
-    status === "amber"  ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]" :
-    status === "red"    ? "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.7)]" :
+    status === "green"        ? "bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.7)]" :
+    status === "amber"        ? "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]" :
+    status === "red"          ? "bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.7)]" :
+    status === "offline"      ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
     "bg-zinc-600";
   return <span className={`inline-block ${dim} rounded-full flex-shrink-0 ${cls}`} />;
 }
@@ -370,22 +371,24 @@ function EditableText({ value, onChange, editMode, placeholder }: {
 function StatusCycle({ status, onChange, editMode, options }: {
   status: string; onChange: (v: string) => void; editMode: boolean; options: string[];
 }) {
-  if (!editMode) return <StatusDot status={status as "green" | "amber" | "red" | "offline"} />;
+  if (!editMode) return <StatusDot status={status as "green" | "amber" | "red" | "offline" | "not_required"} />;
   const next = () => {
     const idx = options.indexOf(status);
     onChange(options[(idx + 1) % options.length]);
   };
   const colorMap: Record<string, string> = {
-    green: "bg-green-500/20 border-green-500/50 text-green-400",
-    amber: "bg-amber-500/20 border-amber-500/50 text-amber-400",
-    red:   "bg-red-500/20   border-red-500/50   text-red-400",
-    offline: "bg-zinc-700   border-zinc-500     text-zinc-400",
+    green:        "bg-green-500/20  border-green-500/50  text-green-400",
+    amber:        "bg-amber-500/20  border-amber-500/50  text-amber-400",
+    red:          "bg-red-500/20    border-red-500/50    text-red-400",
+    offline:      "bg-red-700/30    border-red-500/50    text-red-400",
+    not_required: "bg-zinc-700/50   border-zinc-500/60   text-zinc-400",
   };
   const labelMap: Record<string, string> = {
-    green:   "Serviceable",
-    red:     "Unserviceable",
-    amber:   "Restricted",
-    offline: "Offline",
+    green:        "Serviceable",
+    red:          "Unserviceable",
+    amber:        "Restricted",
+    offline:      "Offline",
+    not_required: "Not Required",
   };
   return (
     <button
@@ -718,7 +721,7 @@ function ExecutiveMeetingView({
         {filteredActions.length === 0 ? (
           <div className="text-sm text-muted-foreground py-6 text-center">No action items yet.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto pb-28">
             <table className="w-full">
               <thead>
                 <tr className="text-muted-foreground border-b border-card-border">
@@ -1623,7 +1626,7 @@ export default function MorningBrief({ role }: Props) {
                           )}
                         </td>
                         <td className="text-center px-2">
-                          <StatusCycle status={svc.status} editMode={editMode} options={["green","amber","offline"]}
+                          <StatusCycle status={svc.status} editMode={editMode} options={["green","amber","offline","not_required"]}
                             onChange={v => {
                               const now = new Date();
                               const hhmm = now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0");
@@ -1667,7 +1670,7 @@ export default function MorningBrief({ role }: Props) {
                 </button>
               )}
               <div className="flex items-center gap-4 mt-4 pt-3 border-t border-card-border">
-                {[["bg-green-400","Online"],["bg-amber-400","Restricted"],["bg-zinc-600","Offline"]].map(([dot,lbl]) => (
+                {[["bg-green-400","Online"],["bg-amber-400","Restricted"],["bg-red-500","Offline"],["bg-zinc-600","Not Required"]].map(([dot,lbl]) => (
                   <span key={lbl} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className={`w-2 h-2 rounded-full ${dot}`} />{lbl}
                   </span>
@@ -1682,7 +1685,7 @@ export default function MorningBrief({ role }: Props) {
                 {aircraft.map((ac, idx) => (
                   <div key={idx}>
                     <div className={`flex items-center gap-2.5 p-3 rounded-xl bg-background/50 ${!editMode ? "cursor-pointer hover:bg-white/[0.04]" : ""} transition-colors`}
-                      onClick={() => !editMode && ((ac.mel || ac.bisDate || ac.scheduledMaint) ? setExpandedMel(expandedMel === ac.rego ? null : ac.rego) : undefined)}>
+                      onClick={() => !editMode && ((ac.mel || ac.rtsDate || ac.scheduledMaint) ? setExpandedMel(expandedMel === ac.rego ? null : ac.rego) : undefined)}>
                       <StatusCycle status={ac.status} editMode={editMode} options={["green","red"]}
                         onChange={v => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, status: v as Aircraft["status"] } : a))} />
                       {editMode ? (
@@ -1700,11 +1703,11 @@ export default function MorningBrief({ role }: Props) {
                         <span className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin size={11} />{ac.location}</span>
                       )}
                       {!editMode && ac.mel && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-400">MEL</span>}
-                      {!editMode && ac.bisDate && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/35 text-red-400">AOG</span>}
+                      {!editMode && ac.rtsDate && <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/35 text-red-400">AOG</span>}
                       {!editMode && ac.scheduledMaint && ac.status === "green" && (
                         <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/35 text-blue-400">SCHED</span>
                       )}
-                      {!editMode && (ac.mel || ac.bisDate || ac.scheduledMaint) && (
+                      {!editMode && (ac.mel || ac.rtsDate || ac.scheduledMaint) && (
                         <ChevronDown size={13} className={`text-muted-foreground transition-transform ${expandedMel === ac.rego ? "rotate-180" : ""}`} />
                       )}
                       {editMode && (
@@ -1718,8 +1721,8 @@ export default function MorningBrief({ role }: Props) {
                           placeholder="MEL note (optional)" value={ac.mel || ""}
                           onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, mel: e.target.value || undefined } : a))} />
                         <input className="bg-background/80 border border-card-border rounded px-2 py-0.5 text-xs w-full focus:outline-none focus:border-cyan-500/40"
-                          placeholder="BIS date (AOG, optional)" value={ac.bisDate || ""}
-                          onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, bisDate: e.target.value || undefined } : a))} />
+                          placeholder="RTS date (AOG, optional)" value={ac.rtsDate || ""}
+                          onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, rtsDate: e.target.value || undefined } : a))} />
                         <input className="bg-background/80 border border-card-border rounded px-2 py-0.5 text-xs w-full focus:outline-none focus:border-cyan-500/40"
                           placeholder="AOG / U/S reason" value={ac.aogReason || ""}
                           onChange={e => setAircraft(prev => prev.map((a, i) => i === idx ? { ...a, aogReason: e.target.value || undefined } : a))} />
@@ -1735,10 +1738,10 @@ export default function MorningBrief({ role }: Props) {
                         </select>
                       </div>
                     )}
-                    {!editMode && expandedMel === ac.rego && (ac.mel || ac.bisDate || ac.scheduledMaint) && (
+                    {!editMode && expandedMel === ac.rego && (ac.mel || ac.rtsDate || ac.scheduledMaint) && (
                       <div className="mx-2 mb-1.5 px-3 py-2 rounded-b-xl bg-amber-500/5 border-x border-b border-amber-500/20 text-sm">
                         {ac.mel && <p className="text-amber-300"><span className="font-semibold text-amber-400">MEL:</span> {ac.mel}</p>}
-                        {ac.bisDate && <p className="text-red-300 mt-0.5"><span className="font-semibold text-red-400">Back in service:</span> {ac.bisDate}</p>}
+                        {ac.rtsDate && <p className="text-red-300 mt-0.5"><span className="font-semibold text-red-400">RTS (Return to Service):</span> {ac.rtsDate}</p>}
                         {ac.aogReason && (
                           <p className="text-red-300 mt-1"><span className="font-semibold text-red-400">Reason:</span> {ac.aogReason}</p>
                         )}
@@ -2287,17 +2290,37 @@ export default function MorningBrief({ role }: Props) {
 
       {/* Agenda side panel — only in present mode */}
       {presentMode && agendaSidePanel && (
-        <div className="w-72 shrink-0 border-l border-white/10 bg-black/40 backdrop-blur-md overflow-y-auto px-4 py-5 space-y-3">
+        <div className="w-72 shrink-0 border-l border-white/10 bg-black/40 backdrop-blur-md overflow-y-auto px-4 py-5 space-y-2">
           <p className="text-xs font-bold text-white/50 uppercase tracking-widest mb-3">Agenda</p>
-          {AGENDA.map(item => (
-            <div key={item.num} className="flex items-start gap-2.5 p-2.5 rounded-lg bg-white/5 border border-white/10">
-              <span className="text-[10px] font-bold text-white/40 w-4 shrink-0 mt-0.5">{item.num}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-white/90 leading-snug">{item.title}</p>
-                <p className="text-[10px] text-white/40 mt-0.5">{item.duration}</p>
+          {AGENDA.map(item => {
+            const note = agendaNotes[item.num] || "";
+            const [noteOpen, setNoteOpen] = [expandedAgenda.includes(item.num), (v: boolean) =>
+              setExpandedAgenda(prev => v ? [...prev, item.num] : prev.filter(n => n !== item.num))];
+            return (
+              <div key={item.num} className="rounded-lg bg-white/5 border border-white/10 overflow-hidden">
+                <button
+                  className="w-full flex items-start gap-2.5 p-2.5 text-left hover:bg-white/[0.04] transition-colors"
+                  onClick={() => setNoteOpen(!noteOpen)}
+                >
+                  <span className="text-[10px] font-bold text-white/40 w-4 shrink-0 mt-0.5">{item.num}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white/90 leading-snug">{item.title}</p>
+                    <p className="text-[10px] text-white/40 mt-0.5">{item.duration}</p>
+                  </div>
+                  {note ? (
+                    noteOpen
+                      ? <ChevronDown size={12} className="text-cyan-400 shrink-0 mt-0.5" />
+                      : <ChevronRight size={12} className="text-cyan-400 shrink-0 mt-0.5" />
+                  ) : null}
+                </button>
+                {note && noteOpen && (
+                  <div className="px-3 pb-3 border-t border-white/10 pt-2">
+                    <p className="text-[11px] text-white/70 leading-relaxed whitespace-pre-wrap">{note}</p>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       </div>{/* end flex row wrapper */}

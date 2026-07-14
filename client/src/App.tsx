@@ -16,8 +16,11 @@ import SpecialMissions from "@/pages/SpecialMissions";
 import FerryFlights from "@/pages/FerryFlights";
 import Bryan from "@/pages/Bryan";
 import BryanLive from "@/pages/BryanLive";
+import Jennifer from "@/pages/Jennifer";
+import JenniferLive from "@/pages/JenniferLive"; // v2
 import DemoMode from "@/pages/DemoMode";
 import Dispatch from "@/pages/Dispatch";
+import RestCalculatorOps from "@/pages/RestCalculatorOps";
 import AuditReports from "@/pages/AuditReports";
 import FlightMap from "@/pages/FlightMap";
 import FlightPlanning from "@/pages/FlightPlanning";
@@ -30,6 +33,7 @@ import FuelFinance from "@/pages/FuelFinance";
 import UserManagement from "@/pages/UserManagement";
 import RBACPermissions from "@/pages/RBACPermissions";
 import SystemSettings from "@/pages/SystemSettings";
+import ApiIntegrations from "@/pages/ApiIntegrations";
 import CheckTraining from "@/pages/CheckTraining";
 import Regulations from "@/pages/Regulations";
 import MedicalEquipment from "@/pages/MedicalEquipment";
@@ -45,6 +49,7 @@ import MissionOptimiser from "@/pages/MissionOptimiser";
 import ManifestSign from "@/pages/ManifestSign";
 import TechLogEmbed from "@/pages/TechLogEmbed";
 import NEPTTasking from "@/pages/NEPTTasking";
+import GovernmentTenders from "@/pages/GovernmentTenders";
 import Invoicing from "@/pages/Invoicing";
 import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
 import CharterQuote from "@/pages/CharterQuote";
@@ -74,6 +79,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/missions" component={() => <MissionBoard role={role} />} />
       <Route path="/map" component={() => <FlightMap role={role} />} />
       <Route path="/dispatch" component={() => <Dispatch role={role} />} />
+      <Route path="/rest-calculator" component={() => <RestCalculatorOps role={role} />} />
       <Route path="/charter-quote" component={() => <CharterQuote />} />
       <Route path="/cost-optimizer" component={() => <CostOptimizer />} />
       <Route path="/nept-tasking" component={() => <NEPTTasking role={role} />} />
@@ -92,8 +98,9 @@ function AppRouter({ role }: { role: UserRole }) {
       {FEATURES.TECH_LOG && <Route path="/tech-log" component={() => <TechLogEmbed />} />}
       <Route path="/techlog" component={() => <ComingSoon title="Tech Log" />} />
       <Route path="/iso-compliance" component={() => <ISOCompliance />} />
-      <Route path="/jennifer" component={() => <Bryan role={role} />} />
+      <Route path="/jennifer" component={() => <Jennifer role={role} />} />
       <Route path="/jennifer-live" component={() => <BryanLive role={role} />} />
+      <Route path="/jennifer-live-qa" component={() => <JenniferLive role={role} />} />
       <Route path="/ai-analyst" component={() => <AIMissionAnalyst role={role} />} />
       <Route path="/telehealth" component={() => <TelehealthPortal role={role} />} />
       <Route path="/doc-ai" component={() => <DocumentAI role={role} />} />
@@ -101,6 +108,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/contracts" component={() => <ContractCompliance role={role} />} />
       <Route path="/finance" component={() => <FuelFinance role={role} />} />
       <Route path="/audit" component={() => <AuditReports role={role} />} />
+      <Route path="/government-tenders" component={() => <GovernmentTenders />} />
       <Route path="/check-training" component={() => <CheckTraining role={role} />} />
       <Route path="/regulations" component={() => <Regulations />} />
       <Route path="/medical-equipment" component={() => <MedicalEquipment role={role} />} />
@@ -112,6 +120,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/users" component={() => <UserManagement role={role} />} />
       <Route path="/rbac" component={() => <RBACPermissions role={role} />} />
       <Route path="/settings" component={() => <SystemSettings role={role} />} />
+      <Route path="/api-integrations" component={() => <ApiIntegrations role={role} />} />
       <Route component={NotFound} />
     </Switch>
   );

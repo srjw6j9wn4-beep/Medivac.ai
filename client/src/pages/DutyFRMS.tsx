@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CREW, type UserRole } from "@/lib/data";
-import { Clock, AlertTriangle, CheckCircle, Users, Moon, Sun, TrendingUp, Shield } from "lucide-react";
+import { Clock, AlertTriangle, CheckCircle, Users, Moon, Sun, TrendingUp, Shield, ChevronRight } from "lucide-react";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 
 interface Props { role: UserRole; }
@@ -46,6 +47,7 @@ function HoursBar({ value, max, warn }: { value: number; max: number; warn: numb
 }
 
 export default function DutyFRMS({ role }: Props) {
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<'duty' | 'hours' | 'fatigue' | 'limits'>('duty');
 
   const overLimit = DUTY_DATA.filter(d => d.cum28 >= 90 || d.fatigue >= 28);
@@ -63,6 +65,20 @@ export default function DutyFRMS({ role }: Props) {
           {overLimit.length > 0 ? <AlertTriangle size={12} /> : <Shield size={12} />}
           {overLimit.length > 0 ? `${overLimit.length} crew approaching limits` : "All crew within limits"}
         </div>
+        {/* FDP alert — rest calculator quick-launch */}
+        {overLimit.length > 0 && (
+          <button
+            onClick={() => navigate("/rest-calculator")}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-400/30 text-orange-300 text-xs hover:bg-orange-500/15 transition-colors"
+            data-testid="button-frms-rest-calc"
+          >
+            <Moon size={12} className="flex-shrink-0" />
+            <span className="font-semibold">{overLimit.length} crew near FDP limit</span>
+            <span className="text-orange-400/70 mx-1">—</span>
+            <span>Open Crew Rest Calculator</span>
+            <ChevronRight size={11} className="ml-auto flex-shrink-0" />
+          </button>
+        )}
       </div>
 
       {/* KPIs */}
