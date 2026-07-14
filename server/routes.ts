@@ -1099,6 +1099,9 @@ Produce the optimised run plan as JSON.`;
   });
 
   app.post("/api/nept-tasks", async (req: Request, res: Response) => {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      return res.status(400).json({ error: "Invalid request body — expected a task object." });
+    }
     try {
       const now = new Date().toISOString();
       const task = await storage.createNeptTask({ ...req.body, createdAt: now, updatedAt: now });
