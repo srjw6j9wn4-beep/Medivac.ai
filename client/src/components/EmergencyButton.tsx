@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle, X, Radio, Shield, CheckCircle2, Clock,
   PhoneCall, Plane, MapPin, Siren, Truck, Flame,
-  AlertCircle, ToggleLeft, ToggleRight,
+  AlertCircle, ToggleLeft, ToggleRight, Minimize2,
 } from "lucide-react";
 import type { UserRole } from "@/lib/data";
 
@@ -77,12 +77,13 @@ interface OverlayProps {
   isDispatch: boolean;
   toggleStep: (id: number) => void;
   standDown: () => void;
+  minimize: () => void;
   atcPanel: boolean;
   emergencyServicesPanel: boolean;
 }
 
 function EmergencyOverlay({
-  event, isAirborne, pulse, steps, isDispatch, toggleStep, standDown, atcPanel, emergencyServicesPanel,
+  event, isAirborne, pulse, steps, isDispatch, toggleStep, standDown, minimize, atcPanel, emergencyServicesPanel,
 }: OverlayProps) {
   return (
     <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, zIndex:9999, display:"flex", flexDirection:"column", background:"rgb(190,0,0)" }}>
@@ -108,6 +109,15 @@ function EmergencyOverlay({
             ACTIVE
           </div>
         </div>
+        {/* Minimise — collapse to a small pulsating square; emergency stays active */}
+        <button onClick={minimize} data-testid="emergency-minimize"
+          aria-label="Minimise emergency panel — emergency stays active"
+          title="Minimise — keep emergency active"
+          style={{ flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center",
+            width:34, height:34, borderRadius:"8px", background:"rgba(0,0,0,0.35)",
+            border:"1.5px solid rgba(255,255,255,0.5)", color:"#fff", cursor:"pointer", transition:"all 0.15s" }}>
+          <Minimize2 size={16} />
+        </button>
       </div>
 
       {/* Body */}
@@ -269,6 +279,38 @@ function EmergencyOverlay({
   );
 }
 
+// ── Minimised state — small pulsating red square, pinned top-right ──
+// Purely a visual collapse: the active emergency and all its state remain
+// intact in the parent. Clicking restores the full overlay via `expand`.
+function MinimizedSquare({ expand }: { expand: () => void }) {
+  return (
+    <div style={{ position:"fixed", top:12, right:12, zIndex:10000 }}>
+      <style>{`
+        @keyframes emergencyMinPulse {
+          0%   { box-shadow: 0 0 0 0 rgba(220,0,0,0.85), 0 0 10px 2px rgba(239,68,68,0.9); transform: scale(1); }
+          70%  { box-shadow: 0 0 0 12px rgba(220,0,0,0), 0 0 18px 5px rgba(239,68,68,0.55); transform: scale(1.06); }
+          100% { box-shadow: 0 0 0 0 rgba(220,0,0,0), 0 0 10px 2px rgba(239,68,68,0.9); transform: scale(1); }
+        }
+      `}</style>
+      <button
+        onClick={expand}
+        data-testid="emergency-minimized"
+        aria-label="Emergency active — click to expand"
+        title="Emergency active — click to expand"
+        style={{
+          width: 34, height: 34, borderRadius: "7px",
+          background: "rgb(220,0,0)", border: "2px solid rgb(255,130,130)",
+          cursor: "pointer", padding: 0, display: "flex",
+          alignItems: "center", justifyContent: "center",
+          animation: "emergencyMinPulse 1.1s ease-in-out infinite",
+        }}
+      >
+        <AlertTriangle size={16} style={{ color: "#fff" }} />
+      </button>
+    </div>
+  );
+}
+
 interface EmergencyEvent {
   timestamp: string;
   role: string;
@@ -287,11 +329,12 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
   if (!EMERGENCY_ROLES.includes(role)) return null;
 
   // ── State ──────────────────────────────────────────────
-  const [armed,    setArmed]    = useState(false);
-  const [active,   setActive]   = useState(false);
-  const [armTimer, setArmTimer] = useState(3);
-  const [event,    setEvent]    = useState<EmergencyEvent | null>(null);
-  const [pulse,    setPulse]    = useState(false);
+  const [armed,     setArmed]     = useState(false);
+  const [active,    setActive]    = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const [armTimer,  setArmTimer]  = useState(3);
+  const [event,     setEvent]     = useState<EmergencyEvent | null>(null);
+  const [pulse,     setPulse]     = useState(false);
 
   // Phase: airborne or on-ground — toggleable in the button bar
   const [phase, setPhase] = useState<Phase>(externalPhase ?? "airborne");
@@ -395,6 +438,7 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
   // ── Stand down ─────────────────────────────────────────
   const standDown = () => {
     setActive(false);
+    setMinimized(false);
     setArmed(false);
     setArmTimer(3);
     setEvent(null);
@@ -501,12 +545,18 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
           </button>
         </div>
 
-        {/* Overlay portal — reuses the same full-screen overlay as desktop */}
-        {active && event && createPortal(<EmergencyOverlay
-          event={event} isAirborne={isAirborne} pulse={pulse}
-          steps={steps} isDispatch={isDispatch} toggleStep={toggleStep}
-          standDown={standDown} atcPanel={atcPanel} emergencyServicesPanel={emergencyServicesPanel}
-        />, document.body)}
+        {/* Overlay portal — reuses the same full-screen overlay as desktop.
+            When minimised, collapse to the pulsating red square instead. */}
+        {active && event && createPortal(
+          minimized
+            ? <MinimizedSquare expand={() => setMinimized(false)} />
+            : <EmergencyOverlay
+                event={event} isAirborne={isAirborne} pulse={pulse}
+                steps={steps} isDispatch={isDispatch} toggleStep={toggleStep}
+                standDown={standDown} minimize={() => setMinimized(true)}
+                atcPanel={atcPanel} emergencyServicesPanel={emergencyServicesPanel}
+              />,
+          document.body)}
       </>
     );
   }
@@ -627,12 +677,18 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
         </button>
       </div>
 
-      {/* ── Emergency overlay (portal — mounts on body to escape stacking) ── */}
-      {active && event && createPortal(<EmergencyOverlay
-        event={event} isAirborne={isAirborne} pulse={pulse}
-        steps={steps} isDispatch={isDispatch} toggleStep={toggleStep}
-        standDown={standDown} atcPanel={atcPanel} emergencyServicesPanel={emergencyServicesPanel}
-      />, document.body)}
+      {/* ── Emergency overlay (portal — mounts on body to escape stacking).
+            When minimised, collapse to the pulsating red square instead. ── */}
+      {active && event && createPortal(
+        minimized
+          ? <MinimizedSquare expand={() => setMinimized(false)} />
+          : <EmergencyOverlay
+              event={event} isAirborne={isAirborne} pulse={pulse}
+              steps={steps} isDispatch={isDispatch} toggleStep={toggleStep}
+              standDown={standDown} minimize={() => setMinimized(true)}
+              atcPanel={atcPanel} emergencyServicesPanel={emergencyServicesPanel}
+            />,
+        document.body)}
     </>
   );
 }
