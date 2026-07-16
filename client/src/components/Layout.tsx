@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { ROLES, type UserRole } from "@/lib/data";
+import { useRbacPerms, canView } from "@/hooks/useRbacPerms";
 import {
   ChevronDown, ChevronRight, Activity, Users, Shield, Settings,
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
@@ -346,8 +347,11 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
   const tooltipTimer                  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentRole = ROLES.find(r => r.id === role)!;
+  const rbacMatrix = useRbacPerms();
 
   const isRestricted = (restricted?: UserRole[]) => !!restricted?.includes(role);
+  // Hide nav item if RBAC matrix says "none" for this role
+  const isHiddenByRbac = (path?: string) => path ? !canView(rbacMatrix, role, path) : false;
 
   const toggleSection = (label: string) =>
     setExpanded(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]);
@@ -409,6 +413,11 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
       <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV.map(section => {
           const isOpen = expanded.includes(section.label);
+          // Hide the entire section if all children are hidden
+          const visibleChildren = section.children?.filter(
+            item => !isRestricted(item.restricted) && !isHiddenByRbac(item.path)
+          );
+          if (section.children && visibleChildren?.length === 0) return null;
           return (
             <div key={section.label} className="mb-0.5">
               <button
@@ -423,6 +432,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                 <div className="ml-2 mt-0.5 space-y-px">
                   {section.children.map(item => {
                     if (isRestricted(item.restricted)) return null;
+                    if (isHiddenByRbac(item.path)) return null;
                     const isActive = location === item.path;
                     return (
                       <Link key={item.path} href={item.path!}>
@@ -508,6 +518,10 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         <nav className="flex-1 overflow-y-auto py-3 px-2">
           {NAV.map(section => {
             const isOpen = expanded.includes(section.label);
+            const visibleChildrenMobile = section.children?.filter(
+              item => !isRestricted(item.restricted) && !isHiddenByRbac(item.path)
+            );
+            if (section.children && visibleChildrenMobile?.length === 0) return null;
             return (
               <div key={section.label} className="mb-0.5">
                 <button
@@ -522,6 +536,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                   <div className="ml-2 mt-0.5 space-y-px">
                     {section.children.map(item => {
                       if (isRestricted(item.restricted)) return null;
+                      if (isHiddenByRbac(item.path)) return null;
                       const isActive = location === item.path;
                       return (
                         <Link key={item.path} href={item.path!}>
