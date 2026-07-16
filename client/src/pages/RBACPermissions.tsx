@@ -543,10 +543,10 @@ export default function RBACPermissions({ role }: Props) {
         <div className="bg-card border border-card-border rounded-xl overflow-auto">
           <table className="text-[10px] w-full">
             <thead>
-              <tr className="border-b border-card-border">
-                <th className="text-left p-2 pl-4 font-semibold text-muted-foreground sticky left-0 bg-card z-10 min-w-32">Module</th>
+              <tr className="border-b border-card-border sticky top-0 z-20 bg-card">
+                <th className="text-left p-2 pl-4 font-semibold text-muted-foreground sticky left-0 bg-card z-30 min-w-32">Module</th>
                 {ROLES.map(r => (
-                  <th key={r.id} className="p-2 text-center font-semibold min-w-20">
+                  <th key={r.id} className="p-2 text-center font-semibold min-w-20 bg-card">
                     <span className={r.color}>{r.icon}</span>
                     <div className="text-muted-foreground">{r.label.split(' ')[0]}</div>
                   </th>
