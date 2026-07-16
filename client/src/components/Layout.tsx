@@ -604,8 +604,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         {/* Section icons */}
         <nav className="flex-1 flex flex-col items-center gap-1 py-3 w-full">
           {NAV.map(section => {
-            const hasActivePage = section.children?.some(c => c.path === location) ?? false;
-            const isActive = hasActivePage;
+            const isCurrentPage = section.children?.some(c => c.path === location) ?? false;
             return (
               <button
                 key={section.label}
@@ -618,16 +617,13 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                 onMouseLeave={() => {
                   tooltipTimer.current = setTimeout(() => setTooltip(null), 150);
                 }}
-                className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150
-                  ${isActive
-                    ? `${section.color} ring-1`
-                    : `text-muted-foreground hover:${section.color} hover:bg-sidebar-accent`}`}
-                style={isActive
+                className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150 ${section.color}`}
+                style={isCurrentPage
                   ? { backgroundColor: section.accent, boxShadow: `0 0 14px ${section.accent}` }
-                  : undefined}
+                  : { opacity: 0.7 }}
               >
                 {section.iconLg}
-                {hasActivePage && (
+                {isCurrentPage && (
                   <span className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'currentColor' }} />
                 )}
               </button>
