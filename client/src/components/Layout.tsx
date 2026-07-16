@@ -177,6 +177,8 @@ interface NavItem {
   path?: string;
   icon: React.ReactNode;
   iconLg: React.ReactNode;
+  color: string;        // Tailwind text color class for this group
+  accent: string;       // hex for active bg tint (used inline)
   children?: { label: string; path: string; restricted?: UserRole[] }[];
   restricted?: UserRole[];
 }
@@ -184,30 +186,27 @@ interface NavItem {
 const NAV: NavItem[] = [
   // ── Demo ──────────────────────────────────────────────────────────
   {
-    label: "Demo",
-    icon: <PlayCircle size={16} />,
-    iconLg: <PlayCircle size={28} />,
+    label: "Demo",  color: "text-slate-400",  accent: "#1e293b",
+    icon: <PlayCircle size={16} />, iconLg: <PlayCircle size={28} />,
     children: [
-      { label: "Demo Overview",   path: "/" },
+      { label: "Demo Overview",    path: "/" },
       { label: "Client Demo Mode", path: "/demo-mode" },
     ],
   },
   // ── Dashboards ────────────────────────────────────────────────────
   {
-    label: "Dashboards",
-    icon: <LayoutDashboard size={16} />,
-    iconLg: <LayoutDashboard size={28} />,
+    label: "Dashboards", color: "text-violet-400", accent: "#2e1065",
+    icon: <LayoutDashboard size={16} />, iconLg: <LayoutDashboard size={28} />,
     children: [
-      { label: "The 8:45",            path: "/morning-brief" },
-      { label: "Shift & Fleet Status", path: "/shift-fleet" },
-      { label: "Ops Room Display",     path: "/ops-display" },
+      { label: "The 8:45",             path: "/morning-brief" },
+      { label: "Shift & Fleet Status",  path: "/shift-fleet" },
+      { label: "Ops Room Display",      path: "/ops-display" },
     ],
   },
   // ── Missions ──────────────────────────────────────────────────────
   {
-    label: "Missions",
-    icon: <Plane size={16} />,
-    iconLg: <Plane size={28} />,
+    label: "Missions", color: "text-cyan-400", accent: "#083344",
+    icon: <Plane size={16} />, iconLg: <Plane size={28} />,
     children: [
       { label: "Dispatch & Intake",   path: "/dispatch" },
       { label: "NEPT Tasking",        path: "/nept-tasking" },
@@ -221,9 +220,8 @@ const NAV: NavItem[] = [
   },
   // ── Operations ────────────────────────────────────────────────────
   {
-    label: "Operations",
-    icon: <Zap size={16} />,
-    iconLg: <Zap size={28} />,
+    label: "Operations", color: "text-emerald-400", accent: "#052e16",
+    icon: <Zap size={16} />, iconLg: <Zap size={28} />,
     children: [
       { label: "Crew Rest Calculator",        path: "/rest-calculator" },
       { label: "Charter Quote",               path: "/charter-quote" },
@@ -236,9 +234,8 @@ const NAV: NavItem[] = [
   },
   // ── Assets ────────────────────────────────────────────────────────
   {
-    label: "Assets",
-    icon: <Wrench size={16} />,
-    iconLg: <Wrench size={28} />,
+    label: "Assets", color: "text-orange-400", accent: "#431407",
+    icon: <Wrench size={16} />, iconLg: <Wrench size={28} />,
     children: [
       { label: "Pilot Handover Board", path: "/pilot-handover" },
       { label: "Tech & Journey Log",   path: FEATURES.TECH_LOG ? "/tech-log" : "/techlog" },
@@ -251,33 +248,30 @@ const NAV: NavItem[] = [
   },
   // ── Crew & People ─────────────────────────────────────────────────
   {
-    label: "Crew & People",
-    icon: <Users size={16} />,
-    iconLg: <Users size={28} />,
+    label: "Crew & People", color: "text-blue-400", accent: "#172554",
+    icon: <Users size={16} />, iconLg: <Users size={28} />,
     children: [
-      { label: "Crew Roster",            path: "/roster" },
+      { label: "Crew Roster",             path: "/roster" },
       { label: "Org Chart & Key Contacts", path: "/org-chart" },
-      { label: "Duty & FRMS",            path: "/frms" },
-      { label: "Check & Training",       path: "/check-training" },
+      { label: "Duty & FRMS",             path: "/frms" },
+      { label: "Check & Training",        path: "/check-training" },
     ],
   },
   // ── Clinical ──────────────────────────────────────────────────────
   {
-    label: "Clinical",
-    icon: <HeartPulse size={16} />,
-    iconLg: <HeartPulse size={28} />,
+    label: "Clinical", color: "text-pink-400", accent: "#500724",
+    icon: <HeartPulse size={16} />, iconLg: <HeartPulse size={28} />,
     children: [
-      { label: "Medical Equipment",    path: "/medical-equipment" },
-      { label: "Stock Usage & Orders", path: "/stock-usage" },
+      { label: "Medical Equipment",       path: "/medical-equipment" },
+      { label: "Stock Usage & Orders",    path: "/stock-usage" },
       { label: "After-Hours AI Med Line", path: "/after-hours" },
-      { label: "Telehealth Portal",    path: "/telehealth" },
+      { label: "Telehealth Portal",       path: "/telehealth" },
     ],
   },
   // ── AI & Comms ────────────────────────────────────────────────────
   {
-    label: "AI & Comms",
-    icon: <Bot size={16} />,
-    iconLg: <Bot size={28} />,
+    label: "AI & Comms", color: "text-purple-400", accent: "#3b0764",
+    icon: <Bot size={16} />, iconLg: <Bot size={28} />,
     children: [
       { label: "Jennifer — Presenter", path: "/jennifer" },
       { label: "Jennifer — Live Q&A",  path: "/jennifer-live-qa" },
@@ -288,9 +282,8 @@ const NAV: NavItem[] = [
   },
   // ── Business ──────────────────────────────────────────────────────
   {
-    label: "Business",
-    icon: <Briefcase size={16} />,
-    iconLg: <Briefcase size={28} />,
+    label: "Business", color: "text-amber-400", accent: "#451a03",
+    icon: <Briefcase size={16} />, iconLg: <Briefcase size={28} />,
     children: [
       { label: "Invoicing",           path: "/invoicing" },
       { label: "Fee Reconciliation",  path: "/finance" },
@@ -304,16 +297,15 @@ const NAV: NavItem[] = [
   },
   // ── Administration ────────────────────────────────────────────────
   {
-    label: "Administration",
-    icon: <Settings size={16} />,
-    iconLg: <Settings size={28} />,
+    label: "Administration", color: "text-slate-300", accent: "#1e293b",
+    icon: <Settings size={16} />, iconLg: <Settings size={28} />,
     children: [
-      { label: "User Management",    path: "/users" },
-      { label: "RBAC Permissions",   path: "/rbac" },
-      { label: "System Settings",    path: "/settings" },
+      { label: "User Management",     path: "/users" },
+      { label: "RBAC Permissions",    path: "/rbac" },
+      { label: "System Settings",     path: "/settings" },
       { label: "API Integration Hub", path: "/api-integrations" },
-      { label: "Project Management", path: "/projects" },
-      { label: "Idea Hub",           path: "/idea-hub" },
+      { label: "Project Management",  path: "/projects" },
+      { label: "Idea Hub",            path: "/idea-hub" },
     ],
   },
 ];
@@ -446,16 +438,20 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
           if (section.children && visibleChildren?.length === 0) return null;
           return (
             <div key={section.label} className="mb-0.5">
+              {/* Section header — coloured icon + label when open */}
               <button
                 onClick={() => toggleSection(section.label)}
-                className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-xs font-semibold text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-semibold transition-colors
+                  ${isOpen
+                    ? `${section.color} bg-sidebar-accent/60`
+                    : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
               >
-                {section.icon}
-                <span className="flex-1 text-left whitespace-nowrap">{section.label}</span>
-                {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                <span className={isOpen ? section.color : ''}>{section.icon}</span>
+                <span className="flex-1 text-left whitespace-nowrap tracking-wide uppercase text-[10px]">{section.label}</span>
+                {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
               </button>
               {isOpen && section.children && (
-                <div className="ml-2 mt-0.5 space-y-px">
+                <div className="ml-1 mt-0.5 space-y-px border-l-2 pl-2" style={{ borderColor: section.accent }}>
                   {section.children.map(item => {
                     if (isRestricted(item.restricted)) return null;
                     if (isHiddenByRbac(item.path)) return null;
@@ -465,8 +461,9 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                         <a
                           className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs transition-colors whitespace-nowrap
                             ${isActive
-                              ? 'bg-cyan-500/15 text-cyan-400 font-medium'
-                              : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
+                              ? `${section.color} font-semibold`
+                              : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
+                          style={isActive ? { backgroundColor: section.accent + '99' } : undefined}
                           data-testid={`nav-${item.path?.replace(/\//g, '') || 'home'}`}
                           onClick={() => setMobileOpen(false)}
                         >
@@ -622,8 +619,9 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                 }}
                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150
                   ${isActive
-                    ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.25)]'
+                    ? `${section.color}`
                     : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
+                style={isActive ? { backgroundColor: section.accent + '55', boxShadow: `0 0 12px ${section.accent}99` } : undefined}
               >
                 {section.iconLg}
               </button>
