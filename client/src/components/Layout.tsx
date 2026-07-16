@@ -208,6 +208,7 @@ const BASE_NAV: NavItem[] = [
       { label: "Special Missions", path: "/special-missions" },
       { label: "Ops Task Management", path: "/ops-tasks" },
       { label: "Pilot Handover Board", path: "/pilot-handover" },
+      { label: "Shift & Fleet Status", path: "/shift-fleet" },
     ],
   },
   {

@@ -55,6 +55,7 @@ import NEPTTasking from "@/pages/NEPTTasking";
 import GovernmentTenders from "@/pages/GovernmentTenders";
 import Invoicing from "@/pages/Invoicing";
 import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
+import ShiftFleetStatus from "@/pages/ShiftFleetStatus";
 import CharterQuote from "@/pages/CharterQuote";
 import CostOptimizer from "@/pages/CostOptimizer";
 import OpsTaskManagement from "@/pages/OpsTaskManagement";
@@ -159,6 +160,7 @@ function App() {
         <Router hook={useHashLocation}>
           {/* Standalone routes — no Layout wrapper */}
           <Route path="/ops-display" component={OpsRoomDisplay} />
+          <Route path="/shift-fleet" component={() => <ShiftFleetStatus role={role} />} />
           {/* All other routes wrapped in Layout */}
           <Route>
             <Layout role={role} onRoleChange={setRole}>
