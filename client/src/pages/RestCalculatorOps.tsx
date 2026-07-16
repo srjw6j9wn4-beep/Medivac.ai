@@ -1001,38 +1001,92 @@ export default function RestCalculatorOps({ role }: Props) {
 
                 {/* Pre-break */}
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1.5">
-                    Pre-Break Segment — <span className="font-semibold text-foreground">{sdPreBreak} hrs</span>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Pre-Break Segment — <span className="font-semibold text-foreground">{`${Math.floor(sdPreBreak)}h ${Math.round((sdPreBreak % 1) * 60).toString().padStart(2,'0')}m`}</span>
                   </label>
-                  <input type="range" min={0.5} max={12} step={0.5} value={sdPreBreak} onChange={e => setSdPreBreak(Number(e.target.value))}
-                    className="w-full accent-[#01696F]" />
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="range" min={1} max={720} step={1}
+                      value={Math.round(sdPreBreak * 60)}
+                      onChange={e => setSdPreBreak(parseInt(e.target.value) / 60)}
+                      className="flex-1 accent-[#01696F]"
+                    />
+                    <input
+                      type="text" pattern="[0-9]{1,2}:[0-5][0-9]" placeholder="HH:MM"
+                      value={`${Math.floor(sdPreBreak).toString().padStart(2,'0')}:${Math.round((sdPreBreak % 1) * 60).toString().padStart(2,'0')}`}
+                      onChange={e => {
+                        const parts = e.target.value.split(":");
+                        if (parts.length !== 2) return;
+                        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+                        if (Number.isNaN(h) || Number.isNaN(m) || m < 0 || m > 59) return;
+                        setSdPreBreak(h + m / 60);
+                      }}
+                      className="w-20 text-xs bg-background border border-border rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
                   <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
-                    <span>0.5h</span><span>12h</span>
+                    <span>1m</span><span>12h</span>
                   </div>
                 </div>
 
                 {/* SDRP */}
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1.5">
-                    Split-Duty Rest Period (SDRP) — <span className="font-semibold text-foreground">{sdSDRP} hrs</span>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Split-Duty Rest Period (SDRP) — <span className="font-semibold text-foreground">{`${Math.floor(sdSDRP)}h ${Math.round((sdSDRP % 1) * 60).toString().padStart(2,'0')}m`}</span>
                     {sdResult.nightwindowViolation && <span className="ml-2 text-[9px] text-orange-400 font-bold">⚠ Night window</span>}
                   </label>
-                  <input type="range" min={1} max={10} step={0.5} value={sdSDRP} onChange={e => setSdSDRP(Number(e.target.value))}
-                    className="w-full accent-[#01696F]" />
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="range" min={1} max={600} step={1}
+                      value={Math.round(sdSDRP * 60)}
+                      onChange={e => setSdSDRP(parseInt(e.target.value) / 60)}
+                      className="flex-1 accent-[#01696F]"
+                    />
+                    <input
+                      type="text" pattern="[0-9]{1,2}:[0-5][0-9]" placeholder="HH:MM"
+                      value={`${Math.floor(sdSDRP).toString().padStart(2,'0')}:${Math.round((sdSDRP % 1) * 60).toString().padStart(2,'0')}`}
+                      onChange={e => {
+                        const parts = e.target.value.split(":");
+                        if (parts.length !== 2) return;
+                        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+                        if (Number.isNaN(h) || Number.isNaN(m) || m < 0 || m > 59) return;
+                        setSdSDRP(h + m / 60);
+                      }}
+                      className="w-20 text-xs bg-background border border-border rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
                   <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
-                    <span>1h</span><span>10h</span>
+                    <span>1m</span><span>10h</span>
                   </div>
                 </div>
 
                 {/* Post-break */}
                 <div>
-                  <label className="text-xs text-muted-foreground block mb-1.5">
-                    Post-Break Segment — <span className="font-semibold text-foreground">{sdPostBreak} hrs</span>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Post-Break Segment — <span className="font-semibold text-foreground">{`${Math.floor(sdPostBreak)}h ${Math.round((sdPostBreak % 1) * 60).toString().padStart(2,'0')}m`}</span>
                   </label>
-                  <input type="range" min={0.5} max={8} step={0.5} value={sdPostBreak} onChange={e => setSdPostBreak(Number(e.target.value))}
-                    className="w-full accent-[#01696F]" />
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="range" min={1} max={480} step={1}
+                      value={Math.round(sdPostBreak * 60)}
+                      onChange={e => setSdPostBreak(parseInt(e.target.value) / 60)}
+                      className="flex-1 accent-[#01696F]"
+                    />
+                    <input
+                      type="text" pattern="[0-9]{1,2}:[0-5][0-9]" placeholder="HH:MM"
+                      value={`${Math.floor(sdPostBreak).toString().padStart(2,'0')}:${Math.round((sdPostBreak % 1) * 60).toString().padStart(2,'0')}`}
+                      onChange={e => {
+                        const parts = e.target.value.split(":");
+                        if (parts.length !== 2) return;
+                        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+                        if (Number.isNaN(h) || Number.isNaN(m) || m < 0 || m > 59) return;
+                        setSdPostBreak(h + m / 60);
+                      }}
+                      className="w-20 text-xs bg-background border border-border rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
                   <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
-                    <span>0.5h</span><span>8h</span>
+                    <span>1m</span><span>8h</span>
                   </div>
                 </div>
 
@@ -1094,7 +1148,7 @@ export default function RestCalculatorOps({ role }: Props) {
                       className="h-8 rounded-l-lg flex items-center justify-center text-[10px] font-bold text-white px-2"
                       style={{ backgroundColor: TEAL, minWidth: `${Math.max(sdPreBreak * 18, 40)}px` }}
                     >
-                      {sdPreBreak}h FDP
+                      {`${Math.floor(sdPreBreak)}h${Math.round((sdPreBreak%1)*60)>0?` ${Math.round((sdPreBreak%1)*60)}m`:''}`} FDP
                     </div>
                   </div>
                   {/* SDRP block */}
@@ -1104,7 +1158,7 @@ export default function RestCalculatorOps({ role }: Props) {
                       className={`h-8 flex items-center justify-center text-[10px] font-bold px-2 ${sdFacility === "sleeping" ? "bg-slate-600 text-slate-200" : "bg-amber-800/60 text-amber-200"}`}
                       style={{ minWidth: `${Math.max(sdSDRP * 18, 48)}px` }}
                     >
-                      {sdSDRP}h {sdFacility === "sleeping" ? "Sleep" : "Rest"}
+                      {`${Math.floor(sdSDRP)}h${Math.round((sdSDRP%1)*60)>0?` ${Math.round((sdSDRP%1)*60)}m`:''}`} {sdFacility === "sleeping" ? "Sleep" : "Rest"}
                     </div>
                   </div>
                   {/* Post-break block */}
@@ -1114,7 +1168,7 @@ export default function RestCalculatorOps({ role }: Props) {
                       className={`h-8 rounded-r-lg flex items-center justify-center text-[10px] font-bold px-2 ${sdResult.valid ? "text-white" : "bg-red-900/60 text-red-200"}`}
                       style={sdResult.valid ? { backgroundColor: TEAL, minWidth: `${Math.max(sdPostBreak * 18, 40)}px` } : { minWidth: `${Math.max(sdPostBreak * 18, 40)}px` }}
                     >
-                      {sdPostBreak}h FDP
+                      {`${Math.floor(sdPostBreak)}h${Math.round((sdPostBreak%1)*60)>0?` ${Math.round((sdPostBreak%1)*60)}m`:''}`} FDP
                     </div>
                   </div>
                   {/* End marker */}
@@ -1125,8 +1179,8 @@ export default function RestCalculatorOps({ role }: Props) {
                 </div>
                 {/* Total FDP summary */}
                 <div className="text-[10px] text-muted-foreground mt-2">
-                  Total span: <span className="text-foreground font-semibold">{(sdPreBreak + sdSDRP + sdPostBreak).toFixed(1)} hrs</span>
-                  &nbsp;·&nbsp; Flight time: <span className="text-foreground font-semibold">{(sdPreBreak + sdPostBreak).toFixed(1)} hrs</span>
+                  Total span: <span className="text-foreground font-semibold">{`${Math.floor(sdPreBreak + sdSDRP + sdPostBreak)}h ${Math.round(((sdPreBreak + sdSDRP + sdPostBreak) % 1) * 60).toString().padStart(2,'0')}m`}</span>
+                  &nbsp;·&nbsp; Flight time: <span className="text-foreground font-semibold">{`${Math.floor(sdPreBreak + sdPostBreak)}h ${Math.round(((sdPreBreak + sdPostBreak) % 1) * 60).toString().padStart(2,'0')}m`}</span>
                   &nbsp;·&nbsp; Limit: <span className="font-semibold" style={{ color: sdResult.valid ? TEAL : "#ef4444" }}>{sdResult.maxTotalFDP.toFixed(1)} hrs</span>
                 </div>
               </div>
