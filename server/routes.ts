@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
-import { storage, seedDefaultRates } from "./storage";
+import { storage, seedDefaultRates, supabase } from "./storage";
 import { getNotamsForAirport, getNotamsForAirports, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } from "./notam";
 import webpush from "web-push";
 
@@ -2473,6 +2473,38 @@ Produce the optimised run plan as JSON.`;
     }
   });
 
+
+  // ── RBAC Permissions persistence ────────────────────────────────────────
+  // GET  /api/rbac-permissions — returns saved matrix or null if not yet saved
+  app.get('/api/rbac-permissions', async (_req: Request, res: Response) => {
+    try {
+      const { data, error } = await supabase
+        .from('rbac_permissions')
+        .select('matrix, updated_at, updated_by')
+        .eq('settings_key', 'default')
+        .single();
+      if (error || !data) return res.json({ matrix: null });
+      return res.json({ matrix: JSON.parse(data.matrix), updatedAt: data.updated_at, updatedBy: data.updated_by });
+    } catch {
+      return res.json({ matrix: null });
+    }
+  });
+
+  // PUT  /api/rbac-permissions — upsert the full matrix (admin only on frontend)
+  app.put('/api/rbac-permissions', async (req: Request, res: Response) => {
+    try {
+      const { matrix, updatedBy } = req.body as { matrix: Record<string, Record<string, string>>; updatedBy: string };
+      if (!matrix || typeof matrix !== 'object') return res.status(400).json({ error: 'Invalid matrix' });
+      const updatedAt = new Date().toISOString();
+      const payload = { settings_key: 'default', matrix: JSON.stringify(matrix), updated_at: updatedAt, updated_by: updatedBy ?? 'admin' };
+      const { error } = await supabase.from('rbac_permissions').upsert(payload, { onConflict: 'settings_key' });
+      if (error) throw error;
+      return res.json({ ok: true, updatedAt });
+    } catch (err: any) {
+      console.error('[rbac-permissions PUT]', err);
+      return res.status(500).json({ error: err.message ?? 'Save failed' });
+    }
+  });
 
   return httpServer;
 }

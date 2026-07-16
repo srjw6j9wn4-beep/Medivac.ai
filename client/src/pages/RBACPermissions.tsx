@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import type { UserRole } from "@/lib/data";
 import { ROLES } from "@/lib/data";
 
@@ -298,6 +300,37 @@ export default function RBACPermissions({ role }: Props) {
   const [selectedRole, setSelectedRole] = useState<UserRole>("pilot");
   const [view, setView] = useState<"role" | "matrix">("role");
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const qc = useQueryClient();
+
+  // Load saved matrix from backend on mount
+  const { data: savedData } = useQuery<{ matrix: PermMatrix | null }>({
+    queryKey: ["/api/rbac-permissions"],
+    staleTime: 0,
+  });
+
+  // When backend data arrives, replace local state (unless it's null — use defaults)
+  useEffect(() => {
+    if (savedData?.matrix) {
+      setPerms(savedData.matrix);
+    }
+  }, [savedData]);
+
+  const saveMutation = useMutation({
+    mutationFn: (matrix: PermMatrix) =>
+      apiRequest("PUT", "/api/rbac-permissions", { matrix, updatedBy: role }),
+    onSuccess: () => {
+      setSaved(true);
+      setSaveError(null);
+      qc.invalidateQueries({ queryKey: ["/api/rbac-permissions"] });
+      setTimeout(() => setSaved(false), 2500);
+    },
+    onError: (err: any) => {
+      setSaveError(err?.message ?? "Save failed — check connection");
+      setTimeout(() => setSaveError(null), 4000);
+    },
+  });
 
   const isAdmin = role === "admin";
 
@@ -312,8 +345,7 @@ export default function RBACPermissions({ role }: Props) {
   }
 
   function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    saveMutation.mutate(perms);
   }
 
   const tabs = [
@@ -330,10 +362,13 @@ export default function RBACPermissions({ role }: Props) {
           <p className="text-sm text-muted-foreground mt-0.5">Role-based access control — module-level permissions per role</p>
         </div>
         {isAdmin && (
-          <button onClick={handleSave}
-            className={`px-4 py-2 border text-xs font-semibold rounded-lg transition-colors ${saved ? "bg-green-400/20 border-green-400/30 text-green-400" : "bg-cyan-400/10 hover:bg-cyan-400/20 border-cyan-400/30 text-cyan-400"}`}>
-            {saved ? "✓ Saved" : "Save Changes"}
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button onClick={handleSave} disabled={saveMutation.isPending}
+              className={`px-4 py-2 border text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 ${saved ? "bg-green-400/20 border-green-400/30 text-green-400" : "bg-cyan-400/10 hover:bg-cyan-400/20 border-cyan-400/30 text-cyan-400"}`}>
+              {saveMutation.isPending ? "Saving…" : saved ? "✓ Saved" : "Save Changes"}
+            </button>
+            {saveError && <span className="text-[10px] text-red-400">{saveError}</span>}
+          </div>
         )}
       </div>
 

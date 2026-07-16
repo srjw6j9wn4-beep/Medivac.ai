@@ -556,3 +556,13 @@ export const staffSuggestions = sqliteTable('staff_suggestions', {
 export const insertStaffSuggestionSchema = createInsertSchema(staffSuggestions).omit({ id: true });
 export type InsertStaffSuggestion = z.infer<typeof insertStaffSuggestionSchema>;
 export type StaffSuggestion = typeof staffSuggestions.$inferSelect;
+
+// ── RBAC Permissions ───────────────────────────────────────────────────────
+// Stores the full permission matrix as a single JSON blob, keyed by a
+// singleton row (settings_key = 'default'). Admins edit via the RBAC page.
+export const rbacPermissions = sqliteTable('rbac_permissions', {
+  settingsKey: text('settings_key').primaryKey(),   // always 'default'
+  matrix:      text('matrix').notNull(),            // JSON: Record<role, Record<moduleId, PermLevel>>
+  updatedAt:   text('updated_at').notNull(),
+  updatedBy:   text('updated_by').notNull(),
+});
