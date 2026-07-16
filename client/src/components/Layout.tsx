@@ -9,6 +9,7 @@ import {
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
   Moon, Sun, SunMoon, Menu, X, PanelLeftClose, PanelLeftOpen,
   Bell, BellRing, CheckCheck, ExternalLink, TrendingUp, HelpCircle,
+  LayoutDashboard, Plane, Zap, Wrench, HeartPulse, Bot, Briefcase,
 } from "lucide-react";
 import EmergencyButton from "@/components/EmergencyButton";
 import HelpDrawer from "@/components/HelpDrawer";
@@ -180,117 +181,142 @@ interface NavItem {
   restricted?: UserRole[];
 }
 
-const BASE_NAV: NavItem[] = [
+const NAV: NavItem[] = [
+  // ── Demo ──────────────────────────────────────────────────────────
   {
     label: "Demo",
     icon: <PlayCircle size={16} />,
     iconLg: <PlayCircle size={28} />,
     children: [
-      { label: "Demo Overview", path: "/" },
+      { label: "Demo Overview",   path: "/" },
       { label: "Client Demo Mode", path: "/demo-mode" },
     ],
   },
+  // ── Dashboards ────────────────────────────────────────────────────
   {
-    label: "Mission Operations",
-    icon: <Activity size={16} />,
-    iconLg: <Activity size={28} />,
+    label: "Dashboards",
+    icon: <LayoutDashboard size={16} />,
+    iconLg: <LayoutDashboard size={28} />,
     children: [
-      { label: "NEPT Tasking", path: "/nept-tasking" },
-      { label: "The 8:45", path: "/morning-brief" },
-      { label: "Passenger Manifest", path: "/passenger-manifest" },
-      { label: "Mission Board", path: "/missions" },
-      { label: "NSW Flight Map", path: "/map" },
-      { label: "Dispatch & Intake", path: "/dispatch" },
-      { label: "Crew Rest Calculator", path: "/rest-calculator" },
-      { label: "Charter Quote", path: "/charter-quote" },
-      { label: "Operational Risk Assessment", path: "/ora" },
-      { label: "Flight Planning", path: "/flight-planning" },
-      { label: "Mission Optimiser", path: "/mission-optimiser" },
-      { label: "Special Missions", path: "/special-missions" },
-      { label: "Ops Task Management", path: "/ops-tasks" },
-      { label: "Pilot Handover Board", path: "/pilot-handover" },
+      { label: "The 8:45",            path: "/morning-brief" },
       { label: "Shift & Fleet Status", path: "/shift-fleet" },
-      { label: "Senior Base Pilot Portal", path: "/sbp-portal" },
+      { label: "Ops Room Display",     path: "/ops-display" },
     ],
   },
+  // ── Missions ──────────────────────────────────────────────────────
   {
-    label: "People & Aircraft",
+    label: "Missions",
+    icon: <Plane size={16} />,
+    iconLg: <Plane size={28} />,
+    children: [
+      { label: "Dispatch & Intake",   path: "/dispatch" },
+      { label: "NEPT Tasking",        path: "/nept-tasking" },
+      { label: "Passenger Manifest",  path: "/passenger-manifest" },
+      { label: "Mission Board",       path: "/missions" },
+      { label: "NSW Flight Map",      path: "/map" },
+      { label: "Flight Planning",     path: "/flight-planning" },
+      { label: "Special Missions",    path: "/special-missions" },
+      { label: "Ferry Flights",       path: "/ferry" },
+    ],
+  },
+  // ── Operations ────────────────────────────────────────────────────
+  {
+    label: "Operations",
+    icon: <Zap size={16} />,
+    iconLg: <Zap size={28} />,
+    children: [
+      { label: "Crew Rest Calculator",        path: "/rest-calculator" },
+      { label: "Charter Quote",               path: "/charter-quote" },
+      { label: "Mission Optimiser",           path: "/mission-optimiser" },
+      { label: "Operational Risk Assessment", path: "/ora" },
+      { label: "Ops Task Management",         path: "/ops-tasks" },
+      { label: "Regulations Reference",       path: "/regulations" },
+      { label: "Senior Base Pilot Portal",    path: "/sbp-portal" },
+    ],
+  },
+  // ── Assets ────────────────────────────────────────────────────────
+  {
+    label: "Assets",
+    icon: <Wrench size={16} />,
+    iconLg: <Wrench size={28} />,
+    children: [
+      { label: "Pilot Handover Board", path: "/pilot-handover" },
+      { label: "Tech & Journey Log",   path: FEATURES.TECH_LOG ? "/tech-log" : "/techlog" },
+      { label: "Aircraft Status",      path: "/aircraft" },
+      { label: "Ground Vehicles",      path: "/ground-vehicles" },
+      { label: "Engineering",          path: "/engineering" },
+      { label: "Maintenance Planner",  path: "/maint-planner" },
+      { label: "Asset Utilisation",    path: "/asset-utilisation" },
+    ],
+  },
+  // ── Crew & People ─────────────────────────────────────────────────
+  {
+    label: "Crew & People",
     icon: <Users size={16} />,
     iconLg: <Users size={28} />,
     children: [
+      { label: "Crew Roster",            path: "/roster" },
       { label: "Org Chart & Key Contacts", path: "/org-chart" },
-      { label: "Crew Roster", path: "/roster" },
-      { label: "Duty & FRMS", path: "/frms" },
-      { label: "Aircraft Status", path: "/aircraft" },
-      { label: "Engineering", path: "/engineering" },
-      { label: "Maintenance Planner", path: "/maint-planner" },
-      { label: "Asset Utilisation", path: "/asset-utilisation" },
-      { label: "Ferry Flights", path: "/ferry" },
-      { label: "Tech Log", path: "/techlog" },
-      { label: "Check & Training", path: "/check-training" },
-      { label: "Regulations Reference", path: "/regulations" },
-      { label: "Medical Equipment", path: "/medical-equipment" },
+      { label: "Duty & FRMS",            path: "/frms" },
+      { label: "Check & Training",       path: "/check-training" },
+    ],
+  },
+  // ── Clinical ──────────────────────────────────────────────────────
+  {
+    label: "Clinical",
+    icon: <HeartPulse size={16} />,
+    iconLg: <HeartPulse size={28} />,
+    children: [
+      { label: "Medical Equipment",    path: "/medical-equipment" },
       { label: "Stock Usage & Orders", path: "/stock-usage" },
       { label: "After-Hours AI Med Line", path: "/after-hours" },
-      { label: "Ground Vehicles", path: "/ground-vehicles" },
+      { label: "Telehealth Portal",    path: "/telehealth" },
     ],
   },
+  // ── AI & Comms ────────────────────────────────────────────────────
   {
-    label: "AI & Communications",
-    icon: <Radio size={16} />,
-    iconLg: <Radio size={28} />,
+    label: "AI & Comms",
+    icon: <Bot size={16} />,
+    iconLg: <Bot size={28} />,
     children: [
       { label: "Jennifer — Presenter", path: "/jennifer" },
-      { label: "Jennifer — Live Q&A", path: "/jennifer-live-qa" },
-      { label: "Graham — Live Q&A", path: "/jennifer-live" },
-      { label: "AI Mission Analyst", path: "/ai-analyst" },
-      { label: "Telehealth Portal", path: "/telehealth", restricted: ['engineer'] },
-      { label: "Document AI", path: "/doc-ai" },
+      { label: "Jennifer — Live Q&A",  path: "/jennifer-live-qa" },
+      { label: "Graham — Live Q&A",    path: "/jennifer-live" },
+      { label: "AI Mission Analyst",   path: "/ai-analyst" },
+      { label: "Document AI",          path: "/doc-ai" },
     ],
   },
+  // ── Business ──────────────────────────────────────────────────────
   {
-    label: "Business & Compliance",
-    icon: <Shield size={16} />,
-    iconLg: <Shield size={28} />,
+    label: "Business",
+    icon: <Briefcase size={16} />,
+    iconLg: <Briefcase size={28} />,
     children: [
-      { label: "Invoicing", path: "/invoicing" },
-      { label: "Cost Optimizer", path: "/cost-optimizer" },
-      { label: "ISO Compliance", path: "/iso", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
-      { label: "Contract Compliance", path: "/contracts", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
-      { label: "Fee Reconciliation", path: "/finance", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
-      { label: "Audit & Reports", path: "/audit" },
-      { label: "Government Tenders", path: "/government-tenders" },
-      { label: "Payroll & Leave", path: "/payroll-leave", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
+      { label: "Invoicing",           path: "/invoicing" },
+      { label: "Fee Reconciliation",  path: "/finance" },
+      { label: "Cost Optimizer",      path: "/cost-optimizer" },
+      { label: "Audit & Reports",     path: "/audit" },
+      { label: "Government Tenders",  path: "/government-tenders" },
+      { label: "Contract Compliance", path: "/contracts" },
+      { label: "ISO Compliance",      path: "/iso" },
+      { label: "Payroll & Leave",     path: "/payroll-leave" },
     ],
   },
+  // ── Administration ────────────────────────────────────────────────
   {
     label: "Administration",
     icon: <Settings size={16} />,
     iconLg: <Settings size={28} />,
     children: [
-      { label: "Idea Hub", path: "/idea-hub" },
+      { label: "User Management",    path: "/users" },
+      { label: "RBAC Permissions",   path: "/rbac" },
+      { label: "System Settings",    path: "/settings" },
+      { label: "API Integration Hub", path: "/api-integrations" },
       { label: "Project Management", path: "/projects" },
-      { label: "User Management", path: "/users", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
-      { label: "RBAC Permissions", path: "/rbac", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety'] },
-      { label: "System Settings", path: "/settings", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety', 'senior_management'] },
-      { label: "API Integration Hub", path: "/api-integrations", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety', 'senior_management'] },
+      { label: "Idea Hub",           path: "/idea-hub" },
     ],
   },
 ];
-
-const TECH_LOG_NAV: NavItem = {
-  label: "Tech & Journey Log",
-  icon: <BookOpen size={16} />,
-  iconLg: <BookOpen size={28} />,
-  children: [
-    { label: "Tech & Journey Log", path: "/tech-log" },
-  ],
-};
-
-// Inject Tech Log section between Mission Operations and People & Aircraft when enabled
-const NAV: NavItem[] = FEATURES.TECH_LOG
-  ? [...BASE_NAV.slice(0, 2), TECH_LOG_NAV, ...BASE_NAV.slice(2)]
-  : BASE_NAV;
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -300,17 +326,17 @@ interface LayoutProps {
 
 function getDefaultSections(r: UserRole): string[] {
   switch (r) {
-    case 'pilot':             return ['Mission Operations'];
+    case 'pilot':             return ['Missions'];
     case 'nurse':
     case 'senior_flight_nurse':
-    case 'ordering_nurse':
-    case 'doctor':            return ['Mission Operations'];
-    case 'dispatcher':        return ['Mission Operations'];
-    case 'engineer':          return ['People & Aircraft'];
+    case 'ordering_nurse':    return ['Clinical'];
+    case 'doctor':            return ['Missions'];
+    case 'dispatcher':        return ['Missions'];
+    case 'engineer':          return ['Assets'];
     case 'admin':             return ['Administration'];
     case 'safety':
-    case 'senior_management': return ['Business & Compliance'];
-    default:                  return ['Mission Operations'];
+    case 'senior_management': return ['Business'];
+    default:                  return ['Missions'];
   }
 }
 
