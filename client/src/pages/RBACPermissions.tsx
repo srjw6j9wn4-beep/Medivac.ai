@@ -540,10 +540,10 @@ export default function RBACPermissions({ role }: Props) {
 
       {/* Full matrix view */}
       {view === "matrix" && (
-        <div className="bg-card border border-card-border rounded-xl overflow-auto">
+        <div className="bg-card border border-card-border rounded-xl overflow-x-auto">
           <table className="text-[10px] w-full">
             <thead>
-              <tr className="border-b border-card-border sticky top-0 z-20 bg-card">
+              <tr className="border-b border-card-border sticky top-0 z-20 bg-card shadow-sm">
                 <th className="text-left p-2 pl-4 font-semibold text-muted-foreground sticky left-0 bg-card z-30 min-w-32">Module</th>
                 {ROLES.map(r => (
                   <th key={r.id} className="p-2 text-center font-semibold min-w-20 bg-card">
