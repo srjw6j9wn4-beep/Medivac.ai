@@ -487,7 +487,7 @@ export default function RBACPermissions({ role }: Props) {
       {view === "role" && (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Role picker */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 lg:sticky lg:top-4 lg:self-start">
             {ROLES.map(r => (
               <button key={r.id} onClick={() => setSelectedRole(r.id)}
                 className={`w-full text-left p-3 rounded-xl border transition-colors flex items-center gap-2 ${selectedRole === r.id ? "border-cyan-400/50 bg-cyan-400/10" : "border-card-border bg-card hover:border-cyan-400/30"}`}>
