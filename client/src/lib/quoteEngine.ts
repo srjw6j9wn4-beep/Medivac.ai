@@ -119,6 +119,7 @@ export interface LegInput {
   distanceNm: number;
   departureTime: string; // HH:MM local
   refuelStop: boolean;
+  refuelStopLocation?: string;
   groundTransport?: { type: GroundTransportType; legs: number };
 }
 

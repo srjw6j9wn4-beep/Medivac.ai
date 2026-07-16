@@ -304,7 +304,7 @@ function RestCard({ event, onAck }: { event: RestEvent; onAck: (id: string) => v
 
         {/* Notes + FDP hours */}
         <div className="flex items-start gap-3 text-[10px] text-muted-foreground border-t border-card-border/50 pt-2.5">
-          <span>FDP recorded: <strong className="text-foreground">{event.fdpHours.toFixed(1)} hrs</strong></span>
+          <span>FDP recorded: <strong className="text-foreground">{`${Math.floor(event.fdpHours)}h ${Math.round((event.fdpHours % 1) * 60).toString().padStart(2,'0')}m`}</strong></span>
           {event.notes && <span className="flex-1 italic">"{event.notes}"</span>}
         </div>
 
@@ -660,7 +660,7 @@ export default function RestCalculatorOps({ role }: Props) {
                 <div className="text-xs font-bold text-orange-300">Auto-detected — FDP Limit Reached</div>
                 <div className="text-[11px] text-muted-foreground">
                   {alert.crew} · {alert.aircraft} · arrived {alert.location} at {alert.arrivalTime} ·
-                  FDP recorded {alert.fdpHours.toFixed(1)} hrs · <span className="opacity-60">{alert.source}</span>
+                  FDP recorded {`${Math.floor(alert.fdpHours)}h ${Math.round((alert.fdpHours % 1) * 60).toString().padStart(2,'0')}m`} · <span className="opacity-60">{alert.source}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -764,18 +764,38 @@ export default function RestCalculatorOps({ role }: Props) {
 
             {/* FDP hours with quick-calc */}
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">FDP Hours Completed Today</label>
-              <div className="flex gap-2">
+              <label className="text-xs text-muted-foreground block mb-1">
+                FDP Hours Completed Today — <span className="font-semibold text-foreground">{`${Math.floor(fdpHours)}h ${Math.round((fdpHours % 1) * 60).toString().padStart(2,'0')}m`}</span>
+              </label>
+              <div className="flex gap-2 items-center">
                 <input
-                  type="number"
-                  step="0.5"
+                  type="range"
                   min="0"
-                  max="16"
-                  value={fdpHours}
-                  onChange={e => setFdpHours(parseFloat(e.target.value) || 0)}
-                  className="flex-1 text-sm bg-background border border-card-border rounded-lg px-3 py-1.5 focus:outline-none font-mono"
+                  max="1200"
+                  step="1"
+                  value={Math.round(fdpHours * 60)}
+                  onChange={e => setFdpHours(parseInt(e.target.value) / 60)}
+                  className="flex-1 accent-[#01696F]"
                   data-testid="input-fdp-hours"
                 />
+                <input
+                  type="text"
+                  pattern="[0-9]{1,2}:[0-5][0-9]"
+                  placeholder="HH:MM"
+                  value={`${Math.floor(fdpHours).toString().padStart(2,'0')}:${Math.round((fdpHours % 1) * 60).toString().padStart(2,'0')}`}
+                  onChange={e => {
+                    const parts = e.target.value.split(":");
+                    if (parts.length !== 2) return;
+                    const h = parseInt(parts[0], 10);
+                    const m = parseInt(parts[1], 10);
+                    if (Number.isNaN(h) || Number.isNaN(m) || m < 0 || m > 59) return;
+                    setFdpHours(h + m / 60);
+                  }}
+                  className="w-20 text-xs bg-background border border-border rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  data-testid="input-fdp-hours-hhmm"
+                />
+              </div>
+              <div className="flex gap-2 mt-2">
                 <div className="flex items-center gap-1">
                   <input
                     type="time"

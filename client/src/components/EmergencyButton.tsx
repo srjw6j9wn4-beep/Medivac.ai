@@ -93,11 +93,78 @@ interface OverlayProps {
   elapsedSecs: number;
 }
 
+// ── Section A/B/C static data ────────────────────────────────
+const ALERT_POSITIONS = [
+  "Pilot in Command", "Flight Nurse (Team Lead)", "Dispatch (On Duty)",
+  "Base Manager", "Operations Manager", "Chief Pilot",
+  "Medical Director", "Engineering (On Call)", "CEO / Executive On-Call",
+];
+
+const IAT_CHECKLIST_ITEMS = [
+  "Confirm emergency type and aircraft/location",
+  "Notify IAT members (Pilot in Command, Medical Director, Operations Manager, CEO)",
+  "Establish communications bridge (phone/radio/Teams)",
+  "Confirm crew status and patient status (if applicable)",
+  "Review applicable ERP procedure for emergency type",
+  "Assign IAT roles: Incident Controller, Safety Officer, Communications Officer",
+  "Document all decisions with timestamps",
+  "Initiate stand-down criteria review",
+];
+
+function buildDraftAgenda(event: { timestamp: string; role: string; phase: Phase }): string {
+  const type = event.phase === "airborne" ? "Airborne Emergency" : "Ground / First-On-Scene Emergency";
+  return `INITIAL ASSESSMENT TEAM MEETING — DRAFT AGENDA
+Initiated: ${event.timestamp}
+Convened by: ${event.role}
+
+1. SITUATION REPORT (5 min)
+   - Confirm emergency type: ${type}
+   - Aircraft/Location: [details]
+   - Crew and patient status
+
+2. IMMEDIATE ACTIONS REVIEW (5 min)
+   - Steps completed
+   - Steps pending
+
+3. RESOURCE ASSESSMENT (5 min)
+   - Assets available
+   - External agencies notified (AMSA, CASA, AFP as applicable)
+
+4. COMMUNICATION PLAN (5 min)
+   - Media / NOK notifications
+   - Internal escalation chain
+
+5. DECISION LOG (ongoing)
+   - Record all decisions with timestamp and responsible officer
+
+Next review in: 15 minutes`;
+}
+
 function EmergencyOverlay({
   event, isAirborne, pulse, steps, isDispatch, toggleStep, standDown, atcPanel, emergencyServicesPanel,
   minimised, onMinimise, onMaximise, elapsedSecs,
 }: OverlayProps) {
   const completedCount = steps.filter(s => s.done).length;
+
+  // ── Section A: Push notification placeholder state ──────
+  const [manualAlertLog, setManualAlertLog] = useState<string | null>(null);
+
+  // ── Section B: IAT checklist state ───────────────────────
+  const [iatChecklist, setIatChecklist] = useState<Record<number, boolean>>({});
+  const toggleIatItem = (idx: number) => {
+    setIatChecklist(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  // ── Section C: Draft meeting agenda state ────────────────
+  const [agendaText, setAgendaText] = useState(() => buildDraftAgenda(event));
+  const [copyLabel, setCopyLabel] = useState("Copy Agenda");
+  const handleCopyAgenda = () => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(agendaText).catch(() => {});
+    }
+    setCopyLabel("Copied!");
+    setTimeout(() => setCopyLabel("Copy Agenda"), 1500);
+  };
 
   // ── Minimised: full-screen red throb + floating status pill ────────────
   if (minimised) {
@@ -360,6 +427,107 @@ function EmergencyOverlay({
               })}
             </div>
             {!isDispatch && <p style={{ marginTop:"8px", fontSize:"10px", color:"rgba(255,255,255,0.75)", textAlign:"center" }}>Checklist controlled by Dispatch</p>}
+          </div>
+
+          {/* ── Section A: Push Notification Dispatch (placeholder) ─────────── */}
+          <div style={{ borderRadius:"10px", border:"2px solid rgba(255,255,255,0.4)", background:"rgba(0,0,0,0.35)", padding:"0.85rem" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"8px", flexWrap:"wrap" }}>
+              <Radio size={14} style={{ color:"#fff" }} />
+              <span style={{ fontSize:"11px", fontWeight:700, color:"#fff", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+                Alert Key Positions
+              </span>
+            </div>
+            <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.85)", marginBottom:"8px", lineHeight:1.5 }}>
+              Push notifications will be sent automatically when ERP integration is complete.
+            </p>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"10px" }}>
+              {ALERT_POSITIONS.map(pos => (
+                <span key={pos} style={{
+                  fontSize:"9px", fontWeight:700, padding:"4px 9px", borderRadius:"9999px",
+                  background:"rgba(255,255,255,0.15)", color:"#fff", border:"1px solid rgba(255,255,255,0.4)",
+                }}>
+                  {pos}
+                </span>
+              ))}
+            </div>
+            <button
+              onClick={() => setManualAlertLog(`Manual notification logged at ${event.timestamp} by ${event.role}.`)}
+              style={{
+                display:"flex", alignItems:"center", gap:"6px", padding:"8px 14px", borderRadius:"7px",
+                border:"1.5px solid rgba(251,191,36,0.9)", background:"rgba(217,119,6,0.9)", color:"#fff",
+                fontSize:"11px", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", cursor:"pointer",
+              }}
+            >
+              <AlertCircle size={12} /> Send Manual Alert
+            </button>
+            {manualAlertLog && (
+              <div style={{ marginTop:"8px", fontSize:"10px", color:"#FDE68A", background:"rgba(0,0,0,0.4)", border:"1px solid rgba(251,191,36,0.4)", borderRadius:"7px", padding:"7px 9px" }}>
+                {manualAlertLog}
+              </div>
+            )}
+          </div>
+
+          {/* ── Section B: IAT Checklist ──────────────────────────────────────── */}
+          <div style={{ borderRadius:"10px", border:"2px solid rgba(255,255,255,0.4)", background:"rgba(0,0,0,0.35)", padding:"0.85rem" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"8px", flexWrap:"wrap" }}>
+              <Shield size={14} style={{ color:"#fff" }} />
+              <span style={{ fontSize:"11px", fontWeight:700, color:"#fff", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+                Initial Assessment Team (IAT) — Checklist
+              </span>
+            </div>
+            <p style={{ fontSize:"10px", color:"rgba(255,255,255,0.85)", marginBottom:"10px", lineHeight:1.5 }}>
+              ERP &amp; IAT documents will be imported at a later date. This is a placeholder framework.
+            </p>
+            <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
+              {IAT_CHECKLIST_ITEMS.map((item, idx) => {
+                const checked = !!iatChecklist[idx];
+                return (
+                  <label key={idx} style={{ display:"flex", alignItems:"flex-start", gap:"9px", cursor:"pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleIatItem(idx)}
+                      style={{
+                        marginTop:"2px", width:"14px", height:"14px", flexShrink:0,
+                        accentColor:"#fff", border:"1.5px solid #fff", borderRadius:"3px",
+                      }}
+                    />
+                    <span style={{
+                      fontSize:"11px", color:"#fff", lineHeight:1.4,
+                      textDecoration: checked ? "line-through" : "none",
+                      opacity: checked ? 0.55 : 1,
+                    }}>
+                      {idx + 1}. {item}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Section C: Draft Meeting Agenda ──────────────────────────────── */}
+          <div style={{ borderRadius:"10px", border:"2px solid rgba(255,255,255,0.4)", background:"rgba(0,0,0,0.35)", padding:"0.85rem" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"8px", flexWrap:"wrap" }}>
+              <Clock size={14} style={{ color:"#fff" }} />
+              <span style={{ fontSize:"11px", fontWeight:700, color:"#fff", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+                IAT Meeting — Draft Agenda
+              </span>
+            </div>
+            <textarea
+              value={agendaText}
+              onChange={e => setAgendaText(e.target.value)}
+              className="bg-black/30 border border-white/20 rounded p-3 text-xs font-mono text-white w-full min-h-[220px] focus:outline-none focus:border-white/50"
+            />
+            <button
+              onClick={handleCopyAgenda}
+              style={{
+                marginTop:"8px", display:"flex", alignItems:"center", gap:"6px", padding:"7px 14px", borderRadius:"7px",
+                border:"1.5px solid rgba(255,255,255,0.6)", background:"rgba(0,0,0,0.35)", color:"#fff",
+                fontSize:"11px", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", cursor:"pointer",
+              }}
+            >
+              <CheckCircle2 size={12} /> {copyLabel}
+            </button>
           </div>
         </div>
       </div>

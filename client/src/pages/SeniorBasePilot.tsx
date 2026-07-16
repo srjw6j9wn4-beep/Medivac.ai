@@ -6,7 +6,8 @@ import {
   ClipboardList, Timer, CalendarCheck, Wifi, WifiOff, MapPin,
   Shield, FileText, Coins, Send, Plus, X, CloudSun, CloudRain,
   Cloud, Sun, Wind, Thermometer, Zap, Activity, Inbox, User,
-  RefreshCw, Lock, Building, Phone
+  RefreshCw, Lock, Building, Phone, Bell, BookOpen, ChevronDown,
+  FolderOpen, Edit3, ExternalLink
 } from "lucide-react";
 import type { UserRole } from "@/lib/data";
 
@@ -18,14 +19,14 @@ interface WeatherData { current: WeatherCurrent; daily: WeatherDay[]; locationNa
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const CARD = "bg-[#1C1B19] border border-[#393836] rounded-xl";
 const HF = { fontFamily: "'Cabinet Grotesk', sans-serif" };
-const BASES = ["Dubbo", "Broken Hill", "Bankstown", "Essendon", "Launceston"] as const;
+// Essendon is managed under Bankstown — same Base Manager
+const BASES = ["Dubbo", "Broken Hill", "Bankstown", "Launceston"] as const;
 type Base = typeof BASES[number];
 
-const BASE_META: Record<Base, { icao: string; lat: number; lon: number; tz: string; code: string }> = {
+const BASE_META: Record<Base, { icao: string; lat: number; lon: number; tz: string; code: string; subBases?: string[] }> = {
   "Dubbo":        { icao: "YSDU", lat: -32.2169, lon: 148.5740, tz: "Australia/Sydney",    code: "DU"  },
   "Broken Hill":  { icao: "YBHI", lat: -31.9920, lon: 141.4722, tz: "Australia/Sydney",    code: "BHI" },
-  "Bankstown":    { icao: "YSBK", lat: -33.9244, lon: 150.9883, tz: "Australia/Sydney",    code: "BK"  },
-  "Essendon":     { icao: "YMEN", lat: -37.7279, lon: 144.9018, tz: "Australia/Melbourne", code: "ESS" },
+  "Bankstown":    { icao: "YSBK", lat: -33.9244, lon: 150.9883, tz: "Australia/Sydney",    code: "BK",  subBases: ["Essendon (YMEN)"] },
   "Launceston":   { icao: "YMLT", lat: -41.5450, lon: 147.2140, tz: "Australia/Hobart",    code: "TAS" },
 };
 
@@ -48,7 +49,7 @@ const ALL_PILOTS: CrewMember[] = [
   { id: 'P7', name: 'Capt. Brooke Henson',  role: 'Captain / PIC', base: 'Launceston',  dutyStatus: 'On Duty',  currency: true,  qualifications: ['B350','IFR','TAS Amb'],      week: ['ON','ON','ON','ON','OFF','OFF','OFF'] },
   { id: 'P8', name: 'F/O Daniel Frost',     role: 'First Officer',  base: 'Launceston',  dutyStatus: 'On Call',  currency: true,  qualifications: ['B350','IFR'],                week: ['OFF','ON','ON','ON','ON','OFF','OFF'] },
   { id: 'P9', name: 'Capt. M. O\'Brien',    role: 'Captain / PIC', base: 'Bankstown',   dutyStatus: 'On Duty',  currency: true,  qualifications: ['B200','B350','IFR'],         week: ['ON','ON','ON','ON','OFF','OFF','OFF'] },
-  { id: 'P10',name: 'F/O B. Kwan',          role: 'First Officer',  base: 'Essendon',    dutyStatus: 'On Duty',  currency: true,  qualifications: ['B200','IFR'],                week: ['ON','ON','ON','ON','OFF','OFF','OFF'] },
+  { id: 'P10',name: 'F/O B. Kwan',          role: 'First Officer',  base: 'Bankstown',   dutyStatus: 'On Duty',  currency: true,  qualifications: ['B200','IFR'],                week: ['ON','ON','ON','ON','OFF','OFF','OFF'], notes: 'Stationed: Essendon (YMEN)' },
 ];
 
 const ALL_OPS: CrewMember[] = [
@@ -59,7 +60,7 @@ const ALL_OPS: CrewMember[] = [
   { id: 'O5', name: 'Dispatcher L. Yau',role: 'Flight Dispatcher',   base: 'Dubbo',       dutyStatus: 'On Duty',  currency: true, qualifications: ['Dispatch','FRMS'],            week: ['ON','ON','ON','ON','OFF','OFF','OFF'] },
   { id: 'O6', name: 'Dispatcher P. Singh',role:'Flight Dispatcher',  base: 'Broken Hill', dutyStatus: 'On Duty',  currency: true, qualifications: ['Dispatch'],                   week: ['ON','ON','ON','ON','OFF','OFF','OFF'] },
   { id: 'O7', name: 'Dispatcher R. Evans',role:'Flight Dispatcher',  base: 'Bankstown',   dutyStatus: 'On Duty',  currency: true, qualifications: ['Dispatch','FRMS'],            week: ['ON','ON','ON','ON','OFF','OFF','OFF'] },
-  { id: 'O8', name: 'T. Stafford',      role: 'Dispatcher (On-Call)',base: 'Essendon',    dutyStatus: 'On Call',  currency: true, qualifications: ['Dispatch'],                   week: ['OFF','OFF','ON','ON','ON','ON','OFF'] },
+  { id: 'O8', name: 'T. Stafford',      role: 'Dispatcher (On-Call)',base: 'Bankstown',   dutyStatus: 'On Call',  currency: true, qualifications: ['Dispatch'],                   week: ['OFF','OFF','ON','ON','ON','ON','OFF'], notes: 'Based: Essendon (YMEN)' },
 ];
 
 const ALL_ENGINEERS: CrewMember[] = [
@@ -68,7 +69,7 @@ const ALL_ENGINEERS: CrewMember[] = [
   { id: 'E3', name: 'Mia Kowalski',     role: 'LAME — On Call', base: 'Broken Hill', dutyStatus: 'On Duty',  currency: true, qualifications: ['B200','LAME'],                   week: ['ON','ON','OFF','OFF','OFF','ON','ON'] },
   { id: 'E4', name: 'Paul Tran',        role: 'Maint. Controller',base:'Dubbo',       dutyStatus: 'On Duty',  currency: true, qualifications: ['Veryon','MEL','Planning'],       week: ['ON','ON','ON','ON','ON','OFF','OFF'] },
   { id: 'E5', name: 'B. Martinez',      role: 'LAME — On Call', base: 'Bankstown',   dutyStatus: 'On Call',  currency: true, qualifications: ['B200','LAME'],                   week: ['OFF','ON','ON','ON','ON','OFF','OFF'] },
-  { id: 'E6', name: 'J. Fitzgerald',    role: 'LAME — On Call', base: 'Essendon',    dutyStatus: 'On Call',  currency: true, qualifications: ['B200','B350','LAME'],            week: ['OFF','OFF','OFF','ON','ON','ON','ON'] },
+  { id: 'E6', name: 'J. Fitzgerald',    role: 'LAME — On Call', base: 'Bankstown',   dutyStatus: 'On Call',  currency: true, qualifications: ['B200','B350','LAME'],            week: ['OFF','OFF','OFF','ON','ON','ON','ON'], notes: 'Based: Essendon (YMEN)' },
   { id: 'E7', name: 'T. Gibson',        role: 'LAME — On Call', base: 'Launceston',  dutyStatus: 'On Duty',  currency: true, qualifications: ['B350','LAME'],                   week: ['ON','ON','ON','ON','OFF','OFF','OFF'] },
 ];
 
@@ -84,7 +85,6 @@ const MISSIONS_BY_BASE: Record<Base, { callsign: string; type: string; from: str
   "Bankstown":    [
     { callsign: "RFD231", type: "NEPT",      from: "YSBK", to: "YMLT", aircraft: "VH-LTQ", status: "Pending",  etd: "11:00", pilot: "Capt. O'Brien" },
   ],
-  "Essendon":     [],
   "Launceston":   [
     { callsign: "RFD241", type: "Ambulance", from: "YMLT", to: "YMML", aircraft: "VH-MQK", status: "Complete",  etd: "07:00", pilot: "Capt. Henson" },
   ],
@@ -129,6 +129,54 @@ const MY_TIMESHEET = {
     { date: "Sun 20", type: "OFF", duty: "—", hrs: 0, notes: "" },
   ]
 };
+
+// ─── Notice to Crews data ───────────────────────────────────────────────────────
+interface Notice {
+  id: string; base: Base | "All"; priority: "High" | "Normal" | "Info";
+  title: string; body: string; author: string; date: string; expiry?: string;
+}
+const NOTICES_DATA: Notice[] = [
+  { id: "N001", base: "All",        priority: "High",   title: "Fire Season — Airspace Restrictions",  body: "NOTAM issued for all bases: additional pre-flight checks required for smoke visibility. Refer to Met briefing before any departure into known smoke-affected areas. Contact ATC for current restrictions.",  author: "Chief Pilot", date: "15 Jul 2026", expiry: "31 Aug 2026" },
+  { id: "N002", base: "Dubbo",      priority: "Normal", title: "Hangar 2 Construction — Ramp Caution",   body: "Construction works in progress adjacent to Hangar 2. Wingtip clearance reduced. Tow only when marshallers are present. Night operations — portable lighting in use.",                                         author: "Fiona Gallagher", date: "14 Jul 2026" },
+  { id: "N003", base: "Bankstown",  priority: "High",   title: "Fuel Uplift Delays — Avjet Service",    body: "Avjet advising 45-minute minimum lead time for fuel requests at YSBK this week. Plan accordingly for early departures. Contact ops to pre-book fuel slots. Essendon (YMEN) — no delays reported.",        author: "R. Evans", date: "16 Jul 2026" },
+  { id: "N004", base: "Broken Hill",priority: "Normal", title: "ILS Maintenance — Approach Restrictions",body: "YBHI ILS out of service until 24 Jul. VOR/DME and NDB approaches available. Circling approved. Advise all crews planning approaches at BHI. Check NOTAMs before departure.",                               author: "Angela Morris", date: "13 Jul 2026", expiry: "24 Jul 2026" },
+  { id: "N005", base: "All",        priority: "Info",   title: "New Uniform Rollout — Return Old Kit",   body: "New uniforms are being distributed this fortnight. All crew please return old epaulettes and ID tabs to your Base Manager by 31 Jul. New name badges will be issued at the same time.",                    author: "HR Operations", date: "10 Jul 2026" },
+  { id: "N006", base: "Launceston", priority: "Info",   title: "ATIS Frequency Change — YMLT",          body: "Launceston ATIS now on 134.200 MHz (previously 127.750). Confirm charts are updated. D-ATIS via VHF is operational.",                                                                                        author: "Sarah Blackwell", date: "12 Jul 2026" },
+];
+
+// ─── Local Operating Procedures (LOPs) data ──────────────────────────────────
+interface LOP {
+  id: string; base: Base | "All"; category: string; title: string;
+  version: string; effective: string; owner: string; status: "Current" | "Under Review" | "Superseded";
+  description: string;
+}
+const LOPS_DATA: LOP[] = [
+  { id: "LOP-OPS-001", base: "All",       category: "Flight Operations", title: "Fuel Policy — Minimum Requirements",         version: "v3.2", effective: "01 Mar 2026", owner: "Chief Pilot",       status: "Current",       description: "Minimum fuel quantities, reserves, and diversion fuel for all aircraft types" },
+  { id: "LOP-OPS-002", base: "All",       category: "Flight Operations", title: "Night Operations Procedures",                version: "v2.1", effective: "15 Jan 2026", owner: "Chief Pilot",       status: "Current",       description: "Night VMC and IFR operations, crew briefings, lighting requirements" },
+  { id: "LOP-OPS-003", base: "Dubbo",     category: "Ground Ops",        title: "Dubbo Ramp — Pushback and Towing",           version: "v1.4", effective: "10 Jun 2026", owner: "Fiona Gallagher",  status: "Current",       description: "Marshalling signals, tow limits, and ramp safety at YSDU" },
+  { id: "LOP-OPS-004", base: "All",       category: "Maintenance",       title: "Tech Log Completion — Manual Fallback",       version: "v2.0", effective: "01 May 2026", owner: "Maint. Control",   status: "Current",       description: "Procedure for paper tech log use when electronic system is unavailable" },
+  { id: "LOP-OPS-005", base: "Bankstown", category: "Ground Ops",        title: "Bankstown / Essendon Ramp Authority",        version: "v1.1", effective: "20 Apr 2026", owner: "R. Evans",         status: "Current",       description: "Shared ramp authority and marshalling procedures for YSBK and YMEN operations" },
+  { id: "LOP-OPS-006", base: "All",       category: "Medical",           title: "In-Flight Medical Emergency — Crew Response", version: "v4.0", effective: "01 Jul 2026", owner: "Medical Director", status: "Current",       description: "Decision tree for crew when a patient deteriorates in flight" },
+  { id: "LOP-OPS-007", base: "Launceston",category: "Flight Operations", title: "TAS Ambulance Protocol — Coordination",      version: "v2.3", effective: "01 Feb 2026", owner: "Sarah Blackwell",  status: "Current",       description: "Coordination with TAS Ambulance for patient handover at YMLT" },
+  { id: "LOP-OPS-008", base: "All",       category: "Safety",            title: "Bird Strike Reporting Procedure",             version: "v1.0", effective: "01 Oct 2025", owner: "Safety Officer",   status: "Under Review",  description: "Mandatory reporting, inspection steps, and ATSB notification process" },
+];
+
+// ─── FDP pilot duty state ─────────────────────────────────────────────────────
+interface FDPPilot {
+  id: string; name: string; aircraft: string; base: Base;
+  startTime: string; // HH:MM local
+  maxFDP: number;    // hours (base limit)
+  extended: boolean;
+  extensionMins: number; // minutes added by extension
+  extensionLog: { ts: string; by: string; reason: string }[];
+}
+const INITIAL_FDP: FDPPilot[] = [
+  { id: 'P1',  name: 'Capt. Sarah Mitchell', aircraft: 'VH-MVW', base: 'Dubbo',     startTime: '05:30', maxFDP: 12, extended: false, extensionMins: 0, extensionLog: [] },
+  { id: 'P6',  name: 'Capt. David Walsh',    aircraft: 'VH-XYJ', base: 'Dubbo',     startTime: '05:30', maxFDP: 12, extended: false, extensionMins: 0, extensionLog: [] },
+  { id: 'P9',  name: "Capt. M. O'Brien",    aircraft: 'VH-LTQ', base: 'Bankstown', startTime: '06:00', maxFDP: 12, extended: false, extensionMins: 0, extensionLog: [] },
+  { id: 'P10', name: 'F/O B. Kwan',          aircraft: 'VH-LTQ', base: 'Bankstown', startTime: '06:00', maxFDP: 12, extended: false, extensionMins: 0, extensionLog: [] },
+  { id: 'P7',  name: 'Capt. Brooke Henson',  aircraft: 'VH-MQK', base: 'Launceston',startTime: '06:30', maxFDP: 12, extended: false, extensionMins: 0, extensionLog: [] },
+];
 
 // ─── Helper components ────────────────────────────────────────────────────────
 function DayCodeBadge({ code, today }: { code: DayCode; today?: boolean }) {
@@ -438,11 +486,26 @@ function NewLeaveForm({ onClose, onAdd }: { onClose: () => void; onAdd: (l: any)
 export default function SeniorBasePilot({ role }: { role: UserRole }) {
   const [, navigate] = useLocation();
   const [selectedBase, setSelectedBase] = useState<Base>("Dubbo");
-  const [activeTab, setActiveTab] = useState<"overview" | "roster" | "finance" | "leave">("overview");
+  const [activeTab, setActiveTab] = useState<string>("overview");
   const [expenses, setExpenses] = useState(EXPENSE_DATA);
   const [leaves, setLeaves] = useState(LEAVE_DATA);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [showLeaveForm, setShowLeaveForm] = useState(false);
+
+  // FDP state
+  const [fdpPilots, setFdpPilots] = useState<FDPPilot[]>(INITIAL_FDP);
+  const [fdpExtModal, setFdpExtModal] = useState<{ pilotId: string; reason: string } | null>(null);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Notices state
+  const [expandedNotice, setExpandedNotice] = useState<string | null>(null);
+
+  // LOPs state
+  const [lopCategory, setLopCategory] = useState<string>("All");
 
   const basePilots    = ALL_PILOTS.filter(p => p.base === selectedBase);
   const baseOps       = ALL_OPS.filter(p => p.base === selectedBase);
@@ -456,9 +519,13 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
   const TABS = [
     { id: "overview", label: "Overview",         icon: <Activity size={12} /> },
     { id: "roster",   label: "Shift Roster",      icon: <Calendar size={12} /> },
+    { id: "fdp",      label: "FDP / Duty",        icon: <Timer size={12} /> },
+    { id: "notices",  label: "Notices to Crews",  icon: <Bell size={12} /> },
+    { id: "lops",     label: "LOPs Portal",       icon: <BookOpen size={12} /> },
     { id: "finance",  label: "Finance Portal",    icon: <Coins size={12} /> },
     { id: "leave",    label: "Leave",             icon: <CalendarCheck size={12} /> },
   ] as const;
+
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto">
@@ -500,8 +567,19 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
         <WeatherStrip base={selectedBase} />
       </div>
 
+      {/* ── Sub-base note (Bankstown only) ── */}
+      {meta.subBases && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-[#4F98A3]/8 border border-[#4F98A3]/20 rounded-lg">
+          <MapPin size={11} className="text-[#4F98A3] shrink-0" />
+          <span className="text-[11px] text-[#797876]">
+            <span className="text-[#CDCCCA] font-semibold">Bankstown</span> view includes reporting from: {meta.subBases.join(", ")}
+            {" "}— same Base Manager, shared crew.
+          </span>
+        </div>
+      )}
+
       {/* ── Tabs ── */}
-      <div className="flex gap-1 bg-[#1C1B19] border border-[#393836] rounded-xl p-1 w-fit">
+      <div className="flex flex-wrap gap-1 bg-[#1C1B19] border border-[#393836] rounded-xl p-1">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -735,6 +813,365 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
           </div>
         </div>
       )}
+
+      {/* ═══════════════ FDP / DUTY TAB ═══════════════ */}
+      {activeTab === "fdp" && (() => {
+        const nowMins = (() => { const n = new Date(); return n.getHours() * 60 + n.getMinutes(); })();
+        const baseFdp = fdpPilots.filter(p => p.base === selectedBase);
+        return (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Timer size={14} className="text-[#4F98A3]" />
+                  <h2 className="text-sm font-bold text-[#CDCCCA]" style={HF}>FDP Countdown — {selectedBase} Pilots On Duty</h2>
+                </div>
+                <p className="text-[11px] text-[#5A5957] mt-0.5">CAO 48.1 limits · RFDS EBA Cl 18 · Extensions require Ops or CP approval · All times AEST</p>
+              </div>
+              <button onClick={() => navigate("/frms")} className="flex items-center gap-1 text-xs text-[#4F98A3] hover:underline shrink-0">
+                Duty &amp; FRMS <ArrowUpRight size={11} />
+              </button>
+            </div>
+
+            {baseFdp.length === 0 && (
+              <div className="text-center py-12">
+                <Plane size={28} className="text-[#393836] mx-auto mb-3" />
+                <p className="text-xs text-[#5A5957]">No pilots on duty at {selectedBase} today</p>
+              </div>
+            )}
+
+            {baseFdp.map(pilot => {
+              const [sh, sm] = pilot.startTime.split(":").map(Number);
+              const startMins = sh * 60 + sm;
+              const maxMins = (pilot.maxFDP * 60) + pilot.extensionMins;
+              const elapsedMins = Math.max(0, nowMins - startMins);
+              const remainMins = Math.max(0, maxMins - elapsedMins);
+              const pct = Math.min(100, (elapsedMins / maxMins) * 100);
+              const remainH = Math.floor(remainMins / 60);
+              const remainM = remainMins % 60;
+              const dueHH = Math.floor((startMins + maxMins) / 60) % 24;
+              const dueMM = (startMins + maxMins) % 60;
+              const dueStr = `${String(dueHH).padStart(2,'0')}:${String(dueMM).padStart(2,'0')}`;
+              const isCritical = remainMins < 60 && remainMins > 0;
+              const isExpired = remainMins === 0;
+              // Max CAO 48.1 extension = 2 hrs (s.48.1.12) when approved by Company
+              const canExtend = !pilot.extended && !isExpired && remainMins < 120 && (role === "admin" || role === "senior_management" || role === "dispatcher");
+              return (
+                <div key={pilot.id} className={`${CARD} p-4`}>
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Plane size={13} className="text-[#4F98A3]" />
+                        <span className="text-sm font-bold text-[#CDCCCA]" style={HF}>{pilot.name}</span>
+                        <span className="text-[10px] font-mono text-[#797876]">{pilot.aircraft}</span>
+                        {pilot.extended && (
+                          <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold">EXTENDED +{pilot.extensionMins}m</span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-[#5A5957] mt-0.5">FDP start: {pilot.startTime} · Max: {pilot.maxFDP}h{pilot.extensionMins > 0 ? ` + ${pilot.extensionMins}m ext` : ""} · Due off: {dueStr}</div>
+                    </div>
+                    <div className={`text-right shrink-0 ${isExpired ? "text-red-400" : isCritical ? "text-amber-400" : "text-green-400"}`}>
+                      <div className="text-xl font-bold font-mono" style={HF}>
+                        {isExpired ? "EXPIRED" : `${remainH}h ${String(remainM).padStart(2,'0')}m`}
+                      </div>
+                      <div className="text-[10px] opacity-70">remaining</div>
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="h-2.5 bg-[#171614] rounded-full overflow-hidden mb-3">
+                    <div
+                      className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : isCritical ? "bg-amber-500" : "bg-[#4F98A3]"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {isExpired && (
+                        <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold"><AlertTriangle size={11} />FDP LIMIT REACHED — crew must be rested</span>
+                      )}
+                      {isCritical && !isExpired && (
+                        <span className="flex items-center gap-1 text-[10px] text-amber-400"><AlertTriangle size={11} />Under 1 hour remaining</span>
+                      )}
+                    </div>
+
+                    {/* Extension button — only for ops/admin when within 2h of limit */}
+                    {canExtend && (
+                      <button
+                        onClick={() => setFdpExtModal({ pilotId: pilot.id, reason: "" })}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-xs font-semibold hover:bg-amber-500/25 transition-colors"
+                      >
+                        <Clock size={11} /> Apply Extension (CAO 48.1.12)
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Extension audit log */}
+                  {pilot.extensionLog.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[#393836] space-y-1">
+                      <div className="text-[10px] text-[#5A5957] uppercase tracking-wider mb-1">Extension Audit Log</div>
+                      {pilot.extensionLog.map((e, i) => (
+                        <div key={i} className="flex items-start gap-2 text-[10px]">
+                          <span className="font-mono text-[#797876] shrink-0">{e.ts}</span>
+                          <span className="text-[#CDCCCA]">Approved by <span className="font-semibold">{e.by}</span> — {e.reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Extension modal */}
+            {fdpExtModal && (() => {
+              const target = fdpPilots.find(p => p.id === fdpExtModal.pilotId);
+              if (!target) return null;
+              const ts = new Date().toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit" });
+              return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setFdpExtModal(null)}>
+                  <div className={`${CARD} p-5 w-full max-w-md`} onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 mb-4">
+                      <Clock size={15} className="text-amber-400" />
+                      <h3 className="text-sm font-bold text-[#CDCCCA]" style={HF}>Apply FDP Extension — CAO 48.1.12</h3>
+                    </div>
+                    <div className="text-[11px] text-[#797876] mb-4 bg-amber-500/8 border border-amber-500/20 rounded-lg p-3">
+                      <strong className="text-amber-400">RFDS EBA Cl 18 / CAO 48.1.12:</strong> Maximum extension is 2 hours (120 min) beyond the base FDP limit. Extension must be approved by the Company (Ops or Chief Pilot) and logged with reason and timestamp. Cannot be applied after FDP has expired.
+                    </div>
+                    <div className="mb-3">
+                      <label className="text-[10px] text-[#5A5957] uppercase tracking-wider block mb-1">Pilot</label>
+                      <div className="text-sm font-semibold text-[#CDCCCA]">{target.name} · {target.aircraft}</div>
+                    </div>
+                    <div className="mb-3">
+                      <label className="text-[10px] text-[#5A5957] uppercase tracking-wider block mb-1">Extension Amount</label>
+                      <select
+                        className="w-full text-xs bg-[#171614] border border-[#393836] rounded-lg px-3 py-2 text-[#CDCCCA] focus:outline-none"
+                        value={60}
+                      >
+                        <option value={30}>30 minutes</option>
+                        <option value={60}>60 minutes (1 hour)</option>
+                        <option value={90}>90 minutes (1.5 hours)</option>
+                        <option value={120}>120 minutes (2 hours — maximum)</option>
+                      </select>
+                    </div>
+                    <div className="mb-4">
+                      <label className="text-[10px] text-[#5A5957] uppercase tracking-wider block mb-1">Reason for Extension *</label>
+                      <textarea
+                        value={fdpExtModal.reason}
+                        onChange={e => setFdpExtModal(prev => prev ? { ...prev, reason: e.target.value } : null)}
+                        placeholder="State operational reason (e.g. delayed return due to weather divert, patient stabilisation required)"
+                        className="w-full text-xs bg-[#171614] border border-[#393836] rounded-lg px-3 py-2 text-[#CDCCCA] placeholder-[#5A5957] focus:outline-none min-h-[80px] resize-none"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setFdpExtModal(null)}
+                        className="flex-1 px-4 py-2 rounded-lg border border-[#393836] text-[#797876] text-xs font-semibold hover:text-[#CDCCCA] transition-colors"
+                      >Cancel</button>
+                      <button
+                        disabled={!fdpExtModal.reason.trim()}
+                        onClick={() => {
+                          const extMins = 60;
+                          setFdpPilots(prev => prev.map(p => p.id === fdpExtModal.pilotId ? {
+                            ...p,
+                            extended: true,
+                            extensionMins: p.extensionMins + extMins,
+                            extensionLog: [...p.extensionLog, {
+                              ts: `${ts} AEST`,
+                              by: role === "admin" ? "System Administrator" : role === "dispatcher" ? "Dispatcher" : "Operations",
+                              reason: fdpExtModal.reason.trim(),
+                            }]
+                          } : p));
+                          setFdpExtModal(null);
+                        }}
+                        className="flex-1 px-4 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-500/30 transition-colors"
+                      >Approve &amp; Log Extension</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Compliance note */}
+            <div className="flex items-start gap-2 px-4 py-3 bg-[#1C1B19] border border-[#393836] rounded-xl">
+              <Shield size={12} className="text-[#4F98A3] mt-0.5 shrink-0" />
+              <div className="text-[10px] text-[#5A5957]">
+                All extension approvals are time-stamped and stored in the audit log above. Records are retained for CASA audit purposes (CAO 48.1 / RFDS EBA Cl 18). Ops must notify the Chief Pilot when an extension is applied.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══════════════ NOTICES TO CREWS TAB ═══════════════ */}
+      {activeTab === "notices" && (() => {
+        const baseNotices = NOTICES_DATA.filter(n => n.base === selectedBase || n.base === "All");
+        const priorityOrder = { "High": 0, "Normal": 1, "Info": 2 };
+        const sorted = [...baseNotices].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+        return (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Bell size={14} className="text-[#4F98A3]" />
+                  <h2 className="text-sm font-bold text-[#CDCCCA]" style={HF}>Notices to Crews — {selectedBase}</h2>
+                </div>
+                <p className="text-[11px] text-[#5A5957] mt-0.5">Local notices for crews temporarily covering or visiting this base · All-bases notices always shown</p>
+              </div>
+              <span className="shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-[#393836]/60 text-[#797876] border border-[#393836]">
+                {sorted.length} notice{sorted.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {sorted.map(n => {
+              const isExpanded = expandedNotice === n.id;
+              const pStyle: Record<string, string> = {
+                High:   "bg-red-500/10 border-red-500/30 text-red-400",
+                Normal: "bg-amber-500/10 border-amber-500/30 text-amber-400",
+                Info:   "bg-[#4F98A3]/10 border-[#4F98A3]/30 text-[#4F98A3]",
+              };
+              const pDot: Record<string, string> = {
+                High: "bg-red-400", Normal: "bg-amber-400", Info: "bg-[#4F98A3]",
+              };
+              return (
+                <div key={n.id} className={`${CARD} overflow-hidden`}>
+                  <button
+                    className="w-full text-left p-4 flex items-start gap-3"
+                    onClick={() => setExpandedNotice(isExpanded ? null : n.id)}
+                  >
+                    <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${pDot[n.priority]}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-[9px] px-2 py-0.5 rounded-full border font-bold ${pStyle[n.priority]}`}>{n.priority.toUpperCase()}</span>
+                        {n.base !== "All" && (
+                          <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#393836]/60 text-[#797876] border border-[#393836]">{n.base}</span>
+                        )}
+                        {n.base === "All" && (
+                          <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/30">All Bases</span>
+                        )}
+                        <span className="text-[10px] text-[#797876]">{n.date}</span>
+                        {n.expiry && <span className="text-[9px] text-red-400/70">Expires {n.expiry}</span>}
+                      </div>
+                      <div className="text-xs font-semibold text-[#CDCCCA] mt-1" style={HF}>{n.title}</div>
+                      {!isExpanded && (
+                        <div className="text-[10px] text-[#5A5957] mt-0.5 truncate">{n.body}</div>
+                      )}
+                    </div>
+                    <ChevronDown size={13} className={`text-[#5A5957] shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                  </button>
+                  {isExpanded && (
+                    <div className="px-4 pb-4 pt-0">
+                      <div className="bg-[#171614] rounded-lg p-3">
+                        <p className="text-xs text-[#CDCCCA] leading-relaxed">{n.body}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <User size={10} className="text-[#5A5957]" />
+                        <span className="text-[10px] text-[#5A5957]">Issued by <span className="text-[#797876]">{n.author}</span> on {n.date}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {sorted.length === 0 && (
+              <div className="text-center py-12">
+                <Bell size={26} className="text-[#393836] mx-auto mb-3" />
+                <p className="text-xs text-[#5A5957]">No notices for {selectedBase}</p>
+              </div>
+            )}
+
+            <div className="flex items-start gap-2 px-4 py-3 bg-[#1C1B19] border border-[#393836] rounded-xl">
+              <Shield size={12} className="text-[#4F98A3] mt-0.5 shrink-0" />
+              <div className="text-[10px] text-[#5A5957]">
+                Notices are issued by Base Managers and the Chief Pilot. For urgent operational matters contact your Base Manager directly. High-priority notices must be read and acknowledged before flight.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ═══════════════ LOPs PORTAL TAB ═══════════════ */}
+      {activeTab === "lops" && (() => {
+        const baseLops = LOPS_DATA.filter(l => l.base === selectedBase || l.base === "All");
+        const categories = ["All", ...Array.from(new Set(baseLops.map(l => l.category)))];
+        const filtered = lopCategory === "All" ? baseLops : baseLops.filter(l => l.category === lopCategory);
+        const statusStyle: Record<string, string> = {
+          "Current":      "bg-green-500/15 text-green-400 border-green-500/30",
+          "Under Review": "bg-amber-500/15 text-amber-400 border-amber-500/30",
+          "Superseded":   "bg-red-500/15 text-red-400 border-red-500/30",
+        };
+        return (
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <div className="flex items-center gap-2">
+                  <BookOpen size={14} className="text-[#4F98A3]" />
+                  <h2 className="text-sm font-bold text-[#CDCCCA]" style={HF}>Local Operating Procedures — {selectedBase}</h2>
+                </div>
+                <p className="text-[11px] text-[#5A5957] mt-0.5">LOPs applicable to this base · All-bases LOPs always shown · Full documents to be uploaded by Base Manager</p>
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {categories.map(cat => (
+                  <button key={cat} onClick={() => setLopCategory(cat)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors ${
+                      lopCategory === cat
+                        ? "bg-[#4F98A3]/20 border-[#4F98A3]/40 text-[#4F98A3]"
+                        : "bg-[#1C1B19] border-[#393836] text-[#797876] hover:text-[#CDCCCA]"
+                    }`}>{cat}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {filtered.map(lop => (
+                <div key={lop.id} className={`${CARD} p-4 flex items-start gap-4`}>
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[#171614] border border-[#393836] shrink-0">
+                    <FolderOpen size={16} className="text-[#4F98A3]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <span className="text-[9px] font-mono text-[#5A5957]">{lop.id}</span>
+                      <span className={`text-[9px] px-2 py-0.5 rounded-full border font-semibold ${statusStyle[lop.status]}`}>{lop.status}</span>
+                      {lop.base !== "All" && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#393836]/60 text-[#797876] border border-[#393836]">{lop.base}</span>
+                      )}
+                      {lop.base === "All" && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/30">All Bases</span>
+                      )}
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-[#393836]/40 text-[#797876] border border-[#393836]">{lop.category}</span>
+                    </div>
+                    <div className="text-xs font-semibold text-[#CDCCCA]" style={HF}>{lop.title}</div>
+                    <div className="text-[10px] text-[#797876] mt-0.5">{lop.description}</div>
+                    <div className="text-[9px] text-[#5A5957] mt-1">{lop.version} · Effective {lop.effective} · Owner: {lop.owner}</div>
+                  </div>
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    <button className="flex items-center gap-1 text-[10px] text-[#4F98A3] hover:underline">
+                      <ExternalLink size={10} /> Open
+                    </button>
+                    <button className="flex items-center gap-1 text-[10px] text-[#797876] hover:text-[#CDCCCA]">
+                      <Edit3 size={10} /> Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {filtered.length === 0 && (
+                <div className="text-center py-10">
+                  <BookOpen size={24} className="text-[#393836] mx-auto mb-2" />
+                  <p className="text-xs text-[#5A5957]">No LOPs in this category for {selectedBase}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-start gap-2 px-4 py-3 bg-[#1C1B19] border border-[#393836] rounded-xl">
+              <Lock size={12} className="text-[#4F98A3] mt-0.5 shrink-0" />
+              <div className="text-[10px] text-[#5A5957]">
+                LOPs are controlled documents. Full PDF versions will be linked by the Base Manager. To add, update, or supersede a procedure contact your Base Manager or the Chief Pilot. All changes require a version increment and review date.
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══════════════ FINANCE TAB ═══════════════ */}
       {activeTab === "finance" && (

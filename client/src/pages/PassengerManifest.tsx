@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Plus, X, Package } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { UserRole } from "@/lib/data";
 import {
@@ -31,6 +32,16 @@ interface Sector {
   eta: string; // stored as "HH:MM" (24hr)
 }
 
+interface CargoItem {
+  id: string;
+  description: string;
+  weight: number;
+  length: number;
+  width: number;
+  height: number;
+  notes: string;
+}
+
 const BOOKING_TEAMS = ["RAHS", "Dental", "Dispatch", "Operations", "Other"];
 const AIRCRAFT_REGS = ["VH-FDR", "VH-OWA", "VH-NHY", "VH-MWY", "VH-XFQ", "VH-ZBY", "VH-MYN", "VH-BKS"];
 
@@ -54,6 +65,10 @@ function newPassenger(): Passenger {
 }
 function newSector(): Sector {
   return { id: crypto.randomUUID(), from: "", to: "", etd: "", eta: "" };
+}
+
+function newCargoItem(): CargoItem {
+  return { id: crypto.randomUUID(), description: "", weight: 0, length: 0, width: 0, height: 0, notes: "" };
 }
 
 // ── 24hr time display helper ──────────────────────────────────────────────────
@@ -248,6 +263,9 @@ export default function PassengerManifest({ role }: Props) {
   const [bookingTeam, setBookingTeam] = useState("");
   const [sectors, setSectors] = useState<Sector[]>([newSector()]);
   const [passengers, setPassengers] = useState<Passenger[]>([newPassenger()]);
+  const [cargoItems, setCargoItems] = useState<CargoItem[]>([]);
+  const [showCargoForm, setShowCargoForm] = useState(false);
+  const [cargoDraft, setCargoDraft] = useState<CargoItem>(newCargoItem());
 
   // UI state
   const [activeTab, setActiveTab] = useState<"build" | "preview" | "list">("list");
@@ -318,6 +336,18 @@ export default function PassengerManifest({ role }: Props) {
 
   function removePassenger(id: string) {
     if (passengers.length > 1) setPassengers(prev => prev.filter(p => p.id !== id));
+  }
+
+  // ── Cargo handlers ───────────────────────────────────────────────────────────
+  function addCargoItem() {
+    if (!cargoDraft.description.trim()) return;
+    setCargoItems(prev => [...prev, { ...cargoDraft, id: crypto.randomUUID() }]);
+    setCargoDraft(newCargoItem());
+    setShowCargoForm(false);
+  }
+
+  function removeCargoItem(id: string) {
+    setCargoItems(prev => prev.filter(c => c.id !== id));
   }
 
   // ── Return sector label ──────────────────────────────────────────────────────
@@ -393,6 +423,9 @@ export default function PassengerManifest({ role }: Props) {
   }
 
   const totalWeight = passengers.reduce((sum, p) => sum + (parseFloat(p.weight) || 0), 0);
+  const totalCargoWeight = cargoItems.reduce((sum, c) => sum + (c.weight || 0), 0);
+  const totalCargoVolume = cargoItems.reduce((sum, c) => sum + ((c.length || 0) * (c.width || 0) * (c.height || 0)), 0) / 1_000_000;
+  const totalAllWeight = totalWeight + totalCargoWeight;
 
   if (!canAccess) {
     return (
@@ -691,8 +724,12 @@ export default function PassengerManifest({ role }: Props) {
                   <h2 className="text-slate-200 font-semibold text-base">
                     👥 Passengers <span className="text-slate-500 text-sm font-normal">({passengers.length}/7)</span>
                   </h2>
-                  {totalWeight > 0 && (
-                    <p className="text-xs text-slate-400 mt-0.5">Total pax weight: <span className="text-white font-semibold">{totalWeight.toFixed(0)} kg</span></p>
+                  {(totalWeight > 0 || totalCargoWeight > 0) && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Pax: <span className="text-white font-semibold">{totalWeight.toFixed(0)} kg</span>
+                      {" "}· Cargo: <span className="text-white font-semibold">{totalCargoWeight.toFixed(0)} kg</span>
+                      {" "}· Total: <span className="text-white font-semibold">{totalAllWeight.toFixed(0)} kg</span>
+                    </p>
                   )}
                 </div>
                 {passengers.length < 7 && (
@@ -789,6 +826,127 @@ export default function PassengerManifest({ role }: Props) {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Cargo */}
+            <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-slate-200 font-semibold text-base flex items-center gap-2">
+                    <Package size={16} className="text-amber-400" />
+                    Cargo Manifest
+                    <span className="text-slate-500 text-sm font-normal">({cargoItems.length})</span>
+                  </h2>
+                  {cargoItems.length > 0 && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Total cargo weight: <span className="text-white font-semibold">{totalCargoWeight.toFixed(0)} kg</span>
+                      {" "}· Combined volume: <span className="text-white font-semibold">{totalCargoVolume.toFixed(2)} m³</span>
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => { setCargoDraft(newCargoItem()); setShowCargoForm(v => !v); }}
+                  className="bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <Plus size={12} />
+                  Add Item
+                </button>
+              </div>
+
+              {showCargoForm && (
+                <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4 mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="flex flex-col gap-1 md:col-span-1">
+                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">Description</label>
+                      <input type="text" value={cargoDraft.description}
+                        onChange={e => setCargoDraft(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="e.g. Medical equipment crate"
+                        className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">Weight (kg)</label>
+                      <input type="number" value={cargoDraft.weight || ""}
+                        onChange={e => setCargoDraft(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                        placeholder="0" min="0"
+                        className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">Notes (optional)</label>
+                      <input type="text" value={cargoDraft.notes}
+                        onChange={e => setCargoDraft(prev => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Handling notes"
+                        className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">Length (cm)</label>
+                      <input type="number" value={cargoDraft.length || ""}
+                        onChange={e => setCargoDraft(prev => ({ ...prev, length: parseFloat(e.target.value) || 0 }))}
+                        placeholder="0" min="0"
+                        className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">Width (cm)</label>
+                      <input type="number" value={cargoDraft.width || ""}
+                        onChange={e => setCargoDraft(prev => ({ ...prev, width: parseFloat(e.target.value) || 0 }))}
+                        placeholder="0" min="0"
+                        className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">Height (cm)</label>
+                      <input type="number" value={cargoDraft.height || ""}
+                        onChange={e => setCargoDraft(prev => ({ ...prev, height: parseFloat(e.target.value) || 0 }))}
+                        placeholder="0" min="0"
+                        className="bg-slate-800 border border-slate-600 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end mt-3">
+                    <button onClick={() => setShowCargoForm(false)}
+                      className="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                      Cancel
+                    </button>
+                    <button onClick={addCargoItem} disabled={!cargoDraft.description.trim()}
+                      className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                      Add to manifest
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {cargoItems.length === 0 ? (
+                <p className="text-xs text-slate-500 italic">No cargo items added</p>
+              ) : (
+                <div className="space-y-2">
+                  {cargoItems.map(c => (
+                    <div key={c.id} className="bg-slate-800/40 border border-slate-700 rounded-lg px-4 py-3 flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-white">{c.description}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 font-semibold">
+                            {c.weight} kg
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5">
+                          {c.length} × {c.width} × {c.height} cm (L×W×H)
+                        </div>
+                        {c.notes && (
+                          <div className="text-xs text-slate-400 mt-0.5">{c.notes}</div>
+                        )}
+                      </div>
+                      <button onClick={() => removeCargoItem(c.id)}
+                        className="text-slate-400 hover:text-red-400 transition-colors flex-shrink-0">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {cargoItems.length > 0 && (
+                <div className="flex justify-end gap-4 mt-3 pt-3 border-t border-slate-700 text-xs text-slate-400">
+                  <span>Total cargo weight: <span className="text-white font-semibold">{totalCargoWeight.toFixed(0)} kg</span></span>
+                  <span>Combined volume: <span className="text-white font-semibold">{totalCargoVolume.toFixed(2)} m³</span></span>
+                </div>
+              )}
             </div>
 
             {/* Return flight explanation */}

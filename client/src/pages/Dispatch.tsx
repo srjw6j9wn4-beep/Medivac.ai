@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { type UserRole } from "@/lib/data";
@@ -114,6 +115,8 @@ export default function Dispatch({ role }: Props) {
   const [crewMode, setCrewMode]       = useState<CrewMode>("shift");
   const [selectedShift, setSelectedShift] = useState<string>("");
   const [shiftOpen, setShiftOpen]     = useState(false);
+  const [shiftAnchor, setShiftAnchor] = useState<{ top: number; left: number; width: number } | null>(null);
+  const shiftRef = useRef<HTMLButtonElement>(null);
 
   // Individual crew fields (editable after shift auto-fill)
   const [aircraft, setAircraft] = useState("VH-XYR");
@@ -411,39 +414,19 @@ export default function Dispatch({ role }: Props) {
                     <label className="text-xs font-medium text-muted-foreground block mb-1.5">Daily Status — Shift</label>
                     <div className="relative">
                       <button
-                        onClick={() => setShiftOpen(o => !o)}
+                        ref={shiftRef}
+                        onClick={() => {
+                          if (!shiftOpen && shiftRef.current) {
+                            const r = shiftRef.current.getBoundingClientRect();
+                            setShiftAnchor({ top: r.bottom + 4, left: r.left, width: r.width });
+                          }
+                          setShiftOpen(o => !o);
+                        }}
                         className="w-full flex items-center justify-between px-3 py-2.5 text-sm bg-background border border-border rounded-lg text-foreground hover:border-cyan-500/50 transition-colors"
                       >
                         <span>{selectedShift || "— Select a shift —"}</span>
                         <ChevronDown size={14} className={`text-muted-foreground transition-transform ${shiftOpen ? "rotate-180" : ""}`} />
                       </button>
-                      {shiftOpen && (
-                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto">
-                          {/* Group by base */}
-                          {["Broken Hill","Dubbo","Bankstown","Essendon","Launceston"].map(base => {
-                            const shifts = DAILY_SHIFTS.filter(s => s.base === base);
-                            return (
-                              <div key={base}>
-                                <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-slate-900/60 border-b border-slate-700">
-                                  {base}
-                                </div>
-                                {shifts.map(s => (
-                                  <button
-                                    key={s.code}
-                                    onClick={() => applyShift(s.code)}
-                                    className={`w-full text-left px-3 py-2.5 text-sm hover:bg-cyan-500/10 transition-colors flex items-center justify-between gap-3 ${
-                                      selectedShift === s.code ? "bg-cyan-500/10 text-cyan-400" : "text-foreground"
-                                    }`}
-                                  >
-                                    <span className="font-mono font-semibold text-xs">{s.code}</span>
-                                    <span className="text-xs text-muted-foreground truncate">{s.aircraft[0]} · {s.pilotHint}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -689,6 +672,42 @@ export default function Dispatch({ role }: Props) {
           </div>
         </div>
       </div>
+
+      {shiftOpen && shiftAnchor && createPortal(
+        <>
+          {/* Backdrop to close on outside click */}
+          <div className="fixed inset-0 z-[200]" onClick={() => setShiftOpen(false)} />
+          <div
+            className="fixed z-[201] bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto"
+            style={{ top: shiftAnchor.top, left: shiftAnchor.left, width: shiftAnchor.width }}
+          >
+            {/* Group by base */}
+            {["Broken Hill","Dubbo","Bankstown","Essendon","Launceston"].map(base => {
+              const shifts = DAILY_SHIFTS.filter(s => s.base === base);
+              return (
+                <div key={base}>
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-slate-900/60 border-b border-slate-700">
+                    {base}
+                  </div>
+                  {shifts.map(s => (
+                    <button
+                      key={s.code}
+                      onClick={() => applyShift(s.code)}
+                      className={`w-full text-left px-3 py-2.5 text-sm hover:bg-cyan-500/10 transition-colors flex items-center justify-between gap-3 ${
+                        selectedShift === s.code ? "bg-cyan-500/10 text-cyan-400" : "text-foreground"
+                      }`}
+                    >
+                      <span className="font-mono font-semibold text-xs">{s.code}</span>
+                      <span className="text-xs text-muted-foreground truncate">{s.aircraft[0]} · {s.pilotHint}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }

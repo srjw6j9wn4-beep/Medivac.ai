@@ -685,7 +685,7 @@ function StarRating({ stars }: { stars: number }) {
 function emptyLeg(): LegInput {
   return {
     fromICAO: "", fromName: "", toICAO: "", toName: "",
-    distanceNm: 0, departureTime: "09:00", refuelStop: false,
+    distanceNm: 0, departureTime: "09:00", refuelStop: false, refuelStopLocation: "",
     groundTransport: { type: "none", legs: 1 },
   };
 }
@@ -1598,6 +1598,63 @@ export default function CharterQuote() {
                       Refuel stop
                     </label>
                   </div>
+                  {leg.refuelStop && (
+                    <div className="mb-2">
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">
+                        Fuel Stop Location (ICAO or Aerodrome Name)
+                      </label>
+                      <input
+                        type="text"
+                        value={leg.refuelStopLocation || ""}
+                        onChange={e => updateLeg(idx, { refuelStopLocation: e.target.value })}
+                        onMouseDown={e => e.stopPropagation()}
+                        className="w-full text-xs bg-background border border-card-border rounded px-2 py-1 focus:outline-none"
+                      />
+                      <div className="mt-1.5">
+                        <span className="text-[10px] text-muted-foreground mr-1.5">Suggested:</span>
+                        <div className="inline-flex flex-wrap gap-1.5">
+                          {(() => {
+                            const from = (leg.fromICAO || "").toUpperCase();
+                            const to = (leg.toICAO || "").toUpperCase();
+                            const combined = `${from} ${to}`;
+                            let suggestions: { icao: string; name: string }[];
+                            if (combined.includes("YSBK") || combined.includes("YBHI")) {
+                              suggestions = [
+                                { icao: "YBHI", name: "Broken Hill" },
+                                { icao: "YWLG", name: "Walgett" },
+                                { icao: "YWCA", name: "Wilcannia" },
+                                { icao: "YDOR", name: "Dorchester / Nyngan" },
+                              ];
+                            } else if (combined.includes("YDBY") || combined.includes("YDOR")) {
+                              suggestions = [
+                                { icao: "YDOR", name: "Dorchester / Nyngan" },
+                                { icao: "YBHI", name: "Broken Hill" },
+                                { icao: "YWLG", name: "Walgett" },
+                                { icao: "YWCA", name: "Wilcannia" },
+                              ];
+                            } else {
+                              suggestions = [
+                                { icao: "YBHI", name: "Broken Hill" },
+                                { icao: "YWLG", name: "Walgett" },
+                                { icao: "YWCA", name: "Wilcannia" },
+                                { icao: "YDOR", name: "Dorchester / Nyngan" },
+                              ];
+                            }
+                            return suggestions.map(s => (
+                              <span
+                                key={s.icao}
+                                onClick={() => updateLeg(idx, { refuelStopLocation: s.icao })}
+                                title={s.name}
+                                className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 hover:bg-cyan-500/20 hover:text-cyan-400 border border-slate-600 cursor-pointer transition-colors"
+                              >
+                                {s.icao}
+                              </span>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-[10px] text-muted-foreground block mb-0.5">Ground Transport</label>

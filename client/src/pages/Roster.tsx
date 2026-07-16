@@ -4,6 +4,7 @@ import {
   Users, Plane, Stethoscope, Truck, Wrench, Briefcase,
   ChevronRight, ChevronLeft, Wifi, WifiOff, Calendar
 } from "lucide-react";
+import type { UserRole } from "@/lib/data";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type DayCode = 'ON' | 'OFF' | 'P' | 'LEAVE' | 'FERRY' | 'SIM' | 'OPS';
@@ -148,6 +149,52 @@ const DUTY_STYLE: Record<string, string> = {
   'Touring':  'bg-amber-500/15 text-amber-400 border border-amber-500/30',
 };
 
+// ─── Role-based tab visibility ────────────────────────────────────────────────
+function defaultGroupForRole(role: UserRole): RosterGroup {
+  switch (role) {
+    case 'pilot':
+    case 'senior_base_pilot':
+    case 'hofo':
+    case 'hotac':
+    case 'training_captain':
+      return 'Pilots';
+    case 'nurse':
+    case 'ordering_nurse':
+      return 'Nurses';
+    case 'doctor':
+      return 'Doctors';
+    case 'dispatcher':
+    case 'senior_management':
+    case 'admin':
+      return 'Pilots';
+    default:
+      return 'Pilots';
+  }
+}
+
+function visibleGroupsForRole(role: UserRole): RosterGroup[] {
+  const ALL_GROUPS: RosterGroup[] = ['Pilots', 'Nurses', 'Doctors', 'Drivers', 'Engineering', 'Management'];
+  switch (role) {
+    case 'pilot':
+    case 'senior_base_pilot':
+    case 'hofo':
+    case 'hotac':
+    case 'training_captain':
+      return ['Pilots'];
+    case 'nurse':
+    case 'ordering_nurse':
+      return ['Nurses'];
+    case 'doctor':
+      return ['Doctors'];
+    case 'dispatcher':
+    case 'senior_management':
+    case 'admin':
+      return ALL_GROUPS;
+    default:
+      return ALL_GROUPS;
+  }
+}
+
 // ─── Today's duty counts ──────────────────────────────────────────────────────
 function todayCount(crew: CrewMember[]) {
   // "Today" = Mon (index 0)
@@ -160,8 +207,9 @@ function todayCount(crew: CrewMember[]) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function Roster() {
-  const [activeGroup, setActiveGroup] = useState<RosterGroup>('Pilots');
+export default function Roster({ role }: { role: UserRole }) {
+  const [activeGroup, setActiveGroup] = useState<RosterGroup>(defaultGroupForRole(role));
+  const visibleGroups = visibleGroupsForRole(role);
   const [syncing, setSyncing] = useState(false);
   const [lastSync] = useState('09:47 AEST');
   const [weekStart, setWeekStart] = useState<Date>(getCurrentMonday);
@@ -256,7 +304,7 @@ export default function Roster() {
 
       {/* Role group tabs */}
       <div className="flex gap-2 flex-wrap">
-        {(Object.keys(GROUP_DATA) as RosterGroup[]).map(group => {
+        {(Object.keys(GROUP_DATA) as RosterGroup[]).filter(group => visibleGroupsForRole(role).includes(group)).map(group => {
           const cnt = todayCount(GROUP_DATA[group]);
           const isActive = activeGroup === group;
           return (
@@ -278,6 +326,11 @@ export default function Roster() {
           );
         })}
       </div>
+      {visibleGroups.length === 1 && (
+        <p className="text-xs text-muted-foreground italic">
+          Showing your department view — contact Ops for full suite access.
+        </p>
+      )}
 
       {/* Summary row */}
       <div className="grid grid-cols-4 gap-3">
