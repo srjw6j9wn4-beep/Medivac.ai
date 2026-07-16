@@ -135,6 +135,7 @@ interface RestEvent {
   currentLocation: string;
   arrivalTime: string;
   fdpHours: number;
+  customRestMins?: number;  // override for min rest (minutes); undefined = use computed
   crew: CrewMember[];
   notes: string;
   isMedivac: boolean;
@@ -169,8 +170,11 @@ function RestCard({ event, onAck }: { event: RestEvent; onAck: (id: string) => v
   // Determine crew type
   const hasFO  = event.crew.some(c => c.isFirstOfficer);
   const multi  = hasFO || event.crew.some(c => c.role !== "pilot");
-  const minRest = minRestHours(event.fdpHours, multi);
-  const restMins = minRest * 60;
+  const minRestComputed = minRestHours(event.fdpHours, multi);
+  const restMins = event.customRestMins ?? (minRestComputed * 60);
+  const restH = Math.floor(restMins / 60);
+  const restM = restMins % 60;
+  const restDisplay = restM > 0 ? `${restH}h ${String(restM).padStart(2,'0')}m` : `${restH}h`;
   const earliestDep = addMins(event.arrivalTime, restMins);
 
   const curfewActive = curfewRule ? isInCurfew(earliestDep, curfewRule) : false;
@@ -225,9 +229,9 @@ function RestCard({ event, onAck }: { event: RestEvent; onAck: (id: string) => v
             <div className="text-[9px] text-muted-foreground">rest period begins</div>
           </div>
           <div className="flex flex-col items-center justify-center">
-            <div className="text-[9px] text-blue-400 font-semibold mb-1">{minRest}h min rest</div>
+            <div className="text-[9px] text-blue-400 font-semibold mb-1">{restDisplay} min rest{event.customRestMins !== undefined && event.customRestMins !== minRestComputed * 60 ? " (custom)" : ""}</div>
             <div className="w-full h-0.5 bg-blue-400/30 rounded-full" />
-            <div className="text-[9px] text-muted-foreground mt-1 text-center leading-tight">{restLabel(event.fdpHours, multi)}</div>
+            <div className="text-[9px] text-muted-foreground mt-1 text-center leading-tight">{event.customRestMins !== undefined && event.customRestMins !== minRestComputed * 60 ? `Custom — min: ${restLabel(event.fdpHours, multi)}` : restLabel(event.fdpHours, multi)}</div>
           </div>
           <div>
             <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1">Rest Complete</div>
@@ -274,7 +278,7 @@ function RestCard({ event, onAck }: { event: RestEvent; onAck: (id: string) => v
             <div className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5">Earliest Permitted Departure</div>
             <div className="text-2xl font-extrabold font-mono" style={{ color: TEAL }}>{actualDep}</div>
             <div className="text-[10px] text-muted-foreground mt-0.5">
-              {wh > 0 ? `${wh}h ${wm}m` : `${wm}m`} from arrival · {restLabel(event.fdpHours, multi)}
+              {wh > 0 ? `${wh}h ${wm}m` : `${wm}m`} from arrival · {event.customRestMins !== undefined && event.customRestMins !== minRestComputed * 60 ? `${restH}h ${String(restM).padStart(2,'0')}m rest (custom)` : restLabel(event.fdpHours, multi)}
               {blocked && <span className="text-red-400 ml-2">· +curfew delay applied</span>}
               {exemptApplies && <span className="text-amber-400 ml-2">· Medivac exempt</span>}
             </div>
@@ -509,6 +513,7 @@ export default function RestCalculatorOps({ role }: Props) {
   const [location, setLocation]         = useState("YSSY (Sydney)");
   const [arrivalTime, setArrivalTime]   = useState(nowHHMM);
   const [fdpHours, setFdpHours]         = useState(9.5);
+  const [customRestMinsInput, setCustomRestMinsInput] = useState<number | null>(null); // null = use computed
   const [isMedivac, setIsMedivac]       = useState(true);
   const [notes, setNotes]               = useState("");
   const [crewNames, setCrewNames]       = useState<string[]>(["Capt. R. Hughes", "S. Mitchell RN"]);
@@ -569,7 +574,9 @@ export default function RestCalculatorOps({ role }: Props) {
     const ev: RestEvent = {
       id: `evt-${Date.now()}`,
       trigger, aircraft, currentLocation: location,
-      arrivalTime, fdpHours, crew, notes, isMedivac,
+      arrivalTime, fdpHours,
+      customRestMins: customRestMinsInput ?? undefined,
+      crew, notes, isMedivac,
       createdAt: nowHHMM, createdBy, acknowledged: false,
     };
     setEvents(prev => [ev, ...prev]);
@@ -817,6 +824,58 @@ export default function RestCalculatorOps({ role }: Props) {
                 Or enter duty start → press Calc to auto-fill from arrival time
               </div>
             </div>
+
+            {/* Min Rest Override */}
+            {(() => {
+              const computedMins = (fdpHours > 10 ? 12 : 10) * 60; // approximate — crew type unknown until submit
+              const restMinsVal = customRestMinsInput ?? computedMins;
+              const rH = Math.floor(restMinsVal / 60);
+              const rM = restMinsVal % 60;
+              return (
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">
+                    Minimum Rest Period — <span className="font-semibold text-foreground">{`${rH}h ${String(rM).padStart(2,'0')}m`}</span>
+                    {customRestMinsInput !== null && customRestMinsInput !== computedMins && (
+                      <span className="ml-2 text-[9px] text-amber-400 font-semibold">custom override</span>
+                    )}
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="range" min={480} max={1440} step={1}
+                      value={restMinsVal}
+                      onChange={e => setCustomRestMinsInput(parseInt(e.target.value))}
+                      className="flex-1 accent-[#01696F]"
+                    />
+                    <input
+                      type="text" pattern="[0-9]{1,2}:[0-5][0-9]" placeholder="HH:MM"
+                      value={`${String(rH).padStart(2,'0')}:${String(rM).padStart(2,'0')}`}
+                      onChange={e => {
+                        const parts = e.target.value.split(":");
+                        if (parts.length !== 2) return;
+                        const h = parseInt(parts[0], 10), m = parseInt(parts[1], 10);
+                        if (Number.isNaN(h) || Number.isNaN(m) || m < 0 || m > 59) return;
+                        setCustomRestMinsInput(h * 60 + m);
+                      }}
+                      className="w-20 text-xs bg-background border border-border rounded px-2 py-1 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    />
+                  </div>
+                  <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                    <span>8h</span>
+                    <span className="text-center">
+                      {customRestMinsInput !== null && customRestMinsInput !== computedMins ? (
+                        <button
+                          onClick={() => setCustomRestMinsInput(null)}
+                          className="text-[9px] text-[#01696F] hover:underline"
+                        >Reset to computed</button>
+                      ) : (
+                        <span className="opacity-50">auto from FDP</span>
+                      )}
+                    </span>
+                    <span>24h</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Mission type */}
             <div className="flex items-center gap-2">
