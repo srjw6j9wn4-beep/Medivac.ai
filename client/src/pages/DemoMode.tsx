@@ -405,7 +405,7 @@ const INITIAL_DEMO_STEPS = [
   { id: 5, title: "ISO Compliance Score", cue: "Switch to Safety role → ISO page", talking: "Live readiness scoring across ISO 9001, 13485, 27001, and 25010. Evidence packs, CAPA tracking, certification critical path.", done: false },
   { id: 6, title: "Jennifer Q&A Demo", cue: "Open AI Mission Analyst", talking: "Let the client ask Jennifer a capability question. Demonstrate voice input and lip-sync response. Position as a white-label option.", done: false },
   { id: 7, title: "Reporting Value", cue: "Navigate to Audit & Reports", talking: "One-click weekly, monthly, and financial-year packs. CASA audit export. Fuel reconciliation. Crew hours vs Air Maestro.", done: false },
-  { id: 8, title: "Pilot Program Ask", cue: "Return to this page", talking: "We'd love to run a 90-day pilot with your operations team at no cost. Three aircraft, full feature access, dedicated onboarding support.", done: false },
+  { id: 8, title: "Pilot Program Ask", cue: "Return to this page", talking: "We'd love to run a 60-day pilot with your operations team. Three aircraft, full feature access, dedicated onboarding support.", done: false },
 ];
 
 // ─── Main component ──────────────────────────────────────────────────────────
@@ -574,7 +574,7 @@ export default function DemoMode({ role }: Props) {
               <h2 className="text-base font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>Closing — Pilot Program Ask</h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              "We'd love to run a <strong className="text-foreground">90-day pilot</strong> with your operations team at no cost — three aircraft, full feature access, and dedicated onboarding support. Our goal is to show you measurable improvement in dispatch speed, compliance confidence, and audit readiness within the first 30 days."
+              "We'd love to run a <strong className="text-foreground">60-day pilot</strong> with your operations team — three aircraft, full feature access, and dedicated onboarding support. Our goal is to show you measurable improvement in dispatch speed, compliance confidence, and audit readiness within the first 30 days."
             </p>
           </div>
         </div>

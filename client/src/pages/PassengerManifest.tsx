@@ -257,6 +257,7 @@ export default function PassengerManifest({ role }: Props) {
   const [loadingList, setLoadingList] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [manifestFilter, setManifestFilter] = useState<string>("all");
 
   const isRAHSDental = ["rahs", "dental"].includes((bookingTeam || "").toLowerCase());
 

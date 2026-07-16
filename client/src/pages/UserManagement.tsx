@@ -164,13 +164,13 @@ export default function UserManagement({ role }: Props) {
               {role === "admin" && (
                 <div className="space-y-2 pt-2 border-t border-card-border">
                   <div className="text-xs font-semibold text-muted-foreground">Admin Actions</div>
-                  <button className="w-full py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
+                  <button onClick={() => { const r = prompt(`Edit role for ${selected?.name}\nCurrent role: ${selected?.role}\n\nEnter new role:`, selected?.role); if (r) alert(`Role updated to "${r}" for ${selected?.name}.\n(In production this updates the user record.)`); }} className="w-full py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
                     Edit Role
                   </button>
-                  <button className="w-full py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
+                  <button onClick={() => { if (confirm(`Send password reset email to ${selected?.name}?`)) alert(`Password reset email sent to ${selected?.name}.\n(In production this triggers an auth reset flow.)`); }} className="w-full py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
                     Reset Password
                   </button>
-                  <button className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-semibold rounded-lg transition-colors">
+                  <button onClick={() => { if (confirm(`Deactivate account for ${selected?.name}?\nThis will remove their access immediately.`)) alert(`Account deactivated for ${selected?.name}.\n(In production this disables login and notifies the user.)`); }} className="w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-semibold rounded-lg transition-colors">
                     Deactivate Account
                   </button>
                 </div>
@@ -209,7 +209,7 @@ export default function UserManagement({ role }: Props) {
               {["Dubbo", "Broken Hill", "Sydney", "Orange", "Bankstown", "Launceston"].map(b => <option key={b}>{b}</option>)}
             </select>
           </div>
-          <button className="w-full py-2.5 bg-cyan-400/20 hover:bg-cyan-400/30 border border-cyan-400/30 text-cyan-400 text-sm font-semibold rounded-lg transition-colors">
+          <button onClick={() => { const form = document.querySelectorAll('#invite-form input, #invite-form select'); const name = (form[0] as HTMLInputElement)?.value; const email = (form[1] as HTMLInputElement)?.value; if (!name || !email) { alert("Please enter a name and email address."); return; } alert(`Invitation sent to ${name} (${email}).\n(In production this sends an onboarding email.)`); }} className="w-full py-2.5 bg-cyan-400/20 hover:bg-cyan-400/30 border border-cyan-400/30 text-cyan-400 text-sm font-semibold rounded-lg transition-colors">
             Send Invitation
           </button>
         </div>

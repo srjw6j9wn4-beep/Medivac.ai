@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle, X, Radio, Shield, CheckCircle2, Clock,
   PhoneCall, Plane, MapPin, Siren, Truck, Flame,
-  AlertCircle, ToggleLeft, ToggleRight,
+  AlertCircle, ToggleLeft, ToggleRight, Minimize2, Maximize2,
 } from "lucide-react";
 import type { UserRole } from "@/lib/data";
 
@@ -69,6 +69,14 @@ const SVC_LABEL: Record<string, string> = {
 type Phase = "airborne" | "ground";
 
 // ── Shared overlay component (used by both desktop portal & mobile portal) ──
+function formatElapsed(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
 interface OverlayProps {
   event: { timestamp: string; role: string; phase: Phase };
   isAirborne: boolean;
@@ -79,11 +87,99 @@ interface OverlayProps {
   standDown: () => void;
   atcPanel: boolean;
   emergencyServicesPanel: boolean;
+  minimised: boolean;
+  onMinimise: () => void;
+  onMaximise: () => void;
+  elapsedSecs: number;
 }
 
 function EmergencyOverlay({
   event, isAirborne, pulse, steps, isDispatch, toggleStep, standDown, atcPanel, emergencyServicesPanel,
+  minimised, onMinimise, onMaximise, elapsedSecs,
 }: OverlayProps) {
+  const completedCount = steps.filter(s => s.done).length;
+
+  // ── Minimised: full-screen red throb + floating status pill ────────────
+  if (minimised) {
+    return (
+      <>
+        {/* Throbbing red vignette — pointer-events none so the app is fully usable */}
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9990,
+          pointerEvents: "none",
+          animation: "emergency-throb 2.8s ease-in-out infinite",
+          background: "radial-gradient(ellipse at center, transparent 30%, rgba(180,0,0,0.45) 100%)",
+        }} />
+
+        {/* Floating status pill — bottom-right, above content */}
+        <div style={{
+          position: "fixed", bottom: 16, right: 16, zIndex: 9995,
+          display: "flex", flexDirection: "column", gap: "6px",
+          alignItems: "flex-end",
+        }}>
+          {/* Status card */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: "8px",
+            background: "rgba(160,0,0,0.92)",
+            border: "1.5px solid rgba(255,255,255,0.5)",
+            borderRadius: "10px",
+            padding: "8px 12px",
+            boxShadow: "0 4px 24px rgba(180,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+          }}>
+            {/* Pulse dot */}
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+              background: "#fff", display: "inline-block",
+              animation: "pulse 0.8s ease-in-out infinite",
+            }} />
+            <AlertTriangle size={13} style={{ color: "#fff", flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
+              <span style={{ fontSize: "11px", fontWeight: 800, color: "#fff", textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1.2 }}>
+                EMERGENCY ACTIVE
+              </span>
+              <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.8)", lineHeight: 1.2 }}>
+                {isAirborne ? "Airborne" : "On Ground"} · {completedCount}/{steps.length} steps
+              </span>
+            </div>
+            {/* Elapsed */}
+            <span style={{
+              fontSize: "14px", fontWeight: 800, fontFamily: "monospace",
+              color: elapsedSecs >= 600 ? "#FDE047" : "#fff",
+              textShadow: elapsedSecs >= 600 ? "0 0 8px rgba(253,224,71,0.7)" : "none",
+              marginLeft: "4px", flexShrink: 0,
+            }}>
+              {formatElapsed(elapsedSecs)}
+            </span>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button onClick={onMaximise}
+              style={{ display: "flex", alignItems: "center", gap: "4px",
+                padding: "5px 10px", borderRadius: "7px",
+                border: "1.5px solid rgba(255,255,255,0.6)",
+                background: "rgba(140,0,0,0.9)", color: "#fff",
+                fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.4)" }}>
+              <Maximize2 size={10} /> Expand
+            </button>
+            <button onClick={standDown}
+              style={{ display: "flex", alignItems: "center", gap: "4px",
+                padding: "5px 10px", borderRadius: "7px",
+                border: "1.5px solid rgba(255,255,255,0.3)",
+                background: "rgba(40,0,0,0.85)", color: "rgba(255,255,255,0.85)",
+                fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.4)" }}>
+              <X size={10} /> Stand Down
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── Full-screen overlay ─────────────────────────────────────────────────
   return (
     <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, zIndex:9999, display:"flex", flexDirection:"column", background:"rgb(190,0,0)" }}>
       {/* Pulsing border */}
@@ -101,12 +197,30 @@ function EmergencyOverlay({
             {event.timestamp} · {event.role}
           </div>
         </div>
-        <div style={{ flexShrink:0, textAlign:"right" }}>
-          <div style={{ fontSize:"9px", color:"rgba(255,255,255,0.8)", textTransform:"uppercase", letterSpacing:"0.1em" }}>Status</div>
-          <div style={{ fontSize:"12px", fontWeight:700, color:"#fff", display:"flex", alignItems:"center", gap:"5px", justifyContent:"flex-end" }}>
-            <span style={{ display:"inline-block", width:7, height:7, borderRadius:"50%", background:"#fff" }} className="animate-pulse" />
-            ACTIVE
+        <div style={{ flexShrink:0, display:"flex", alignItems:"center", gap:"8px" }}>
+          <div style={{ textAlign:"right" }}>
+            <div style={{ fontSize:"9px", color:"rgba(255,255,255,0.8)", textTransform:"uppercase", letterSpacing:"0.1em" }}>Status</div>
+            <div style={{ fontSize:"12px", fontWeight:700, color:"#fff", display:"flex", alignItems:"center", gap:"5px", justifyContent:"flex-end" }}>
+              <span style={{ display:"inline-block", width:7, height:7, borderRadius:"50%", background:"#fff" }} className="animate-pulse" />
+              ACTIVE
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:"4px", justifyContent:"flex-end", marginTop:"3px",
+              fontSize:"16px", fontWeight:800, fontFamily:"monospace",
+              color: elapsedSecs >= 600 ? "#FDE047" : "#fff",
+              textShadow: elapsedSecs >= 600 ? "0 0 10px rgba(253,224,71,0.8)" : "none" }}>
+              <Clock size={13} />{formatElapsed(elapsedSecs)}
+            </div>
           </div>
+          {/* Minimise button */}
+          <button onClick={onMinimise} title="Minimise — continue working"
+            style={{ display:"flex", alignItems:"center", gap:"5px", padding:"6px 12px",
+              borderRadius:"7px", border:"1.5px solid rgba(255,255,255,0.6)",
+              background:"rgba(0,0,0,0.35)", color:"#fff",
+              fontSize:"11px", fontWeight:700, cursor:"pointer",
+              textTransform:"uppercase", letterSpacing:"0.04em",
+              boxShadow:"0 2px 8px rgba(0,0,0,0.3)" }}>
+            <Minimize2 size={12} /> Minimise
+          </button>
         </div>
       </div>
 
@@ -287,11 +401,13 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
   if (!EMERGENCY_ROLES.includes(role)) return null;
 
   // ── State ──────────────────────────────────────────────
-  const [armed,    setArmed]    = useState(false);
-  const [active,   setActive]   = useState(false);
-  const [armTimer, setArmTimer] = useState(3);
-  const [event,    setEvent]    = useState<EmergencyEvent | null>(null);
-  const [pulse,    setPulse]    = useState(false);
+  const [armed,       setArmed]       = useState(false);
+  const [active,      setActive]      = useState(false);
+  const [armTimer,    setArmTimer]    = useState(3);
+  const [event,       setEvent]       = useState<EmergencyEvent | null>(null);
+  const [pulse,       setPulse]       = useState(false);
+  const [minimised,   setMinimised]   = useState(false);
+  const [elapsedSecs, setElapsedSecs] = useState(0);
 
   // Phase: airborne or on-ground — toggleable in the button bar
   const [phase, setPhase] = useState<Phase>(externalPhase ?? "airborne");
@@ -323,6 +439,14 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
   useEffect(() => {
     if (!active) return;
     const id = setInterval(() => setPulse(p => !p), 800);
+    return () => clearInterval(id);
+  }, [active]);
+
+  // Elapsed time counter — ticks every second while emergency is active
+  useEffect(() => {
+    if (!active) { setElapsedSecs(0); return; }
+    setElapsedSecs(0);
+    const id = setInterval(() => setElapsedSecs(s => s + 1), 1000);
     return () => clearInterval(id);
   }, [active]);
 
@@ -398,6 +522,7 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
     setArmed(false);
     setArmTimer(3);
     setEvent(null);
+    setMinimised(false);
     setSteps(
       (phase === "airborne" ? AIRBORNE_STEPS : GROUND_STEPS)
         .map(s => ({ ...s, done: false }))
@@ -506,6 +631,8 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
           event={event} isAirborne={isAirborne} pulse={pulse}
           steps={steps} isDispatch={isDispatch} toggleStep={toggleStep}
           standDown={standDown} atcPanel={atcPanel} emergencyServicesPanel={emergencyServicesPanel}
+          minimised={minimised} onMinimise={() => setMinimised(true)} onMaximise={() => setMinimised(false)}
+          elapsedSecs={elapsedSecs}
         />, document.body)}
       </>
     );
@@ -632,6 +759,8 @@ export default function EmergencyButton({ role, phase: externalPhase, mobile = f
         event={event} isAirborne={isAirborne} pulse={pulse}
         steps={steps} isDispatch={isDispatch} toggleStep={toggleStep}
         standDown={standDown} atcPanel={atcPanel} emergencyServicesPanel={emergencyServicesPanel}
+        minimised={minimised} onMinimise={() => setMinimised(true)} onMaximise={() => setMinimised(false)}
+        elapsedSecs={elapsedSecs}
       />, document.body)}
     </>
   );

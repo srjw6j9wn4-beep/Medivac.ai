@@ -1,96 +1,26 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { MISSIONS, AIRCRAFT, NSW_AIRPORTS, type UserRole } from "@/lib/data";
-import { Plane, Navigation, ZoomIn, ZoomOut, Maximize2, Minimize2, RotateCcw } from "lucide-react";
+import { Navigation, ZoomIn, ZoomOut, Maximize2, Minimize2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Props { role: UserRole; }
 
-const ROUTES = [
-  { from: { x: 52, y: 48 }, to: { x: 82, y: 68 }, mission: 'M001', status: 'Active',   color: '#f97316' },
-  { from: { x: 18, y: 44 }, to: { x: 72, y: 78 }, mission: 'M002', status: 'Pending',  color: '#facc15' },
-  { from: { x: 52, y: 48 }, to: { x: 44, y: 38 }, mission: 'M003', status: 'Complete', color: '#22d3ee' },
-  { from: { x: 44, y: 32 }, to: { x: 52, y: 48 }, mission: 'M004', status: 'Airborne', color: '#4ade80' },
-];
-
+const STATUS_COLORS: Record<string, string> = {
+  Active:    'text-orange-400',
+  Airborne:  'text-cyan-400',
+  Pending:   'text-yellow-400',
+  Complete:  'text-green-400',
+  Cancelled: 'text-red-400',
+};
 
 export default function FlightMap({ role }: Props) {
   const [selectedMission, setSelectedMission] = useState<string | null>(null);
-  const [hoveredAirport, setHoveredAirport]   = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen]       = useState(false);
-
-  // ViewBox state for pan/zoom
-  const leafletRef     = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-
-
-  // ── Leaflet map initialisation ────────────────────────────────────────────
-  useEffect(() => {
-    if (mapInstanceRef.current || !leafletRef.current) return;
-    import("leaflet").then(L => {
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-      });
-      const map = L.map(leafletRef.current!, {
-        center: [-32.5, 146.5], zoom: 6,
-        zoomControl: true, attributionControl: true,
-      });
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 18,
-      }).addTo(map);
-
-      // Airport markers
-      NSW_AIRPORTS.forEach(ap => {
-        const isBase = ap.icao === 'YSDU' || ap.icao === 'YBHI' || ap.icao === 'YSBK';
-        const html = isBase
-          ? `<div style="background:#0097A7;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:15px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.5);">✈</div>`
-          : `<div style="background:#1e293b;color:#94a3b8;border-radius:4px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;border:1px solid #334155;box-shadow:0 1px 4px rgba(0,0,0,0.4);">✈</div>`;
-        L.marker([ap.lat, ap.lng], {
-          icon: L.divIcon({ className: "", html, iconSize: isBase ? [30,30] : [22,22], iconAnchor: isBase ? [15,15] : [11,11] })
-        }).bindPopup(`<b>${ap.name}</b><br/>${ap.icao}${isBase ? "<br/><b style='color:#0097A7'>RFDS Base</b>" : ""}`).addTo(map);
-      });
-
-      // Active mission routes
-      MISSIONS.filter(m => m.status !== 'Complete' && m.status !== 'Cancelled').forEach(m => {
-        const fromAp = NSW_AIRPORTS.find(a => a.icao === m.from);
-        const toAp   = NSW_AIRPORTS.find(a => a.icao === m.to);
-        if (fromAp && toAp) {
-          const color = m.status === 'Airborne' ? '#22d3ee' : m.status === 'Active' ? '#f97316' : '#facc15';
-          L.polyline([[fromAp.lat, fromAp.lng],[toAp.lat, toAp.lng]], {
-            color, weight: m.status === 'Airborne' ? 3 : 2, opacity: 0.85,
-            dashArray: m.status === 'Airborne' ? undefined : "6 4",
-          }).bindPopup(`<b>${m.callsign}</b><br/>${m.from} → ${m.to}<br/>${m.status}`).addTo(map);
-        }
-      });
-
-      mapInstanceRef.current = { map, L };
-    });
-    return () => {
-      if (mapInstanceRef.current) { mapInstanceRef.current.map.remove(); mapInstanceRef.current = null; }
-    };
-  }, []);
-
-  const zoom = (factor: number) => {
-    if (mapInstanceRef.current) {
-      factor < 1 ? mapInstanceRef.current.map.zoomIn() : mapInstanceRef.current.map.zoomOut();
-    }
-  };
-  const resetView = () => {
-    if (mapInstanceRef.current) mapInstanceRef.current.map.setView([-32.5, 146.5], 6);
-  };
+  const [showAllAircraft, setShowAllAircraft] = useState(false);
 
   const selected       = MISSIONS.find(m => m.id === selectedMission);
   const activeMissions = MISSIONS.filter(m => m.status !== 'Complete' && m.status !== 'Cancelled');
 
-  // ── Zoom ─────────────────────────────────────────────────────────────────────
-
-
-  // Reset view
-
-  // ── Fullscreen (CSS overlay — no browser API needed) ─────────────────────
   function toggleFullscreen() { setIsFullscreen(f => !f); }
 
   // Escape key exits fullscreen
@@ -102,14 +32,15 @@ export default function FlightMap({ role }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [isFullscreen]);
 
-  // ── Map panel (reused in normal + fullscreen) ─────────────────────────────
+  // ── Map panel (iframe — works in all sandbox/iframe environments) ─────────
   function MapPanel({ compact = false }: { compact?: boolean }) {
+    const h = compact ? "400px" : "500px";
     return (
       <div className={cn(
         "bg-card border border-card-border rounded-xl overflow-hidden flex flex-col",
         compact ? "h-full" : ""
       )}>
-        {/* Map toolbar */}
+        {/* Toolbar */}
         <div className="px-4 py-2.5 border-b border-card-border flex items-center gap-2 flex-shrink-0">
           <Navigation size={14} className="text-cyan-400" />
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex-1">
@@ -118,47 +49,39 @@ export default function FlightMap({ role }: Props) {
           <span className="text-[10px] text-muted-foreground mr-2 hidden sm:block">
             Scroll to zoom · Drag to pan
           </span>
-          {/* Zoom controls */}
-          <button
-            onClick={() => zoom(0.75)}
-            className="p-1.5 rounded hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
-            title="Zoom in"
-          >
-            <ZoomIn size={14} />
-          </button>
-          <button
-            onClick={() => zoom(1.33)}
-            className="p-1.5 rounded hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
-            title="Zoom out"
-          >
-            <ZoomOut size={14} />
-          </button>
-          <button
-            onClick={resetView}
-            className="p-1.5 rounded hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
-            title="Reset view"
-          >
-            <RotateCcw size={12} />
-          </button>
-          <div className="w-px h-4 bg-white/10 mx-1" />
           <button
             onClick={toggleFullscreen}
             className="p-1.5 rounded hover:bg-white/5 text-cyan-400 hover:text-cyan-300 transition-colors"
-            title={isFullscreen ? "Exit fullscreen" : "Fullscreen (Ops room / visitor display)"}
+            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
 
-        {/* Leaflet map — OpenStreetMap tiles + airport overlays */}
-        <div className="relative flex-1" style={{ minHeight: compact ? "100%" : "480px" }}>
-          <div ref={leafletRef} style={{ width: "100%", height: "100%", minHeight: compact ? "400px" : "480px" }} />
+        {/* OSM iframe — no Leaflet, works in all iframe environments */}
+        <div className="relative" style={{ height: h }}>
+          <iframe
+            title="NSW Operational Map"
+            src="https://www.openstreetmap.org/export/embed.html?bbox=140.9,-37.5,153.6,-28.0&layer=mapnik"
+            style={{ width: "100%", height: h, border: 0, display: "block" }}
+            loading="lazy"
+          />
+          {/* RFDS base overlays */}
+          <div className="absolute top-2 right-2 flex flex-col gap-1 pointer-events-none">
+            {NSW_AIRPORTS
+              .filter(a => a.icao === 'YSDU' || a.icao === 'YBHI' || a.icao === 'YSBK')
+              .map(base => (
+                <div key={base.icao} className="bg-cyan-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1">
+                  ✈ {base.icao} — {base.name}
+                </div>
+              ))}
+          </div>
         </div>
       </div>
     );
   }
 
-  // ── Right sidebar content ─────────────────────────────────────────────────
+  // ── Right sidebar ─────────────────────────────────────────────────────────
   function SidePanel() {
     return (
       <div className="space-y-3">
@@ -260,13 +183,9 @@ export default function FlightMap({ role }: Props) {
 
   return (
     <>
-      {/* ── Fullscreen overlay ───────────────────────────────────────────── */}
+      {/* Fullscreen overlay */}
       {isFullscreen && (
-        <div
-          className="fixed inset-0 z-[999] bg-slate-950 flex flex-col"
-          style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}
-        >
-          {/* Fullscreen header bar */}
+        <div className="fixed inset-0 z-[999] bg-slate-950 flex flex-col" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
           <div className="flex items-center justify-between px-6 py-3 border-b border-white/10 flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-1 rounded-full">
@@ -286,43 +205,29 @@ export default function FlightMap({ role }: Props) {
               </button>
             </div>
           </div>
-
-          {/* Fullscreen body — map takes all available space */}
           <div className="flex flex-1 gap-0 overflow-hidden">
-            {/* Map — expands to fill */}
-            <div className="flex-1 p-4 flex flex-col">
-              <MapPanel compact />
-            </div>
-            {/* Sidebar — fixed width scrollable */}
-            <div className="w-72 border-l border-white/10 overflow-y-auto p-4 flex-shrink-0">
-              <SidePanel />
-            </div>
+            <div className="flex-1 p-4 flex flex-col"><MapPanel compact /></div>
+            <div className="w-72 border-l border-white/10 overflow-y-auto p-4 flex-shrink-0"><SidePanel /></div>
           </div>
         </div>
       )}
 
-      {/* ── Normal layout ─────────────────────────────────────────────────── */}
+      {/* Normal layout */}
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>NSW Flight Map</h1>
             <p className="text-xs text-muted-foreground mt-0.5">Live operational picture · RFDS SE Section airspace</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-1 rounded-full">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              LIVE
-            </div>
+          <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-500/10 border border-green-500/20 px-2.5 py-1 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            LIVE
           </div>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <MapPanel />
-          </div>
-          <div>
-            <SidePanel />
-          </div>
+          <div className="lg:col-span-2"><MapPanel /></div>
+          <div><SidePanel /></div>
         </div>
       </div>
     </>

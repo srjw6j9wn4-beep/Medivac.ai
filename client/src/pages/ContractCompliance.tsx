@@ -191,10 +191,13 @@ export default function ContractCompliance({ role }: Props) {
             </div>
 
             <div className="flex gap-2">
-              <button className="flex-1 py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
+              <button onClick={() => alert(`Opening ${selected.title}\n\nIn production this would open the full contract document for ${selected.counterparty}.`)} className="flex-1 py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
                 View Full Contract
               </button>
-              <button className="flex-1 py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
+              <button onClick={() => {
+                const d = prompt(`Set reminder for "${selected.title}"\nEnter days before expiry (current: ${selected.daysToExpiry} days):`, '30');
+                if (d) alert(`Reminder set — ${d} days before expiry of ${selected.title}.\n(In production this would create a calendar notification.)`);
+              }} className="flex-1 py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
                 Set Reminder
               </button>
             </div>
@@ -209,7 +212,7 @@ export default function ContractCompliance({ role }: Props) {
             <div key={i} className={`bg-card border rounded-xl p-4 flex items-start gap-4 ${a.level === "high" ? "border-red-400/30" : a.level === "medium" ? "border-yellow-400/30" : "border-card-border"}`}>
               <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${a.level === "high" ? "bg-red-400" : a.level === "medium" ? "bg-yellow-400" : "bg-green-400"}`} />
               <div className="flex-1 text-sm">{a.text}</div>
-              <button className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors whitespace-nowrap">{a.action} →</button>
+              <button onClick={() => alert(`Action: ${a.action}\n\n"${a.text}"\n\nIn production this would navigate to the relevant screen.`)} className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors whitespace-nowrap">{a.action} →</button>
             </div>
           ))}
         </div>

@@ -7,9 +7,10 @@ import {
   ChevronDown, ChevronRight, Activity, Users, Shield, Settings,
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
   Moon, Sun, SunMoon, Menu, X, PanelLeftClose, PanelLeftOpen,
-  Bell, BellRing, CheckCheck, ExternalLink, TrendingUp,
+  Bell, BellRing, CheckCheck, ExternalLink, TrendingUp, HelpCircle,
 } from "lucide-react";
 import EmergencyButton from "@/components/EmergencyButton";
+import HelpDrawer from "@/components/HelpDrawer";
 import { FEATURES } from "@/lib/config";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -205,6 +206,8 @@ const BASE_NAV: NavItem[] = [
       { label: "Flight Planning", path: "/flight-planning" },
       { label: "Mission Optimiser", path: "/mission-optimiser" },
       { label: "Special Missions", path: "/special-missions" },
+      { label: "Ops Task Management", path: "/ops-tasks" },
+      { label: "Pilot Handover Board", path: "/pilot-handover" },
     ],
   },
   {
@@ -212,11 +215,13 @@ const BASE_NAV: NavItem[] = [
     icon: <Users size={16} />,
     iconLg: <Users size={28} />,
     children: [
+      { label: "Org Chart & Key Contacts", path: "/org-chart" },
       { label: "Crew Roster", path: "/roster" },
       { label: "Duty & FRMS", path: "/frms" },
       { label: "Aircraft Status", path: "/aircraft" },
       { label: "Engineering", path: "/engineering" },
       { label: "Maintenance Planner", path: "/maint-planner" },
+      { label: "Asset Utilisation", path: "/asset-utilisation" },
       { label: "Ferry Flights", path: "/ferry" },
       { label: "Tech Log", path: "/techlog" },
       { label: "Check & Training", path: "/check-training" },
@@ -249,9 +254,10 @@ const BASE_NAV: NavItem[] = [
       { label: "Cost Optimizer", path: "/cost-optimizer" },
       { label: "ISO Compliance", path: "/iso", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
       { label: "Contract Compliance", path: "/contracts", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
-      { label: "Fuel & Finance", path: "/finance", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
+      { label: "Fee Reconciliation", path: "/finance", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
       { label: "Audit & Reports", path: "/audit" },
       { label: "Government Tenders", path: "/government-tenders" },
+      { label: "Payroll & Leave", path: "/payroll-leave", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer'] },
     ],
   },
   {
@@ -259,6 +265,8 @@ const BASE_NAV: NavItem[] = [
     icon: <Settings size={16} />,
     iconLg: <Settings size={28} />,
     children: [
+      { label: "Idea Hub", path: "/idea-hub" },
+      { label: "Project Management", path: "/projects" },
       { label: "User Management", path: "/users", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher'] },
       { label: "RBAC Permissions", path: "/rbac", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety'] },
       { label: "System Settings", path: "/settings", restricted: ['pilot', 'nurse', 'senior_flight_nurse', 'ordering_nurse', 'doctor', 'engineer', 'dispatcher', 'safety', 'senior_management'] },
@@ -331,6 +339,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
   }, [darkMode]);
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [panelOpen, setPanelOpen]     = useState(false);
+  const [helpOpen, setHelpOpen]       = useState(false);
   const [tooltip, setTooltip]         = useState<{ label: string; y: number } | null>(null);
   const tooltipTimer                  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -627,6 +636,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
             <span className="truncate hidden sm:inline">Aeromedical Operations</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={() => setHelpOpen(true)} title="Help" className="p-1.5 rounded-lg text-muted-foreground hover:text-cyan-400 hover:bg-white/10 transition-colors" data-testid="button-help"><HelpCircle size={16} /></button>
             <NotificationBell role={role} />
             <div className="hidden md:block">
               <EmergencyButton role={role} />
@@ -639,6 +649,12 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         </header>
         <main className="flex-1 overflow-y-auto">
           {children}
+          {helpOpen && <HelpDrawer path={location} onClose={() => setHelpOpen(false)} />}
+          <footer className="px-4 py-2 border-t border-border text-center">
+            <p className="text-[10px] text-muted-foreground">
+              © 2026 Medivac.ai. Medivac.ai is proprietary software. All intellectual property, design, and functionality rights are reserved. Confidential — not for distribution.
+            </p>
+          </footer>
         </main>
       </div>
     </div>

@@ -745,7 +745,7 @@ export default function MedicalEquipment({ role }: Props) {
                     <span className={`px-1.5 py-0.5 rounded text-xs ${drugStatusBadge(d.status)}`}>{drugStatusLabel(d.status)}</span>
                     {d.reorderQty > 0 && <span className="text-amber-400 font-medium">Order {d.reorderQty} {d.unit}</span>}
                     {canOrder && (
-                      <button className="text-xs bg-teal-500/15 border border-teal-500/30 text-teal-400 rounded px-2 py-0.5 hover:bg-teal-500/25 transition-colors flex items-center gap-1">
+                      <button onClick={() => alert(`Order raised for ${d.name}\nQty: ${d.reorderQty} ${d.unit}\n\nIn production this would create a pharmacy requisition order.`)} className="text-xs bg-teal-500/15 border border-teal-500/30 text-teal-400 rounded px-2 py-0.5 hover:bg-teal-500/25 transition-colors flex items-center gap-1">
                         <Plus size={10} />Raise Order
                       </button>
                     )}
@@ -761,7 +761,7 @@ export default function MedicalEquipment({ role }: Props) {
                   <div className="flex items-center gap-2">
                     <span className={`px-1.5 py-0.5 rounded text-xs ${drugStatusBadge(b.status)}`}>{drugStatusLabel(b.status)}</span>
                     {canOrder && (
-                      <button className="text-xs bg-teal-500/15 border border-teal-500/30 text-teal-400 rounded px-2 py-0.5 hover:bg-teal-500/25 transition-colors flex items-center gap-1">
+                      <button onClick={() => alert(`ARCBS Contact — ${b.group} ${b.component}\nExpiry: ${b.expiryDate}\n\nContact ARCBS Dubbo: 1800 777 203\n\nIn production this would initiate a blood product order request.`)} className="text-xs bg-teal-500/15 border border-teal-500/30 text-teal-400 rounded px-2 py-0.5 hover:bg-teal-500/25 transition-colors flex items-center gap-1">
                         <Plus size={10} />Contact ARCBS
                       </button>
                     )}
@@ -822,7 +822,7 @@ export default function MedicalEquipment({ role }: Props) {
                       <div className="text-muted-foreground mt-0.5">{a.by}</div>
                     </div>
                     {!a.done && canSignOff && (
-                      <button className="flex-shrink-0 text-xs bg-green-500/15 border border-green-500/25 text-green-400 rounded px-2 py-0.5 hover:bg-green-500/25 transition-colors">
+                      <button onClick={() => alert(`Action marked complete:\n"${a.action}"\n\nIn production this would update the action status in the ordering queue.`)} className="flex-shrink-0 text-xs bg-green-500/15 border border-green-500/25 text-green-400 rounded px-2 py-0.5 hover:bg-green-500/25 transition-colors">
                         Mark Done
                       </button>
                     )}
@@ -832,7 +832,7 @@ export default function MedicalEquipment({ role }: Props) {
               {canSignOff && (
                 <div className="mt-4 pt-3 border-t border-teal-500/20 flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Senior Flight Nurse sign-off required for S8 requisitions</span>
-                  <button className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-emerald-500/25 transition-colors">
+                  <button onClick={() => alert("SFN Sign-Off submitted\n\nAll S8 requisitions signed off by Senior Flight Nurse.\nRef: " + new Date().toLocaleString("en-AU") + "\n\nIn production this would submit the requisition to pharmacy and create an audit trail.")} className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-emerald-500/25 transition-colors">
                     <ShieldCheck size={13} />
                     SFN Sign-Off & Submit
                   </button>

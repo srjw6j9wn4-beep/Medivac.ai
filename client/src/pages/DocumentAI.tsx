@@ -118,9 +118,14 @@ export default function DocumentAI({ role }: Props) {
             <div className="text-3xl mb-2">📂</div>
             <div className="text-sm font-semibold mb-1">Drop documents here or click to upload</div>
             <div className="text-xs text-muted-foreground">PDF, DOCX, TXT — up to 50 MB per file</div>
-            <button className="mt-3 px-4 py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
+            <label className="mt-3 inline-block cursor-pointer px-4 py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
               Browse Files
-            </button>
+              <input type="file" accept=".pdf,.docx,.txt" multiple className="hidden" onChange={e => {
+                const files = Array.from(e.target.files || []);
+                if (files.length) alert(`${files.length} file(s) selected: ${files.map(f=>f.name).join(', ')}. Upload handling would be processed by the server in production.`);
+                e.target.value = '';
+              }} />
+            </label>
           </div>
 
           {/* Document list */}

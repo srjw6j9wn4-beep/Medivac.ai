@@ -16,7 +16,7 @@ const VIDEOS = [
     color: "from-cyan-900/60 to-slate-900",
     accent: "border-cyan-400/40",
     videoSrc: `/video/01_welcome.mp4`,
-    backdropSrc: "/bg_01_welcome.png",
+    backdropSrc: "/thumb_01_welcome.png",
   },
   {
     id: 2,
@@ -524,19 +524,19 @@ export default function Jennifer({ role }: Props) {
               className="relative w-full bg-[#0a1628] overflow-hidden"
               style={{ aspectRatio: '16/9' }}
             >
-              {/* Full-bleed scenic backdrop — always visible, video overlays on top */}
-              {activeVideo.backdropSrc && (
+              {/* Backdrop — only shown when paused */}
+              {activeVideo.backdropSrc && !playing && (
                 <div
                   className="absolute inset-0"
                   style={{
                     backgroundImage: `url(${activeVideo.backdropSrc})`,
-                    backgroundSize: '100% 100%',
+                    backgroundSize: 'cover',
                     backgroundPosition: 'center',
                   }}
                 />
               )}
               {/* Bottom gradient only when paused */}
-              {!playing && (
+              {!playing && activeVideo.id !== 1 && (
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(5,13,26,0.75) 0%, rgba(5,13,26,0.1) 50%, rgba(5,13,26,0.0) 70%)' }} />
               )}
               {/* Jennifer video — full width, no blend */}
@@ -555,7 +555,7 @@ export default function Jennifer({ role }: Props) {
               />
 
               {!playing && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: 'rgba(5,13,26,0.55)' }}>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4" style={{ background: activeVideo.id === 1 ? 'transparent' : 'rgba(5,13,26,0.55)' }}>
 
                   <div className="text-lg font-bold text-white text-center px-6" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
                     {activeVideo.title}

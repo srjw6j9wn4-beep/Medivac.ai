@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { generateInvoicePDF } from "@/lib/generateInvoicePDF";
@@ -7,6 +7,7 @@ import {
   Plus, Search, FileText, Download, Trash2, Send, CheckCircle2,
   Save, X, DollarSign, Clock, AlertTriangle, Receipt, Plane,
   MapPin, ArrowRight, Building2, ShieldCheck, FileSpreadsheet,
+  CalendarRange, ChevronDown, ChevronUp, Layers, CheckSquare, Square,
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -15,6 +16,7 @@ interface Props { role: UserRole; }
 type InvoiceStatus = "Draft" | "Submitted" | "Paid" | "Overdue" | "Pending Approval";
 type PayerType = "nsw_health" | "private";
 type MissionType = "Standard NEPT" | "Complex/Long-haul NEPT" | "NETS Neonatal" | "ECMO";
+type ViewTab = "list" | "bulk";
 
 interface Invoice {
   id: number;
@@ -51,6 +53,32 @@ interface Invoice {
   updatedAt: string;
 }
 
+interface NeptTask {
+  id: number;
+  taskRef: string;
+  status: string;
+  pickupLocation: string;
+  destLocation: string;
+  referringHospital: string | null;
+  receivingHospital: string | null;
+  aircraftReg: string | null;
+  completedAt: string | null;
+}
+
+// ─── Bulk line item ───────────────────────────────────────────────────────────
+interface BulkLine {
+  taskRef: string;
+  serviceDate: string;
+  fromTo: string;
+  aircraftReg: string;
+  missionType: MissionType;
+  amountCents: number;
+  isCancelled: boolean;
+  cancellationReason: string;
+  partialPercent: number; // 0-100, for cancelled partial billing
+  includeInInvoice: boolean;
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 const MISSION_BASE_AMOUNTS: Record<MissionType, number> = {
   "Standard NEPT": 285000,
@@ -72,6 +100,11 @@ function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function firstOfMonthISO(): string {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
+
 function addDaysISO(dateISO: string, days: number): string {
   const d = new Date(dateISO || todayISO());
   d.setDate(d.getDate() + days);
@@ -90,8 +123,8 @@ function isOverdue(inv: Invoice): boolean {
   if (!inv.dueDate) return false;
   const due = new Date(inv.dueDate);
   const now = new Date();
-  return due.getTime() < now.getTime() - 0 && (inv.status === "Draft" || inv.status === "Submitted") &&
-    (now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24) > 30;
+  return (now.getTime() - due.getTime()) / (1000 * 60 * 60 * 24) > 30 &&
+    (inv.status === "Draft" || inv.status === "Submitted");
 }
 
 function effectiveStatus(inv: Invoice): InvoiceStatus {
@@ -144,44 +177,25 @@ function buildXeroCSV(invoices: Invoice[]): string {
     "Quantity", "UnitAmount", "AccountCode", "TaxType", "TaxAmount",
     "TrackingName1", "TrackingOption1",
   ];
-
   const esc = (v: string | number) => {
     const s = String(v ?? "");
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-
   const rows = invoices.map(inv => {
     const total = inv.totalAmount / 100;
     const tax = inv.gstAmount / 100;
     const paid = inv.status === "Paid" ? total : 0;
     const due = inv.status === "Paid" ? 0 : total;
     return [
-      inv.payerName,
-      "",
-      "",
-      "",
-      "",
-      "AU",
-      inv.invoiceNumber,
-      inv.taskRef ?? "",
-      inv.invoiceDate,
-      inv.dueDate,
-      total.toFixed(2),
-      tax.toFixed(2),
-      paid.toFixed(2),
-      due.toFixed(2),
+      inv.payerName, "", "", "", "", "AU",
+      inv.invoiceNumber, inv.taskRef ?? "", inv.invoiceDate, inv.dueDate,
+      total.toFixed(2), tax.toFixed(2), paid.toFixed(2), due.toFixed(2),
       "NEPT-MISSION",
       `${inv.missionType} — ${inv.pickupLocation ?? ""} to ${inv.destination ?? ""}`,
-      "1",
-      total.toFixed(2),
-      "200",
-      "GST Free Income",
-      "0.00",
-      "Payer Type",
-      inv.payerType === "nsw_health" ? "NSW Health" : "Private / Insurance",
+      "1", total.toFixed(2), "200", "GST Free Income", "0.00",
+      "Payer Type", inv.payerType === "nsw_health" ? "NSW Health" : "Private / Insurance",
     ].map(esc).join(",");
   });
-
   return [headers.join(","), ...rows].join("\n");
 }
 
@@ -189,15 +203,11 @@ function downloadCSV(csv: string, filename: string) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
+  a.href = url; a.download = filename; a.style.display = "none";
+  document.body.appendChild(a); a.click();
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
 }
 
-// ─── Empty draft builder ────────────────────────────────────────────────────
 function emptyDraft(nextInvoiceNumber: string, prefill?: Record<string, string>): Partial<Invoice> {
   const invoiceDate = prefill?.date || todayISO();
   return {
@@ -207,13 +217,10 @@ function emptyDraft(nextInvoiceNumber: string, prefill?: Record<string, string>)
     serviceDate: prefill?.date || todayISO(),
     status: "Draft",
     approvalStatus: null,
-    approvedBy: null,
-    approvedAt: null,
-    rejectedBy: null,
-    rejectedAt: null,
+    approvedBy: null, approvedAt: null,
+    rejectedBy: null, rejectedAt: null,
     approvalNote: null,
-    autoGenerated: 0,
-    sourceType: null,
+    autoGenerated: 0, sourceType: null,
     payerType: "nsw_health",
     payerName: "NSW Health",
     taskRef: prefill?.taskRef || "",
@@ -231,9 +238,355 @@ function emptyDraft(nextInvoiceNumber: string, prefill?: Record<string, string>)
   };
 }
 
+// ─── Currency input hook ─────────────────────────────────────────────────────
+// Stores display string separately so user types dollars naturally
+function CurrencyInput({
+  valueCents,
+  onChange,
+  disabled,
+  className,
+}: {
+  valueCents: number;
+  onChange: (cents: number) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [raw, setRaw] = useState(String((valueCents / 100).toFixed(2)));
+  const focused = useRef(false);
+
+  // Sync when external value changes (e.g. mission type switch) but not while user is typing
+  useEffect(() => {
+    if (!focused.current) {
+      setRaw((valueCents / 100).toFixed(2));
+    }
+  }, [valueCents]);
+
+  return (
+    <div className="relative">
+      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">$</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        disabled={disabled}
+        className={`${className} pl-5`}
+        value={raw}
+        onFocus={() => {
+          focused.current = true;
+          // Select all on focus so user can type over immediately
+          setRaw(raw === "0.00" ? "" : raw);
+        }}
+        onChange={e => {
+          // Allow digits and a single dot
+          const v = e.target.value.replace(/[^0-9.]/g, "");
+          setRaw(v);
+          const parsed = parseFloat(v);
+          if (!isNaN(parsed)) onChange(Math.round(parsed * 100));
+        }}
+        onBlur={() => {
+          focused.current = false;
+          const parsed = parseFloat(raw);
+          const finalCents = isNaN(parsed) ? 0 : Math.round(parsed * 100);
+          onChange(finalCents);
+          setRaw((finalCents / 100).toFixed(2));
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Bulk Invoice Builder ────────────────────────────────────────────────────
+function BulkInvoicePanel() {
+  const qc = useQueryClient();
+  const [payerName, setPayerName] = useState("");
+  const [payerType, setPayerType] = useState<PayerType>("nsw_health");
+  const [dateFrom, setDateFrom] = useState(firstOfMonthISO());
+  const [dateTo, setDateTo] = useState(todayISO());
+  const [searching, setSearching] = useState(false);
+  const [lines, setLines] = useState<BulkLine[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [notes, setNotes] = useState("");
+  const [generated, setGenerated] = useState<Invoice | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fieldCls = "w-full text-xs bg-muted/10 border border-card-border rounded-md px-2.5 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500/50";
+  const labelCls = "text-[10px] text-muted-foreground uppercase tracking-wide mb-1 block";
+
+  async function handleSearch() {
+    if (!dateFrom || !dateTo) { setError("Enter date range"); return; }
+    setSearching(true); setError(null); setLines([]); setGenerated(null);
+    try {
+      const res = await apiRequest("POST", "/api/invoices/bulk-search", {
+        payerName: payerName.trim() || "__ALL__",
+        dateFrom, dateTo,
+      });
+      const tasks: NeptTask[] = await res.json();
+      if (!tasks.length) { setError("No completed transfers found in that date range" + (payerName ? ` for "${payerName}"` : "")); setSearching(false); return; }
+      setLines(tasks.map(t => ({
+        taskRef: t.taskRef,
+        serviceDate: t.completedAt?.slice(0, 10) ?? dateFrom,
+        fromTo: `${t.pickupLocation} → ${t.destLocation}`,
+        aircraftReg: t.aircraftReg ?? "",
+        missionType: "Standard NEPT" as MissionType,
+        amountCents: MISSION_BASE_AMOUNTS["Standard NEPT"],
+        isCancelled: t.status === "Cancelled",
+        cancellationReason: "",
+        partialPercent: 50,
+        includeInInvoice: t.status !== "Cancelled", // cancelled start unchecked — user opts in
+      })));
+    } catch (e) { setError(String(e)); }
+    setSearching(false);
+  }
+
+  function toggleLine(idx: number) {
+    setLines(prev => prev.map((l, i) => i === idx ? { ...l, includeInInvoice: !l.includeInInvoice } : l));
+  }
+  function updateLine<K extends keyof BulkLine>(idx: number, key: K, val: BulkLine[K]) {
+    setLines(prev => prev.map((l, i) => {
+      if (i !== idx) return l;
+      const next = { ...l, [key]: val };
+      // Recompute amount for partial cancellation
+      if (key === "partialPercent" || key === "missionType") {
+        const base = MISSION_BASE_AMOUNTS[next.missionType] ?? MISSION_BASE_AMOUNTS["Standard NEPT"];
+        next.amountCents = next.isCancelled
+          ? Math.round(base * (Number(next.partialPercent) / 100))
+          : base;
+      }
+      return next;
+    }));
+  }
+
+  const includedLines = lines.filter(l => l.includeInInvoice);
+  const totalCents = includedLines.reduce((s, l) => s + l.amountCents, 0);
+
+  async function handleGenerate() {
+    if (!includedLines.length) { setError("Select at least one transfer to include"); return; }
+    if (!payerName.trim()) { setError("Enter a payer name"); return; }
+    setGenerating(true); setError(null);
+    try {
+      const res = await apiRequest("POST", "/api/invoices/bulk-generate", {
+        payerName: payerName.trim(),
+        payerType,
+        dateFrom, dateTo,
+        taskRefs: includedLines.map(l => l.taskRef),
+        lineItems: includedLines.map(l => ({ taskRef: l.taskRef, amountCents: l.amountCents })),
+        notes: notes || null,
+      });
+      const inv: Invoice = await res.json();
+      setGenerated(inv);
+      qc.invalidateQueries({ queryKey: ["/api/invoices"] });
+    } catch (e) { setError(String(e)); }
+    setGenerating(false);
+  }
+
+  return (
+    <div className="p-4 space-y-5">
+      <div>
+        <SectionHeading icon={<CalendarRange size={12} />} title="Monthly / Bulk Client Invoice" />
+        <p className="text-[11px] text-muted-foreground mb-3">
+          Search all completed transfers for a client in a date range, review each line, then generate one itemised invoice — de-identified, no patient names on the document.
+        </p>
+
+        {/* Search controls */}
+        <div className="space-y-2.5">
+          <div>
+            <label className={labelCls}>Client / Payer Name</label>
+            <input className={fieldCls} value={payerName} onChange={e => setPayerName(e.target.value)}
+              placeholder="e.g. NSW Health, Dubbo Base Hospital (leave blank for all)" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelCls}>Date From</label>
+              <input type="date" className={fieldCls} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}>Date To</label>
+              <input type="date" className={fieldCls} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              disabled={!dateFrom || !dateTo}
+              onClick={() => { setPayerType("nsw_health"); }}
+              className={`text-xs py-2 rounded-md border font-medium transition-colors ${
+                payerType === "nsw_health" ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40" : "text-muted-foreground border-card-border hover:text-foreground"
+              } disabled:opacity-60`}
+            >NSW Health</button>
+            <button
+              onClick={() => setPayerType("private")}
+              className={`text-xs py-2 rounded-md border font-medium transition-colors ${
+                payerType === "private" ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40" : "text-muted-foreground border-card-border hover:text-foreground"
+              }`}
+            >Private / Insurance</button>
+          </div>
+          <button
+            onClick={handleSearch}
+            disabled={searching || !dateFrom || !dateTo}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/25 transition-colors disabled:opacity-50"
+          >
+            <Search size={12} /> {searching ? "Searching…" : "Search Transfers"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="mt-3 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Results */}
+      {lines.length > 0 && !generated && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-semibold text-foreground/80 uppercase tracking-wide">
+              {lines.length} transfer{lines.length !== 1 ? "s" : ""} found — review & select
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setLines(p => p.map(l => ({ ...l, includeInInvoice: true })))}
+                className="text-[10px] text-cyan-300 hover:underline">All</button>
+              <button onClick={() => setLines(p => p.map(l => ({ ...l, includeInInvoice: false })))}
+                className="text-[10px] text-muted-foreground hover:underline">None</button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {lines.map((line, idx) => (
+              <div
+                key={line.taskRef}
+                className={`rounded-md border p-3 space-y-2 transition-colors ${
+                  line.includeInInvoice
+                    ? line.isCancelled ? "border-amber-500/30 bg-amber-500/5" : "border-card-border bg-muted/5"
+                    : "border-card-border/40 opacity-50"
+                }`}
+              >
+                {/* Row 1: checkbox + ref + amount */}
+                <div className="flex items-start gap-2">
+                  <button onClick={() => toggleLine(idx)} className="mt-0.5 shrink-0 text-cyan-400 hover:text-cyan-300">
+                    {line.includeInInvoice ? <CheckSquare size={14} /> : <Square size={14} className="text-muted-foreground" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs font-semibold">{line.taskRef}</span>
+                      {line.isCancelled && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">
+                          CANCELLED — Partial billing
+                        </span>
+                      )}
+                      <span className="text-[10px] text-muted-foreground">{fmtDateShort(line.serviceDate)}</span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                      {line.fromTo}{line.aircraftReg ? ` · ${line.aircraftReg}` : ""}
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold text-foreground shrink-0">{formatCents(line.amountCents)}</div>
+                </div>
+
+                {/* Row 2: mission type + partial controls */}
+                {line.includeInInvoice && (
+                  <div className="pl-5 space-y-1.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5 block`}>Mission Type</label>
+                        <select
+                          className="w-full text-[11px] bg-muted/10 border border-card-border rounded-md px-2 py-1 text-foreground focus:outline-none"
+                          value={line.missionType}
+                          onChange={e => updateLine(idx, "missionType", e.target.value as MissionType)}
+                        >
+                          {MISSION_TYPES.map(mt => <option key={mt} value={mt}>{mt}</option>)}
+                        </select>
+                      </div>
+                      {line.isCancelled && (
+                        <div>
+                          <label className={`text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5 block`}>
+                            Charge % (crew dispatched)
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min={0} max={100} step={5}
+                              className="w-full text-[11px] bg-muted/10 border border-card-border rounded-md px-2 py-1 text-foreground focus:outline-none"
+                              value={line.partialPercent}
+                              onChange={e => updateLine(idx, "partialPercent", Number(e.target.value))}
+                            />
+                            <span className="text-[10px] text-muted-foreground shrink-0">%</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {line.isCancelled && (
+                      <div>
+                        <label className={`text-[9px] text-muted-foreground uppercase tracking-wide mb-0.5 block`}>Cancellation Reason (for notes)</label>
+                        <input
+                          className="w-full text-[11px] bg-muted/10 border border-card-border rounded-md px-2 py-1 text-foreground focus:outline-none"
+                          value={line.cancellationReason}
+                          onChange={e => updateLine(idx, "cancellationReason", e.target.value)}
+                          placeholder="e.g. cancelled after crew departure from base"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Total + notes + generate */}
+          <div className="space-y-2.5 border-t border-card-border pt-3">
+            <div>
+              <label className={labelCls}>Invoice Notes</label>
+              <textarea
+                className={`${fieldCls} min-h-[60px] resize-y`}
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Any additional notes for this consolidated invoice…"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{includedLines.length} transfer{includedLines.length !== 1 ? "s" : ""} included</span>
+              <span className="text-xl font-extrabold text-cyan-300">{formatCents(totalCents)}</span>
+            </div>
+            <div className="text-[10px] text-muted-foreground bg-cyan-500/5 border border-cyan-500/20 rounded-md px-3 py-2">
+              De-identified: the generated invoice shows only Task Reference IDs (no patient names, DOBs, or clinical info).
+            </div>
+            <button
+              onClick={handleGenerate}
+              disabled={generating || !includedLines.length || !payerName.trim()}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-cyan-500 text-black hover:bg-cyan-400 transition-colors disabled:opacity-50"
+            >
+              <FileText size={12} /> {generating ? "Generating…" : "Generate Bulk Invoice"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Success */}
+      {generated && (
+        <div className="space-y-3 border border-green-500/30 bg-green-500/5 rounded-lg p-4">
+          <div className="flex items-center gap-2 text-green-300 text-sm font-semibold">
+            <CheckCircle2 size={16} /> Invoice Created
+          </div>
+          <div className="text-xs text-foreground/80">
+            <span className="font-mono font-semibold">{generated.invoiceNumber}</span> — {formatCents(generated.totalAmount * 100)} — saved as Draft
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Find it in the Invoice List. Submit it from there when ready to send.
+          </p>
+          <button
+            onClick={() => { setGenerated(null); setLines([]); setPayerName(""); setNotes(""); }}
+            className="text-xs text-cyan-300 hover:underline"
+          >
+            Create another
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 export default function Invoicing({ role }: Props) {
   const qc = useQueryClient();
+  const [viewTab, setViewTab] = useState<ViewTab>("list");
   const [filter, setFilter] = useState<InvoiceStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<number | "new" | null>(null);
@@ -249,15 +602,20 @@ export default function Invoicing({ role }: Props) {
     queryKey: ["/api/invoices/next-number"],
   });
 
-  // ── Handle deep-link query params from NEPTTasking "Generate Invoice" ──────
+  // Handle deep-link from NEPTTasking "Generate Invoice" button
+  const prefillHandled = useRef(false);
   useEffect(() => {
+    if (prefillHandled.current) return;
     const params = parseQueryParams();
     if (params.taskRef && nextNumberData?.invoiceNumber) {
+      prefillHandled.current = true;
       setSelectedId("new");
       setDraft(emptyDraft(nextNumberData.invoiceNumber, params));
       setMobileDetailOpen(true);
+      setViewTab("list");
+      // Clean params from hash so back-navigation doesn't re-trigger
+      window.history.replaceState(null, "", window.location.pathname + "#/invoicing");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nextNumberData?.invoiceNumber]);
 
   const createMutation = useMutation({
@@ -283,9 +641,7 @@ export default function Invoicing({ role }: Props) {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/invoices/${id}`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/invoices"] });
-      setSelectedId(null);
-      setDraft(null);
-      setMobileDetailOpen(false);
+      setSelectedId(null); setDraft(null); setMobileDetailOpen(false);
     },
   });
 
@@ -304,27 +660,26 @@ export default function Invoicing({ role }: Props) {
   const [approvalNotes, setApprovalNotes] = useState<Record<number, string>>({});
   const canApprove = APPROVER_ROLES.includes(role);
 
-  // ── Stats ──────────────────────────────────────────────────────────────────
+  // Stats
   const stats = useMemo(() => {
     const withStatus = invoices.map(inv => ({ ...inv, status: effectiveStatus(inv) }));
-    const total = withStatus.length;
-    const draftCount = withStatus.filter(i => i.status === "Draft").length;
-    const submittedCount = withStatus.filter(i => i.status === "Submitted").length;
-    const paidCount = withStatus.filter(i => i.status === "Paid").length;
-    const overdueCount = withStatus.filter(i => i.status === "Overdue").length;
-    const revenue = withStatus.filter(i => i.status === "Paid").reduce((s, i) => s + i.totalAmount, 0);
-    const outstanding = withStatus.filter(i => i.status === "Draft" || i.status === "Submitted" || i.status === "Overdue")
-      .reduce((s, i) => s + i.totalAmount, 0);
-    const pendingApprovalList = invoices.filter(i => i.approvalStatus === "pending");
-    const autoGeneratedCount = invoices.filter(i => i.autoGenerated === 1).length;
-    return { total, draftCount, submittedCount, paidCount, overdueCount, revenue, outstanding, pendingApprovalList, autoGeneratedCount };
+    return {
+      total: withStatus.length,
+      draftCount: withStatus.filter(i => i.status === "Draft").length,
+      submittedCount: withStatus.filter(i => i.status === "Submitted").length,
+      paidCount: withStatus.filter(i => i.status === "Paid").length,
+      overdueCount: withStatus.filter(i => i.status === "Overdue").length,
+      revenue: withStatus.filter(i => i.status === "Paid").reduce((s, i) => s + i.totalAmount, 0),
+      outstanding: withStatus.filter(i => ["Draft","Submitted","Overdue"].includes(i.status)).reduce((s, i) => s + i.totalAmount, 0),
+      pendingApprovalList: invoices.filter(i => i.approvalStatus === "pending"),
+      autoGeneratedCount: invoices.filter(i => i.autoGenerated === 1).length,
+    };
   }, [invoices]);
 
-  // ── Filtering ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = invoices.map(inv => ({ ...inv, status: effectiveStatus(inv) }));
     if (filter === "Pending Approval") {
-      list = list.filter(i => i.approvalStatus === "pending" || i.approvalStatus === "approved" || i.approvalStatus === "rejected");
+      list = list.filter(i => ["pending","approved","rejected"].includes(i.approvalStatus ?? ""));
     } else if ((filter as string) === "Auto-Generated") {
       list = list.filter(i => i.autoGenerated === 1);
     } else if (filter !== "All") {
@@ -341,52 +696,32 @@ export default function Invoicing({ role }: Props) {
     return list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [invoices, filter, search]);
 
-  // ── Selection handlers ───────────────────────────────────────────────────
   function openInvoice(inv: Invoice) {
-    setSelectedId(inv.id);
-    setDraft(inv);
-    setMobileDetailOpen(true);
+    setSelectedId(inv.id); setDraft(inv); setMobileDetailOpen(true);
   }
-
   function startNew() {
     setSelectedId("new");
     setDraft(emptyDraft(nextNumberData?.invoiceNumber || "INV-NEPT-2026-0001"));
     setMobileDetailOpen(true);
   }
-
   function closeDetail() {
-    setMobileDetailOpen(false);
-    setSelectedId(null);
-    setDraft(null);
+    setMobileDetailOpen(false); setSelectedId(null); setDraft(null);
   }
 
-  // ── Draft field updater with auto-calculation ────────────────────────────
   function setField<K extends keyof Invoice>(key: K, value: Invoice[K]) {
     setDraft(prev => {
       if (!prev) return prev;
       const next = { ...prev, [key]: value };
-
-      // Mission type drives base amount default (only if user hasn't customized away from a known default)
       if (key === "missionType") {
-        const mt = value as MissionType;
-        next.baseAmount = MISSION_BASE_AMOUNTS[mt] ?? prev.baseAmount;
+        next.baseAmount = MISSION_BASE_AMOUNTS[value as MissionType] ?? prev.baseAmount;
       }
-
-      // Invoice date drives due date (+30 days)
-      if (key === "invoiceDate") {
-        next.dueDate = addDaysISO(value as string, 30);
-      }
-
-      // Recalculate total whenever charge-related fields change
+      if (key === "invoiceDate") next.dueDate = addDaysISO(value as string, 30);
       const base = key === "baseAmount" ? (value as number) : (next.baseAmount ?? 0);
       const surcharge = key === "afterHoursSurcharge" ? (value as number) : (next.afterHoursSurcharge ?? 0);
       const additional = key === "additionalCharges" ? (value as number) : (next.additionalCharges ?? 0);
       const gst = next.gstAmount ?? 0;
-      next.baseAmount = base;
-      next.afterHoursSurcharge = surcharge;
-      next.additionalCharges = additional;
+      next.baseAmount = base; next.afterHoursSurcharge = surcharge; next.additionalCharges = additional;
       next.totalAmount = base + surcharge + additional + gst;
-
       return next;
     });
   }
@@ -397,33 +732,23 @@ export default function Invoicing({ role }: Props) {
 
   function handleSaveDraft() {
     if (!draft) return;
-    if (selectedId === "new") {
-      createMutation.mutate(draft);
-    } else if (typeof selectedId === "number") {
-      updateMutation.mutate({ id: selectedId, updates: draft });
-    }
+    if (selectedId === "new") createMutation.mutate(draft);
+    else if (typeof selectedId === "number") updateMutation.mutate({ id: selectedId, updates: draft });
   }
-
   function handleSubmit() {
     if (!draft) return;
-    if (selectedId === "new") {
-      createMutation.mutate({ ...draft, status: "Submitted" });
-    } else if (typeof selectedId === "number") {
-      updateMutation.mutate({ id: selectedId, updates: { ...draft, status: "Submitted" } });
-    }
+    if (selectedId === "new") createMutation.mutate({ ...draft, status: "Submitted" });
+    else if (typeof selectedId === "number") updateMutation.mutate({ id: selectedId, updates: { ...draft, status: "Submitted" } });
   }
-
   function handleMarkPaid() {
     if (!draft || typeof selectedId !== "number") return;
     updateMutation.mutate({ id: selectedId, updates: { status: "Paid" } });
   }
-
   function handleDelete() {
     if (typeof selectedId !== "number") return;
     if (!window.confirm(`Delete invoice ${draft?.invoiceNumber}? This cannot be undone.`)) return;
     deleteMutation.mutate(selectedId);
   }
-
   function handleExportPDF() {
     if (!draft) return;
     generateInvoicePDF({
@@ -448,22 +773,19 @@ export default function Invoicing({ role }: Props) {
       notes: draft.notes ?? null,
     });
   }
-
   function handleExportCSV() {
     const list = filtered.length > 0 ? filtered : invoices;
-    const csv = buildXeroCSV(list);
-    downloadCSV(csv, `medivac_invoices_xero_export_${todayISO()}.csv`);
+    downloadCSV(buildXeroCSV(list), `medivac_invoices_xero_export_${todayISO()}.csv`);
   }
 
   const fieldCls = "w-full text-xs bg-muted/10 border border-card-border rounded-md px-2.5 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500/50";
   const labelCls = "text-[10px] text-muted-foreground uppercase tracking-wide mb-1 block";
-
   const canEdit = draft?.status === "Draft" || selectedId === "new";
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
     <div className="flex h-full min-h-[calc(100vh-49px)]">
-      {/* ══════════════════════ LEFT PANEL — Invoice List ══════════════════════ */}
+      {/* LEFT PANEL */}
       <div className={`flex flex-col w-full lg:w-[62%] lg:border-r border-card-border ${mobileDetailOpen ? "hidden lg:flex" : "flex"}`}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-card-border">
@@ -475,184 +797,192 @@ export default function Invoicing({ role }: Props) {
               <button
                 onClick={() => setFilter("Pending Approval")}
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 text-[10px] font-semibold"
-                title="View invoices awaiting approval"
               >
-                <AlertTriangle size={10} /> {stats.pendingApprovalList.length} Pending Approval
+                <AlertTriangle size={10} /> {stats.pendingApprovalList.length} Pending
               </button>
             )}
           </div>
-          <button
-            onClick={startNew}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-500 text-black hover:bg-cyan-400 transition-colors"
-          >
-            <Plus size={13} /> New Invoice
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setViewTab(t => t === "bulk" ? "list" : "bulk")}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs border rounded-lg font-medium transition-colors ${
+                viewTab === "bulk"
+                  ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                  : "border-card-border text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40"
+              }`}
+            >
+              <CalendarRange size={12} /> Bulk Invoice
+            </button>
+            <button
+              onClick={startNew}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-500 text-black hover:bg-cyan-400 transition-colors"
+            >
+              <Plus size={13} /> New Invoice
+            </button>
+          </div>
         </div>
 
-        {/* Stats bar */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2 px-4 py-3 border-b border-card-border bg-muted/5">
-          <StatCard label="Total" value={String(stats.total)} />
-          <StatCard label="Auto-Generated" value={String(stats.autoGeneratedCount)} color="text-cyan-300"
-            onClick={() => setFilter("Auto-Generated" as any)} clickable />
-          <StatCard label="Draft" value={String(stats.draftCount)} color="text-gray-300" />
-          <StatCard label="Submitted" value={String(stats.submittedCount)} color="text-cyan-300" />
-          <StatCard label="Paid" value={String(stats.paidCount)} color="text-green-300" />
-          <StatCard label="Overdue" value={String(stats.overdueCount)} color="text-red-300" />
-          <StatCard label="Revenue" value={formatCents(stats.revenue)} color="text-green-300" wide />
-          <StatCard label="Outstanding" value={formatCents(stats.outstanding)} color="text-amber-300" wide />
-        </div>
-
-        {/* Pending Approval panel */}
-        {stats.pendingApprovalList.length > 0 && (
-          <div className="border-b border-card-border bg-amber-500/5 px-4 py-3 space-y-2">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 uppercase tracking-wide">
-              <AlertTriangle size={12} /> Pending Approval ({stats.pendingApprovalList.length})
+        {viewTab === "bulk" ? (
+          <div className="flex-1 overflow-y-auto">
+            <BulkInvoicePanel />
+          </div>
+        ) : (
+          <>
+            {/* Stats bar */}
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 px-4 py-3 border-b border-card-border bg-muted/5">
+              <StatCard label="Total" value={String(stats.total)} />
+              <StatCard label="Auto-Gen" value={String(stats.autoGeneratedCount)} color="text-cyan-300" onClick={() => setFilter("Auto-Generated" as any)} clickable />
+              <StatCard label="Draft" value={String(stats.draftCount)} color="text-gray-300" />
+              <StatCard label="Submitted" value={String(stats.submittedCount)} color="text-cyan-300" />
+              <StatCard label="Paid" value={String(stats.paidCount)} color="text-green-300" />
+              <StatCard label="Overdue" value={String(stats.overdueCount)} color="text-red-300" />
+              <StatCard label="Revenue" value={formatCents(stats.revenue)} color="text-green-300" wide />
+              <StatCard label="Outstanding" value={formatCents(stats.outstanding)} color="text-amber-300" wide />
             </div>
-            <div className="space-y-2">
-              {stats.pendingApprovalList.map(inv => (
-                <div key={inv.id} className="bg-background/60 border border-amber-500/20 rounded-md p-2.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-semibold">{inv.invoiceNumber}</span>
-                        <span className="text-[10px] text-muted-foreground">{inv.missionType}</span>
-                        {inv.taskRef && <span className="text-[10px] font-mono text-muted-foreground">{inv.taskRef}</span>}
-                        {inv.autoGenerated === 1 && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border text-[9px] font-semibold bg-purple-500/15 text-purple-300 border-purple-500/30">
-                            Auto-generated
-                          </span>
-                        )}
+
+            {/* Pending Approval panel */}
+            {stats.pendingApprovalList.length > 0 && (
+              <div className="border-b border-card-border bg-amber-500/5 px-4 py-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 uppercase tracking-wide">
+                  <AlertTriangle size={12} /> Pending Approval ({stats.pendingApprovalList.length})
+                </div>
+                {stats.pendingApprovalList.map(inv => (
+                  <div key={inv.id} className="bg-background/60 border border-amber-500/20 rounded-md p-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-semibold">{inv.invoiceNumber}</span>
+                          <span className="text-[10px] text-muted-foreground">{inv.missionType}</span>
+                          {inv.taskRef && <span className="text-[10px] font-mono text-muted-foreground">{inv.taskRef}</span>}
+                          {inv.autoGenerated === 1 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border text-[9px] font-semibold bg-purple-500/15 text-purple-300 border-purple-500/30">Auto-generated</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-foreground/90 mt-0.5">{inv.payerName} · {fmtDateShort(inv.serviceDate)}</div>
                       </div>
-                      <div className="text-[11px] text-foreground/90 mt-0.5">{inv.payerName} · {fmtDateShort(inv.serviceDate)}</div>
+                      <div className="text-sm font-bold text-amber-300 shrink-0">{formatCents(inv.totalAmount)}</div>
                     </div>
-                    <div className="text-sm font-bold text-amber-300 shrink-0">{formatCents(inv.totalAmount)}</div>
+                    {canApprove && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          value={approvalNotes[inv.id] ?? ""}
+                          onChange={e => setApprovalNotes(prev => ({ ...prev, [inv.id]: e.target.value }))}
+                          placeholder="Note (optional)"
+                          className="flex-1 text-[11px] bg-muted/10 border border-card-border rounded-md px-2 py-1 focus:outline-none"
+                        />
+                        <button
+                          onClick={() => approveMutation.mutate({ id: inv.id, note: approvalNotes[inv.id] })}
+                          disabled={approveMutation.isPending}
+                          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md bg-green-500/15 text-green-300 border border-green-500/40 hover:bg-green-500/25 transition-colors disabled:opacity-50"
+                        >
+                          <CheckCircle2 size={11} /> Approve
+                        </button>
+                        <button
+                          onClick={() => rejectMutation.mutate({ id: inv.id, note: approvalNotes[inv.id] })}
+                          disabled={rejectMutation.isPending}
+                          className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25 transition-colors disabled:opacity-50"
+                        >
+                          Return
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  {canApprove && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <input
-                        value={approvalNotes[inv.id] ?? ""}
-                        onChange={e => setApprovalNotes(prev => ({ ...prev, [inv.id]: e.target.value }))}
-                        placeholder="Note (optional)"
-                        className="flex-1 text-[11px] bg-muted/10 border border-card-border rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-                      />
-                      <button
-                        onClick={() => approveMutation.mutate({ id: inv.id, note: approvalNotes[inv.id] })}
-                        disabled={approveMutation.isPending}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md bg-green-500/15 text-green-300 border border-green-500/40 hover:bg-green-500/25 transition-colors disabled:opacity-50"
-                      >
-                        <CheckCircle2 size={11} /> Approve
-                      </button>
-                      <button
-                        onClick={() => rejectMutation.mutate({ id: inv.id, note: approvalNotes[inv.id] })}
-                        disabled={rejectMutation.isPending}
-                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/40 hover:bg-amber-500/25 transition-colors disabled:opacity-50"
-                      >
-                        Return
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+
+            {/* Filter tabs + search */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-2.5 border-b border-card-border">
+              <div className="flex items-center gap-1 flex-wrap">
+                {FILTERS.map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFilter(f)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      filter === f ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30" : "text-muted-foreground hover:text-foreground border border-transparent"
+                    }`}
+                  >{f}</button>
+                ))}
+              </div>
+              <div className="relative flex-1 min-w-[160px]">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search invoice #, task ref, payer…"
+                  className="w-full text-xs bg-muted/10 border border-card-border rounded-md pl-7 pr-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
+                />
+              </div>
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40 transition-colors whitespace-nowrap"
+              >
+                <FileSpreadsheet size={12} /> Export CSV
+              </button>
             </div>
-          </div>
+
+            {/* Invoice list */}
+            <div className="flex-1 overflow-y-auto">
+              {isLoading && <div className="p-6 text-center text-muted-foreground text-xs">Loading invoices…</div>}
+              {!isLoading && filtered.length === 0 && (
+                <div className="p-10 text-center text-muted-foreground text-xs">
+                  <Receipt size={24} className="mx-auto mb-2 opacity-30" />No invoices found
+                </div>
+              )}
+              <div className="divide-y divide-card-border">
+                {filtered.map(inv => (
+                  <button
+                    key={inv.id}
+                    onClick={() => openInvoice(inv)}
+                    className={`w-full text-left px-4 py-3 hover:bg-muted/10 transition-colors ${
+                      selectedId === inv.id ? "bg-cyan-500/5 border-l-2 border-cyan-400" : "border-l-2 border-transparent"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-semibold">{inv.invoiceNumber}</span>
+                          <StatusBadge status={inv.status} />
+                          {getApprovalBadge(inv) && (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${getApprovalBadge(inv)!.cls}`}>
+                              {getApprovalBadge(inv)!.label}
+                            </span>
+                          )}
+                          {inv.autoGenerated === 1 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap bg-purple-500/15 text-purple-300 border-purple-500/30">Auto-generated</span>
+                          )}
+                          {inv.sourceType === "bulk" && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap bg-cyan-500/15 text-cyan-300 border-cyan-500/30">Bulk</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-foreground/90 mt-1 truncate">{inv.payerName}</div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-1">
+                          <Plane size={10} className="text-cyan-400/70" />
+                          <span>{inv.missionType}</span>
+                          <span>·</span>
+                          <span>{fmtDateShort(inv.serviceDate)}</span>
+                          {inv.taskRef && <><span>·</span><span className="font-mono">{inv.taskRef}</span></>}
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold">{formatCents(inv.totalAmount)}</div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5">Due {fmtDateShort(inv.dueDate)}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-4 py-2 border-t border-card-border text-[10px] text-muted-foreground flex items-center justify-between">
+              <span>{filtered.length} of {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}</span>
+              <span>Auto-refreshes every 30s</span>
+            </div>
+          </>
         )}
-
-        {/* Filter tabs + search */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-2.5 border-b border-card-border">
-          <div className="flex items-center gap-1 flex-wrap">
-            {FILTERS.map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  filter === f
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
-                    : "text-muted-foreground hover:text-foreground border border-transparent"
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          <div className="relative flex-1 min-w-[160px]">
-            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search invoice #, task ref, payer…"
-              className="w-full text-xs bg-muted/10 border border-card-border rounded-md pl-7 pr-2.5 py-1.5 text-foreground focus:outline-none focus:ring-1 focus:ring-cyan-500/50"
-            />
-          </div>
-          <button
-            onClick={handleExportCSV}
-            title="Export Xero/MYOB CSV"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40 transition-colors whitespace-nowrap"
-          >
-            <FileSpreadsheet size={12} /> Export CSV
-          </button>
-        </div>
-
-        {/* Invoice list */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading && <div className="p-6 text-center text-muted-foreground text-xs">Loading invoices…</div>}
-          {!isLoading && filtered.length === 0 && (
-            <div className="p-10 text-center text-muted-foreground text-xs">
-              <Receipt size={24} className="mx-auto mb-2 opacity-30" />
-              No invoices found
-            </div>
-          )}
-          <div className="divide-y divide-card-border">
-            {filtered.map(inv => (
-              <button
-                key={inv.id}
-                onClick={() => openInvoice(inv)}
-                className={`w-full text-left px-4 py-3 hover:bg-muted/10 transition-colors ${
-                  selectedId === inv.id ? "bg-cyan-500/5 border-l-2 border-cyan-400" : "border-l-2 border-transparent"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-semibold text-foreground">{inv.invoiceNumber}</span>
-                      <StatusBadge status={inv.status} />
-                      {getApprovalBadge(inv) && (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap ${getApprovalBadge(inv)!.cls}`}>
-                          {getApprovalBadge(inv)!.label}
-                        </span>
-                      )}
-                      {inv.autoGenerated === 1 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-semibold whitespace-nowrap bg-purple-500/15 text-purple-300 border-purple-500/30">
-                          Auto-generated
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-xs text-foreground/90 mt-1 truncate">{inv.payerName}</div>
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-1">
-                      <Plane size={10} className="text-cyan-400/70" />
-                      <span>{inv.missionType}</span>
-                      <span>·</span>
-                      <span>{fmtDateShort(inv.serviceDate)}</span>
-                      {inv.taskRef && <><span>·</span><span className="font-mono">{inv.taskRef}</span></>}
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-bold text-foreground">{formatCents(inv.totalAmount)}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">Due {fmtDateShort(inv.dueDate)}</div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-2 border-t border-card-border text-[10px] text-muted-foreground flex items-center justify-between">
-          <span>{filtered.length} of {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}</span>
-          <span>Auto-refreshes every 30s</span>
-        </div>
       </div>
 
-      {/* ══════════════════════ RIGHT PANEL — Detail / Create Form ══════════════════════ */}
+      {/* RIGHT PANEL — Detail / Create */}
       <div className={`flex-col w-full lg:w-[38%] ${mobileDetailOpen ? "flex" : "hidden lg:flex"}`}>
         {!draft ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -661,54 +991,39 @@ export default function Invoicing({ role }: Props) {
           </div>
         ) : (
           <div className="flex flex-col h-full overflow-y-auto">
-            {/* Header */}
+            {/* Sticky header */}
             <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm px-4 py-3 border-b border-card-border">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2 min-w-0">
-                  <button onClick={closeDetail} className="lg:hidden text-muted-foreground hover:text-foreground">
-                    <X size={16} />
-                  </button>
-                  <span className="font-mono text-sm font-bold text-foreground truncate">{draft.invoiceNumber}</span>
+                  <button onClick={closeDetail} className="lg:hidden text-muted-foreground hover:text-foreground"><X size={16} /></button>
+                  <span className="font-mono text-sm font-bold truncate">{draft.invoiceNumber}</span>
                   <StatusBadge status={effectiveStatus(draft as Invoice)} />
                 </div>
               </div>
               <div className="flex items-center gap-1.5 flex-wrap mt-2">
-                <button
-                  onClick={handleSaveDraft}
-                  disabled={isSaving}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40 transition-colors disabled:opacity-50"
-                >
+                <button onClick={handleSaveDraft} disabled={isSaving}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40 transition-colors disabled:opacity-50">
                   <Save size={11} /> Save Draft
                 </button>
                 {draft.status !== "Paid" && (
-                  <button
-                    onClick={handleSubmit}
-                    disabled={isSaving}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-cyan-500/40 bg-cyan-500/10 rounded-md text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
-                  >
+                  <button onClick={handleSubmit} disabled={isSaving}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-cyan-500/40 bg-cyan-500/10 rounded-md text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-50">
                     <Send size={11} /> Submit
                   </button>
                 )}
                 {draft.status !== "Paid" && typeof selectedId === "number" && (
-                  <button
-                    onClick={handleMarkPaid}
-                    disabled={isSaving}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-green-500/40 bg-green-500/10 rounded-md text-green-300 hover:bg-green-500/20 transition-colors disabled:opacity-50"
-                  >
+                  <button onClick={handleMarkPaid} disabled={isSaving}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-green-500/40 bg-green-500/10 rounded-md text-green-300 hover:bg-green-500/20 transition-colors disabled:opacity-50">
                     <CheckCircle2 size={11} /> Mark Paid
                   </button>
                 )}
-                <button
-                  onClick={handleExportPDF}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40 transition-colors"
-                >
+                <button onClick={handleExportPDF}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-cyan-300 hover:border-cyan-400/40 transition-colors">
                   <Download size={11} /> PDF
                 </button>
                 {typeof selectedId === "number" && (
-                  <button
-                    onClick={handleDelete}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-red-400 hover:border-red-500/40 transition-colors ml-auto"
-                  >
+                  <button onClick={handleDelete}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-card-border rounded-md text-muted-foreground hover:text-red-400 hover:border-red-500/40 transition-colors ml-auto">
                     <Trash2 size={11} />
                   </button>
                 )}
@@ -720,38 +1035,22 @@ export default function Invoicing({ role }: Props) {
               <section>
                 <SectionHeading icon={<Building2 size={12} />} title="Payer Details" />
                 <div className="grid grid-cols-2 gap-2 mb-2">
-                  <button
-                    disabled={!canEdit}
+                  <button disabled={!canEdit}
                     onClick={() => { setField("payerType", "nsw_health" as any); setField("payerName", "NSW Health" as any); }}
-                    className={`text-xs py-2 rounded-md border font-medium transition-colors ${
-                      draft.payerType === "nsw_health"
-                        ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40"
-                        : "text-muted-foreground border-card-border hover:text-foreground"
-                    } disabled:opacity-60`}
-                  >
+                    className={`text-xs py-2 rounded-md border font-medium transition-colors ${draft.payerType === "nsw_health" ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40" : "text-muted-foreground border-card-border hover:text-foreground"} disabled:opacity-60`}>
                     NSW Health
                   </button>
-                  <button
-                    disabled={!canEdit}
+                  <button disabled={!canEdit}
                     onClick={() => { setField("payerType", "private" as any); setField("payerName", "" as any); }}
-                    className={`text-xs py-2 rounded-md border font-medium transition-colors ${
-                      draft.payerType === "private"
-                        ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40"
-                        : "text-muted-foreground border-card-border hover:text-foreground"
-                    } disabled:opacity-60`}
-                  >
+                    className={`text-xs py-2 rounded-md border font-medium transition-colors ${draft.payerType === "private" ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/40" : "text-muted-foreground border-card-border hover:text-foreground"} disabled:opacity-60`}>
                     Private / Insurance
                   </button>
                 </div>
                 <div>
                   <label className={labelCls}>Payer Name</label>
-                  <input
-                    disabled={!canEdit}
-                    className={fieldCls}
-                    value={draft.payerName || ""}
+                  <input disabled={!canEdit} className={fieldCls} value={draft.payerName || ""}
                     onChange={e => setField("payerName", e.target.value as any)}
-                    placeholder={draft.payerType === "nsw_health" ? "NSW Health" : "e.g. Bupa, Medibank, self-funded"}
-                  />
+                    placeholder={draft.payerType === "nsw_health" ? "NSW Health" : "e.g. Bupa, Medibank, self-funded"} />
                 </div>
               </section>
 
@@ -761,31 +1060,38 @@ export default function Invoicing({ role }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className={labelCls}>Task Reference</label>
-                    <input disabled={!canEdit} className={`${fieldCls} font-mono`} value={draft.taskRef || ""} onChange={e => setField("taskRef", e.target.value as any)} placeholder="NEPT-2026-0047" />
+                    <input disabled={!canEdit} className={`${fieldCls} font-mono`} value={draft.taskRef || ""}
+                      onChange={e => setField("taskRef", e.target.value as any)} placeholder="NEPT-2026-0047" />
                   </div>
                   <div>
                     <label className={labelCls}>Patient ID</label>
-                    <input disabled={!canEdit} className={`${fieldCls} font-mono`} value={draft.patientId || ""} onChange={e => setField("patientId", e.target.value as any)} placeholder="Task ref only — no medical info" />
+                    <input disabled={!canEdit} className={`${fieldCls} font-mono`} value={draft.patientId || ""}
+                      onChange={e => setField("patientId", e.target.value as any)} placeholder="UR number for traceability" />
                   </div>
                   <div className="col-span-2">
                     <label className={labelCls}>Service Date</label>
-                    <input disabled={!canEdit} type="date" className={fieldCls} value={draft.serviceDate || ""} onChange={e => setField("serviceDate", e.target.value as any)} />
+                    <input disabled={!canEdit} type="date" className={fieldCls} value={draft.serviceDate || ""}
+                      onChange={e => setField("serviceDate", e.target.value as any)} />
                   </div>
                   <div>
                     <label className={labelCls}>Pickup Location</label>
-                    <input disabled={!canEdit} className={fieldCls} value={draft.pickupLocation || ""} onChange={e => setField("pickupLocation", e.target.value as any)} placeholder="e.g. Dubbo Base Hospital" />
+                    <input disabled={!canEdit} className={fieldCls} value={draft.pickupLocation || ""}
+                      onChange={e => setField("pickupLocation", e.target.value as any)} placeholder="e.g. Dubbo Base Hospital" />
                   </div>
                   <div>
                     <label className={labelCls}>Destination</label>
-                    <input disabled={!canEdit} className={fieldCls} value={draft.destination || ""} onChange={e => setField("destination", e.target.value as any)} placeholder="e.g. Bankstown Airport" />
+                    <input disabled={!canEdit} className={fieldCls} value={draft.destination || ""}
+                      onChange={e => setField("destination", e.target.value as any)} placeholder="e.g. Bankstown Airport" />
                   </div>
                   <div>
                     <label className={labelCls}>Aircraft Rego</label>
-                    <input disabled={!canEdit} className={`${fieldCls} font-mono`} value={draft.aircraftReg || ""} onChange={e => setField("aircraftReg", e.target.value.toUpperCase() as any)} placeholder="VH-KBC" />
+                    <input disabled={!canEdit} className={`${fieldCls} font-mono`} value={draft.aircraftReg || ""}
+                      onChange={e => setField("aircraftReg", e.target.value.toUpperCase() as any)} placeholder="VH-KBC" />
                   </div>
                   <div>
                     <label className={labelCls}>Mission Type</label>
-                    <select disabled={!canEdit} className={fieldCls} value={draft.missionType || "Standard NEPT"} onChange={e => setField("missionType", e.target.value as any)}>
+                    <select disabled={!canEdit} className={fieldCls} value={draft.missionType || "Standard NEPT"}
+                      onChange={e => setField("missionType", e.target.value as any)}>
                       {MISSION_TYPES.map(mt => <option key={mt} value={mt}>{mt}</option>)}
                     </select>
                   </div>
@@ -806,7 +1112,8 @@ export default function Invoicing({ role }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className={labelCls}>Invoice Date</label>
-                    <input disabled={!canEdit} type="date" className={fieldCls} value={draft.invoiceDate || ""} onChange={e => setField("invoiceDate", e.target.value as any)} />
+                    <input disabled={!canEdit} type="date" className={fieldCls} value={draft.invoiceDate || ""}
+                      onChange={e => setField("invoiceDate", e.target.value as any)} />
                   </div>
                   <div>
                     <label className={labelCls}>Due Date (auto +30d)</label>
@@ -815,23 +1122,18 @@ export default function Invoicing({ role }: Props) {
                 </div>
               </section>
 
-              {/* Charges */}
+              {/* Charges — using CurrencyInput for dollar-first entry */}
               <section>
                 <SectionHeading icon={<DollarSign size={12} />} title="Charges" />
                 <div className="space-y-2.5">
                   <div>
-                    <label className={labelCls}>Base Amount (AUD)</label>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-                      <input
-                        disabled={!canEdit}
-                        type="number"
-                        step="0.01"
-                        className={`${fieldCls} pl-5`}
-                        value={((draft.baseAmount ?? 0) / 100).toFixed(2)}
-                        onChange={e => setField("baseAmount", Math.round(parseFloat(e.target.value || "0") * 100) as any)}
-                      />
-                    </div>
+                    <label className={labelCls}>Base Amount (AUD excl. GST)</label>
+                    <CurrencyInput
+                      valueCents={draft.baseAmount ?? 0}
+                      onChange={v => setField("baseAmount", v as any)}
+                      disabled={!canEdit}
+                      className={fieldCls}
+                    />
                   </div>
 
                   <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer select-none">
@@ -847,17 +1149,12 @@ export default function Invoicing({ role }: Props) {
 
                   <div>
                     <label className={labelCls}>Additional Charges (AUD)</label>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
-                      <input
-                        disabled={!canEdit}
-                        type="number"
-                        step="0.01"
-                        className={`${fieldCls} pl-5`}
-                        value={((draft.additionalCharges ?? 0) / 100).toFixed(2)}
-                        onChange={e => setField("additionalCharges", Math.round(parseFloat(e.target.value || "0") * 100) as any)}
-                      />
-                    </div>
+                    <CurrencyInput
+                      valueCents={draft.additionalCharges ?? 0}
+                      onChange={v => setField("additionalCharges", v as any)}
+                      disabled={!canEdit}
+                      className={fieldCls}
+                    />
                   </div>
 
                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-card-border/60">
@@ -866,7 +1163,7 @@ export default function Invoicing({ role }: Props) {
                   </div>
 
                   <div className="flex items-center justify-between pt-2 border-t border-card-border">
-                    <span className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <span className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5">
                       <ShieldCheck size={12} className="text-cyan-400" /> Total
                     </span>
                     <span className="text-2xl font-extrabold text-cyan-300">{formatCents(draft.totalAmount ?? 0)}</span>
@@ -888,8 +1185,7 @@ export default function Invoicing({ role }: Props) {
 
               {draft.status === "Overdue" && (
                 <div className="flex items-center gap-2 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
-                  <AlertTriangle size={13} />
-                  This invoice is more than 30 days past its due date.
+                  <AlertTriangle size={13} /> This invoice is more than 30 days past its due date.
                 </div>
               )}
             </div>
@@ -900,14 +1196,10 @@ export default function Invoicing({ role }: Props) {
   );
 }
 
-// ─── Small subcomponents ────────────────────────────────────────────────────
 function StatCard({ label, value, color, wide, onClick, clickable }: { label: string; value: string; color?: string; wide?: boolean; onClick?: () => void; clickable?: boolean }) {
   return (
-    <div
-      className={`text-center ${wide ? "col-span-2 sm:col-span-1" : ""} ${clickable ? "cursor-pointer hover:opacity-75 transition-opacity" : ""}`}
-      onClick={onClick}
-      title={clickable ? `Click to filter by ${label}` : undefined}
-    >
+    <div className={`text-center ${wide ? "col-span-2 sm:col-span-1" : ""} ${clickable ? "cursor-pointer hover:opacity-75 transition-opacity" : ""}`}
+      onClick={onClick} title={clickable ? `Click to filter by ${label}` : undefined}>
       <div className={`text-sm font-bold ${color || "text-foreground"}`}>{value}</div>
       <div className="text-[9px] text-muted-foreground uppercase tracking-wide">{label}</div>
     </div>

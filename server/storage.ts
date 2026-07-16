@@ -76,7 +76,7 @@ function mapChestItemEdit(r: any): ChestItemEdit {
   return { id: r.id, chestId: r.chest_id, itemId: r.item_id, expiryDate: r.expiry_date, qtyPresent: r.qty_present, note: r.note, flagReorder: r.flag_reorder, updatedAt: r.updated_at, updatedBy: r.updated_by };
 }
 function mapNeptTask(r: any): NeptTask {
-  return { id: r.id, taskRef: r.task_ref, status: r.status, priority: r.priority, requestTime: r.request_time, requiredBy: r.required_by, pickupLocation: r.pickup_location, pickupIcao: r.pickup_icao, destLocation: r.dest_location, destIcao: r.dest_icao, sectors: r.sectors, patientName: r.patient_name, patientRef: r.patient_ref, escortName: r.escort_name, escortHeavy: r.escort_heavy ?? false, driverNameLeg2: r.driver_name_leg2 ?? null, referringHospital: r.referring_hospital, receivingHospital: r.receiving_hospital, aircraftReg: r.aircraft_reg, pilotName: r.pilot_name, nurseName: r.nurse_name, dispatchedBy: r.dispatched_by, estimatedEta: r.estimated_eta, actualDepart: r.actual_depart, actualArrive: r.actual_arrive, completedAt: r.completed_at, notes: r.notes, groundTransportCost: r.ground_transport_cost, createdAt: r.created_at, updatedAt: r.updated_at };
+  return { id: r.id, taskRef: r.task_ref, status: r.status, priority: r.priority, requestTime: r.request_time, requiredBy: r.required_by, pickupLocation: r.pickup_location, pickupIcao: r.pickup_icao, destLocation: r.dest_location, destIcao: r.dest_icao, sectors: r.sectors, patientName: r.patient_name, patientRef: r.patient_ref, escortName: r.escort_name, escortHeavy: r.escort_heavy ?? false, driverName: r.driver_name ?? null, driverNameLeg2: r.driver_name_leg2 ?? null, referringHospital: r.referring_hospital, receivingHospital: r.receiving_hospital, aircraftReg: r.aircraft_reg, pilotName: r.pilot_name, nurseName: r.nurse_name, dispatchedBy: r.dispatched_by, estimatedEta: r.estimated_eta, actualDepart: r.actual_depart, actualArrive: r.actual_arrive, completedAt: r.completed_at, notes: r.notes, groundTransportCost: r.ground_transport_cost, createdAt: r.created_at, updatedAt: r.updated_at, patients: r.patients ?? null, patientMobility: r.patient_mobility ?? 'ambulant', specialConsiderations: r.special_considerations ?? null, pickupTimeNote: r.pickup_time_note ?? null, dropoffTimeNote: r.dropoff_time_note ?? null };
 }
 function mapNotification(r: any): Notification {
   return { id: r.id, type: r.type, title: r.title, body: r.body, taskRef: r.task_ref, taskId: r.task_id, readAt: r.read_at, createdAt: r.created_at };
@@ -370,6 +370,9 @@ class DatabaseStorage {
       patient_name: d.patientName ?? null,
       patient_ref: d.patientRef ?? null,
       escort_name: d.escortName ?? null,
+      escort_heavy: d.escortHeavy ? 1 : 0,
+      driver_name: d.driverName ?? null,
+      driver_name_leg2: d.driverNameLeg2 ?? null,
       referring_hospital: d.referringHospital ?? null,
       receiving_hospital: d.receivingHospital ?? null,
       aircraft_reg: d.aircraftReg ?? null,
@@ -382,6 +385,11 @@ class DatabaseStorage {
       completed_at: d.completedAt ?? null,
       notes: d.notes ?? null,
       ground_transport_cost: d.groundTransportCost ?? null,
+      patients: (d as any).patients ?? null,
+      patient_mobility: d.patientMobility ?? 'ambulant',
+      special_considerations: (d as any).specialConsiderations ?? null,
+      pickup_time_note: (d as any).pickupTimeNote ?? null,
+      dropoff_time_note: (d as any).dropoffTimeNote ?? null,
       created_at: d.createdAt || new Date().toISOString(),
       updated_at: d.updatedAt || new Date().toISOString(),
     };
@@ -391,13 +399,36 @@ class DatabaseStorage {
   }
   async updateNeptTask(id: number, u: Partial<NeptTask>): Promise<NeptTask> {
     const row: any = { updated_at: new Date().toISOString() };
-    const map: Record<string, string> = { taskRef: 'task_ref', status: 'status', priority: 'priority', requestTime: 'request_time', requiredBy: 'required_by', pickupLocation: 'pickup_location', pickupIcao: 'pickup_icao', destLocation: 'dest_location', destIcao: 'dest_icao', sectors: 'sectors', patientName: 'patient_name', patientRef: 'patient_ref', escortName: 'escort_name', escortHeavy: 'escort_heavy', driverNameLeg2: 'driver_name_leg2', referringHospital: 'referring_hospital', receivingHospital: 'receiving_hospital', aircraftReg: 'aircraft_reg', pilotName: 'pilot_name', nurseName: 'nurse_name', dispatchedBy: 'dispatched_by', estimatedEta: 'estimated_eta', actualDepart: 'actual_depart', actualArrive: 'actual_arrive', completedAt: 'completed_at', notes: 'notes', groundTransportCost: 'ground_transport_cost' };
+    const map: Record<string, string> = { taskRef: 'task_ref', status: 'status', priority: 'priority', requestTime: 'request_time', requiredBy: 'required_by', pickupLocation: 'pickup_location', pickupIcao: 'pickup_icao', destLocation: 'dest_location', destIcao: 'dest_icao', sectors: 'sectors', patientName: 'patient_name', patientRef: 'patient_ref', escortName: 'escort_name', escortHeavy: 'escort_heavy', driverName: 'driver_name', driverNameLeg2: 'driver_name_leg2', referringHospital: 'referring_hospital', receivingHospital: 'receiving_hospital', aircraftReg: 'aircraft_reg', pilotName: 'pilot_name', nurseName: 'nurse_name', dispatchedBy: 'dispatched_by', estimatedEta: 'estimated_eta', actualDepart: 'actual_depart', actualArrive: 'actual_arrive', completedAt: 'completed_at', notes: 'notes', groundTransportCost: 'ground_transport_cost', patients: 'patients', patientMobility: 'patient_mobility', specialConsiderations: 'special_considerations', pickupTimeNote: 'pickup_time_note', dropoffTimeNote: 'dropoff_time_note' };
     for (const [k, v] of Object.entries(map)) if ((u as any)[k] !== undefined) row[v] = (u as any)[k];
     const { data } = await supabase.from('nept_tasks').update(row).eq('id', id).select().single();
     return mapNeptTask(data);
   }
   async deleteNeptTask(id: number): Promise<void> {
     await supabase.from('nept_tasks').delete().eq('id', id);
+  }
+
+  // ── NEPT Breaks ───────────────────────────────────────────────────
+  async listNeptBreaks(): Promise<any[]> {
+    const { data } = await supabase.from('nept_breaks').select('*').order('start_time', { ascending: true });
+    return (data ?? []).map((r: any) => ({
+      id: r.id, category: r.category, base: r.base, crewNames: r.crew_names,
+      startTime: r.start_time, endTime: r.end_time, notes: r.notes,
+      createdAt: r.created_at, updatedAt: r.updated_at,
+    }));
+  }
+  async createNeptBreak(d: { category: string; base: string; crewNames: string; startTime: string; endTime: string; notes?: string | null }): Promise<any> {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.from('nept_breaks').insert({
+      category: d.category, base: d.base, crew_names: d.crewNames,
+      start_time: d.startTime, end_time: d.endTime, notes: d.notes ?? null,
+      created_at: now, updated_at: now,
+    }).select().single();
+    if (error) throw new Error(`Failed to create break: ${error.message}`);
+    return { id: data.id, category: data.category, base: data.base, crewNames: data.crew_names, startTime: data.start_time, endTime: data.end_time, notes: data.notes, createdAt: data.created_at, updatedAt: data.updated_at };
+  }
+  async deleteNeptBreak(id: number): Promise<void> {
+    await supabase.from('nept_breaks').delete().eq('id', id);
   }
 
   // ── Notifications ─────────────────────────────────────────────────────────
@@ -752,6 +783,254 @@ class DatabaseStorage {
 
     return invoice;
   }
+
+  // ── Ops Tasks ────────────────────────────────────────────────────────────────
+  async listOpsTasks(): Promise<any[]> {
+    const { data } = await supabase.from('ops_tasks').select('*').order('created_at', { ascending: false });
+    return data ?? [];
+  }
+  async getOpsTask(id: number): Promise<any> {
+    const { data } = await supabase.from('ops_tasks').select('*').eq('id', id).single();
+    return data;
+  }
+  async createOpsTask(d: any): Promise<any> {
+    const now = new Date().toISOString();
+    const year = new Date().getFullYear();
+    const { count } = await supabase.from('ops_tasks').select('*', { count: 'exact', head: true }).like('task_ref', `OPS-${year}-%`).then(r => ({ count: r.count ?? 0 }));
+    const taskRef = `OPS-${year}-${String((count ?? 0) + 1).padStart(4, '0')}`;
+    const { data } = await supabase.from('ops_tasks').insert({ ...d, task_ref: taskRef, created_at: now, updated_at: now }).select().single();
+    return data;
+  }
+  async updateOpsTask(id: number, u: any): Promise<any> {
+    const { data } = await supabase.from('ops_tasks').update({ ...u, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    return data;
+  }
+  async deleteOpsTask(id: number): Promise<boolean> {
+    const { error } = await supabase.from('ops_tasks').delete().eq('id', id);
+    return !error;
+  }
+  async listOpsTaskComments(taskId: number): Promise<any[]> {
+    const { data } = await supabase.from('ops_task_comments').select('*').eq('task_id', taskId).order('created_at', { ascending: true });
+    return data ?? [];
+  }
+  async createOpsTaskComment(d: any): Promise<any> {
+    const { data } = await supabase.from('ops_task_comments').insert({ ...d, created_at: new Date().toISOString() }).select().single();
+    return data;
+  }
+
+  // ── Projects ─────────────────────────────────────────────────────────────────
+  async listProjects(): Promise<any[]> {
+    const { data } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+    return data ?? [];
+  }
+  async getProject(id: number): Promise<any> {
+    const { data } = await supabase.from('projects').select('*').eq('id', id).single();
+    return data;
+  }
+  async createProject(d: any): Promise<any> {
+    const now = new Date().toISOString();
+    const year = new Date().getFullYear();
+    const { count } = await supabase.from('projects').select('*', { count: 'exact', head: true }).like('project_ref', `PRJ-${year}-%`).then(r => ({ count: r.count ?? 0 }));
+    const projectRef = `PRJ-${year}-${String((count ?? 0) + 1).padStart(3, '0')}`;
+    const { data } = await supabase.from('projects').insert({ ...d, project_ref: projectRef, created_at: now, updated_at: now }).select().single();
+    return data;
+  }
+  async updateProject(id: number, u: any): Promise<any> {
+    const { data } = await supabase.from('projects').update({ ...u, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    return data;
+  }
+  async deleteProject(id: number): Promise<boolean> {
+    const { error } = await supabase.from('projects').delete().eq('id', id);
+    return !error;
+  }
+  async listProjectTasks(projectId: number): Promise<any[]> {
+    const { data } = await supabase.from('project_tasks').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
+    return data ?? [];
+  }
+  async createProjectTask(d: any): Promise<any> {
+    const now = new Date().toISOString();
+    const { count } = await supabase.from('project_tasks').select('*', { count: 'exact', head: true }).eq('project_id', d.project_id).then(r => ({ count: r.count ?? 0 }));
+    const taskRef = `${d.project_ref ?? 'PRJ'}-T-${String((count ?? 0) + 1).padStart(2, '0')}`;
+    const { data } = await supabase.from('project_tasks').insert({ ...d, task_ref: taskRef, created_at: now, updated_at: now }).select().single();
+    return data;
+  }
+  async updateProjectTask(id: number, u: any): Promise<any> {
+    const { data } = await supabase.from('project_tasks').update({ ...u, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    return data;
+  }
+  async deleteProjectTask(id: number): Promise<boolean> {
+    const { error } = await supabase.from('project_tasks').delete().eq('id', id);
+    return !error;
+  }
+
+  // ── Pilot Handover Board ──────────────────────────────────────────────────────
+  async listHandovers(): Promise<any[]> {
+    const { data } = await supabase.from('pilot_handover').select('*').order('updated_at', { ascending: false });
+    return data ?? [];
+  }
+  async getHandoverByReg(reg: string): Promise<any> {
+    const { data } = await supabase.from('pilot_handover').select('*').eq('aircraft_reg', reg).order('created_at', { ascending: false }).limit(1).single();
+    return data;
+  }
+  async upsertHandover(d: any): Promise<any> {
+    const now = new Date().toISOString();
+    const { data } = await supabase.from('pilot_handover').insert({ ...d, created_at: now, updated_at: now }).select().single();
+    return data;
+  }
+  async updateHandover(id: number, u: any): Promise<any> {
+    const { data } = await supabase.from('pilot_handover').update({ ...u, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    return data;
+  }
+
+  // ── Asset Utilisation ─────────────────────────────────────────────
+  async logServiceStatuses(entries: Array<{
+    date: string; dayOfWeek: number; serviceCode: string; base: string;
+    status: string; aircraftReg?: string; recordedBy?: string;
+  }>): Promise<void> {
+    if (!entries.length) return;
+    const now = new Date().toISOString();
+    const rows = entries.map(e => ({
+      date: e.date, day_of_week: e.dayOfWeek, service_code: e.serviceCode,
+      base: e.base, status: e.status, aircraft_reg: e.aircraftReg ?? null,
+      recorded_at: now, recorded_by: e.recordedBy ?? null,
+    }));
+    await supabase.from('service_status_log').insert(rows);
+  }
+
+  async getServiceStatusHistory(lookbackDays = 90): Promise<any[]> {
+    const since = new Date(Date.now() - lookbackDays * 86400000).toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from('service_status_log')
+      .select('*')
+      .gte('date', since)
+      .order('date', { ascending: false });
+    return data ?? [];
+  }
+
+  async getAircraftStatusHistory(reg: string, lookbackDays = 90): Promise<any[]> {
+    const since = new Date(Date.now() - lookbackDays * 86400000).toISOString().slice(0, 10);
+    const { data } = await supabase
+      .from('service_status_log')
+      .select('*')
+      .eq('aircraft_reg', reg)
+      .gte('date', since)
+      .order('date', { ascending: false });
+    return data ?? [];
+  }
+
+
+  // ── Staff Suggestions / Idea Hub ──────────────────────────────────────────
+  async submitSuggestion(data: {
+    title: string; description: string; category: string;
+    impactArea: string; submittedBy: string;
+  }): Promise<any> {
+    const now = new Date().toISOString();
+    const { data: row, error } = await supabase
+      .from('staff_suggestions')
+      .insert({
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        impact_area: data.impactArea,
+        submitted_by: data.submittedBy,
+        submitted_at: now,
+        status: 'pending',
+      })
+      .select().single();
+    if (error) throw error;
+    return row;
+  }
+
+  async listSuggestions(opts?: { status?: string; limit?: number }): Promise<any[]> {
+    let q = supabase.from('staff_suggestions').select('*').order('submitted_at', { ascending: false });
+    if (opts?.status) q = q.eq('status', opts.status);
+    if (opts?.limit)  q = q.limit(opts.limit);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data ?? [];
+  }
+
+  async getSuggestion(id: number): Promise<any | null> {
+    const { data } = await supabase.from('staff_suggestions').select('*').eq('id', id).single();
+    return data ?? null;
+  }
+
+  async updateSuggestionAI(id: number, ai: {
+    aiScore: number; aiSummary: string; aiEffort: string;
+    aiImpact: string; aiRecommendation: string; clusterTag: string;
+  }): Promise<void> {
+    const { error } = await supabase.from('staff_suggestions').update({
+      ai_score: ai.aiScore, ai_summary: ai.aiSummary,
+      ai_effort: ai.aiEffort, ai_impact: ai.aiImpact,
+      ai_recommendation: ai.aiRecommendation,
+      ai_analysed_at: new Date().toISOString(),
+      cluster_tag: ai.clusterTag,
+      status: 'reviewing',
+    }).eq('id', id);
+    if (error) throw error;
+  }
+
+  async updateSuggestionGM(id: number, update: {
+    status: string; gmNote?: string;
+  }): Promise<void> {
+    const { error } = await supabase.from('staff_suggestions').update({
+      status: update.status,
+      gm_note: update.gmNote ?? null,
+      gm_reviewed_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) throw error;
+  }
+
+
+  // ── Closed Tenders ──────────────────────────────────────────────────────────
+  async listClosedTenders(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('closed_tenders')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  }
+
+  async createClosedTender(t: {
+    ref: string; title: string; agency: string; closed: string;
+    awarded_to?: string; contract_value?: string; type: string;
+    scope: string; region: string; fit: string;
+    missed_reason: string; lesson: string;
+    bid_submitted: boolean; our_outcome?: string; notes?: string;
+  }): Promise<any> {
+    const { data, error } = await supabase
+      .from('closed_tenders')
+      .insert([t])
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+
+  async updateClosedTender(id: number, t: Partial<{
+    ref: string; title: string; agency: string; closed: string;
+    awarded_to: string; contract_value: string; type: string;
+    scope: string; region: string; fit: string;
+    missed_reason: string; lesson: string;
+    bid_submitted: boolean; our_outcome: string; notes: string;
+  }>): Promise<any> {
+    const { data, error } = await supabase
+      .from('closed_tenders')
+      .update(t)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async deleteClosedTender(id: number): Promise<void> {
+    const { error } = await supabase.from('closed_tenders').delete().eq('id', id);
+    if (error) throw error;
+  }
+
 }
 
 export const storage = new DatabaseStorage();

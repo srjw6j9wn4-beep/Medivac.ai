@@ -79,9 +79,20 @@ const SMARTSHEET_URL = "https://app.smartsheet.com/b/publish?EQBCT=50ddc199d8cc4
 
 type CrewStatus = "green" | "red" | "offline";
 
+// Maps service code prefix to base ID
+function serviceBase(code: string): string {
+  if (code.startsWith("BHI")) return "BHI";
+  if (code.startsWith("DU"))  return "DU";
+  if (code.startsWith("BK"))  return "BK";
+  if (code.startsWith("ESS")) return "ESS";
+  if (code.startsWith("TAS")) return "TAS";
+  return "UNKNOWN";
+}
+
 interface Service {
-  code: string; status: "green" | "amber" | "offline";
+  code: string; status: "green" | "amber" | "offline" | "not_required";
   pilot: CrewStatus; doctor: CrewStatus; nurse: CrewStatus; updated: string;
+  aircraftReg?: string;  // which aircraft is assigned to this service today
 }
 
 const DEFAULT_SERVICES: Service[] = [
@@ -941,6 +952,18 @@ export default function MorningBrief({ role }: Props) {
       await Promise.all(datasets.map(([key, payload]) =>
         apiRequest("POST", `/api/morning-brief/${todayKey}/${key}`, { payload, updatedBy: role })
       ));
+      // ── Log service statuses for asset utilisation analytics ──
+      // Fire-and-forget — don’t block save completion if this fails
+      apiRequest("POST", "/api/asset-utilisation/log", {
+        date: todayKey,
+        recordedBy: role,
+        services: services.map(s => ({
+          serviceCode: s.code,
+          base: serviceBase(s.code),
+          status: s.status,
+          aircraftReg: s.aircraftReg,
+        })),
+      }).catch(err => console.warn("[utilisation log]", err));
       setSaveMsg("Saved ✓");
       setTimeout(() => setSaveMsg(null), 2500);
       setEditMode(false);
@@ -1606,6 +1629,7 @@ export default function MorningBrief({ role }: Props) {
                     <tr className="text-muted-foreground border-b border-card-border">
                       <th className="text-left py-2 pr-3 text-xs font-semibold uppercase tracking-wider">Service</th>
                       <th className="text-center px-2 text-xs font-semibold uppercase tracking-wider">Status</th>
+                      <th className="text-center px-2 text-xs font-semibold uppercase tracking-wider">Aircraft</th>
                       <th className="text-center px-2 text-xs font-semibold uppercase tracking-wider">P · D · N</th>
                       <th className="text-right pl-2 text-xs font-semibold uppercase tracking-wider">Upd</th>
                     </tr>
@@ -1632,6 +1656,18 @@ export default function MorningBrief({ role }: Props) {
                               const hhmm = now.getHours().toString().padStart(2,"0") + ":" + now.getMinutes().toString().padStart(2,"0");
                               setServices(prev => prev.map((s, i) => i === idx ? { ...s, status: v as any, updated: hhmm } : s));
                             }} />
+                        </td>
+                        <td className="text-center px-2">
+                          {editMode ? (
+                            <input
+                              className="bg-background/80 border border-card-border rounded px-1.5 py-0.5 text-[11px] font-mono w-20 focus:outline-none focus:border-cyan-400/60 text-center uppercase"
+                              placeholder="VH-XXX"
+                              value={svc.aircraftReg ?? ""}
+                              onChange={e => setServices(prev => prev.map((s, i) => i === idx ? { ...s, aircraftReg: e.target.value.toUpperCase() || undefined } : s))}
+                            />
+                          ) : (
+                            <span className="text-[11px] font-mono text-cyan-300">{svc.aircraftReg ?? "—"}</span>
+                          )}
                         </td>
                         <td className="px-2">
                           {editMode ? (

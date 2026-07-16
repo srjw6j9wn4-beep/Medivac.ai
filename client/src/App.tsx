@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Switch, Route, Router } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { queryClient } from "./lib/queryClient";
@@ -44,6 +45,8 @@ import Engineering from "@/pages/Engineering";
 import OperationalRiskAssessment from "@/pages/OperationalRiskAssessment";
 import MaintenancePlanner from "@/pages/MaintenancePlanner";
 import MorningBrief from "@/pages/MorningBrief";
+import AssetUtilisation from "@/pages/AssetUtilisation";
+import IdeaHub from "@/pages/IdeaHub";
 import PassengerManifest from "@/pages/PassengerManifest";
 import MissionOptimiser from "@/pages/MissionOptimiser";
 import ManifestSign from "@/pages/ManifestSign";
@@ -54,6 +57,11 @@ import Invoicing from "@/pages/Invoicing";
 import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
 import CharterQuote from "@/pages/CharterQuote";
 import CostOptimizer from "@/pages/CostOptimizer";
+import OpsTaskManagement from "@/pages/OpsTaskManagement";
+import ProjectManagement from "@/pages/ProjectManagement";
+import PilotHandover from "@/pages/PilotHandover";
+import OrgChart from "@/pages/OrgChart";
+import PayrollLeave from "@/pages/PayrollLeave";
 import { FEATURES } from "@/lib/config";
 import type { UserRole } from "@/lib/data";
 
@@ -107,6 +115,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/iso" component={() => <ISOCompliance role={role} />} />
       <Route path="/contracts" component={() => <ContractCompliance role={role} />} />
       <Route path="/finance" component={() => <FuelFinance role={role} />} />
+      <Route path="/fuel-finance" component={() => <FuelFinance role={role} />} />
       <Route path="/audit" component={() => <AuditReports role={role} />} />
       <Route path="/government-tenders" component={() => <GovernmentTenders />} />
       <Route path="/check-training" component={() => <CheckTraining role={role} />} />
@@ -117,10 +126,17 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/ground-vehicles" component={() => <GroundVehicles role={role} />} />
       <Route path="/engineering" component={() => <Engineering role={role} />} />
       <Route path="/maint-planner" component={() => <MaintenancePlanner role={role} />} />
+      <Route path="/asset-utilisation" component={() => <AssetUtilisation role={role} />} />
+      <Route path="/idea-hub" component={() => <IdeaHub role={role} />} />
       <Route path="/users" component={() => <UserManagement role={role} />} />
       <Route path="/rbac" component={() => <RBACPermissions role={role} />} />
       <Route path="/settings" component={() => <SystemSettings role={role} />} />
       <Route path="/api-integrations" component={() => <ApiIntegrations role={role} />} />
+      <Route path="/ops-tasks" component={() => <OpsTaskManagement role={role} />} />
+      <Route path="/projects" component={() => <ProjectManagement role={role} />} />
+      <Route path="/pilot-handover" component={() => <PilotHandover role={role} />} />
+      <Route path="/org-chart" component={() => <OrgChart role={role} />} />
+      <Route path="/payroll-leave" component={() => <PayrollLeave role={role} />} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -128,6 +144,13 @@ function AppRouter({ role }: { role: UserRole }) {
 
 function App() {
   const [role, setRole] = useState<UserRole>("dispatcher");
+
+  // Pre-warm the backend sandbox on page load so cold-start 503s never
+  // reach the user mid-action. Fires once, silently, no UI impact.
+  useEffect(() => {
+    const base = (window.location.hostname.endsWith('.pplx.app')) ? '/port/5000' : '';
+    fetch(`${base}/api/health`).catch(() => {/* ignore — just waking the sandbox */});
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -139,7 +162,9 @@ function App() {
           {/* All other routes wrapped in Layout */}
           <Route>
             <Layout role={role} onRoleChange={setRole}>
-              <AppRouter role={role} />
+              <ErrorBoundary label="AppRouter">
+                <AppRouter role={role} />
+              </ErrorBoundary>
             </Layout>
           </Route>
         </Router>

@@ -6,6 +6,24 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+
+// Aircraft reg → base
+const REG_BASE: Record<string, string> = {
+  "VH-MVW": "Dubbo",  "VH-XYJ": "Dubbo",  "VH-XYU": "Dubbo",  "VH-MVX": "Dubbo",
+  "VH-LTQ": "Bankstown", "VH-MWH": "Bankstown", "VH-MWK": "Bankstown", "VH-RFD": "Bankstown",
+  "VH-VPQ": "Bankstown",
+};
+function taskBase(t: { aircraftReg: string | null; pickupIcao: string | null }): string {
+  if (t.aircraftReg && REG_BASE[t.aircraftReg]) return REG_BASE[t.aircraftReg];
+  if (t.pickupIcao) {
+    const icao = t.pickupIcao.toUpperCase();
+    if (["YWDB","YWLG","YWCA","YNRM","YWOL"].some(x => icao.includes(x))) return "Dubbo";
+    if (["YSBK","YSSY","YSCB"].some(x => icao.includes(x))) return "Bankstown";
+    if (["YBHI"].some(x => icao.includes(x))) return "Broken Hill";
+  }
+  return "Dubbo";
+}
+const BASES = ["Dubbo", "Bankstown", "Broken Hill"] as const;
 import { apiRequest } from "@/lib/queryClient";
 import {
   Ambulance, Clock, Plane, MapPin, User, ArrowRight,
@@ -35,6 +53,7 @@ interface NeptTask {
   destLocation: string;
   destIcao: string | null;
   patientRef: string | null;
+  patientName: string | null;
   escortName: string | null;
   referringHospital: string | null;
   receivingHospital: string | null;
@@ -45,6 +64,10 @@ interface NeptTask {
   actualDepart: string | null;
   completedAt: string | null;
   notes: string | null;
+  patients: string | null;               // JSON array
+  specialConsiderations: string | null;  // comma-separated
+  pickupTimeNote: string | null;
+  dropoffTimeNote: string | null;
   sectors: Sector[] | null;
   createdAt: string;
   updatedAt: string;
@@ -234,13 +257,61 @@ function TaskCard({ task }: { task: NeptTask }) {
         </div>
       )}
 
-      {/* Row 4: Patient ref */}
-      {task.patientRef && (
-        <div className="text-xs text-slate-400 font-mono">
-          Patient: <span className="text-slate-200">{task.patientRef}</span>
-          {task.escortName && <span className="ml-2 text-slate-500">+ escort {task.escortName}</span>}
-        </div>
-      )}
+      {/* Row 4: Patients — multi-patient with special considerations + time notes */}
+      {(() => {
+        // Parse patients JSON if present
+        let patients: Array<{ id: string; name: string; ref: string; mobility: string; specialConsiderations: string[] }> = [];
+        if (task.patients) {
+          try { patients = JSON.parse(task.patients); } catch {}
+        }
+        // Fall back to legacy single-patient fields
+        if (patients.length === 0 && (task.patientRef || task.patientName)) {
+          const cons = task.specialConsiderations ? task.specialConsiderations.split(",").map(s => s.trim()).filter(Boolean) : [];
+          patients = [{ id: "legacy", name: task.patientName ?? "", ref: task.patientRef ?? "", mobility: "ambulant", specialConsiderations: cons }];
+        }
+        if (patients.length === 0) return null;
+        return (
+          <div className="space-y-1.5">
+            {patients.map((pt, i) => (
+              <div key={pt.id ?? i} className="text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-slate-300 font-semibold">{pt.ref || pt.name || `Pt ${i + 1}`}</span>
+                  {pt.name && pt.ref && <span className="text-slate-500">{pt.name}</span>}
+                  {pt.mobility === "stretcher"
+                    ? <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/30">Stretcher</span>
+                    : <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-500/15 text-green-400 border border-green-500/20">Ambulant</span>
+                  }
+                </div>
+                {pt.specialConsiderations && pt.specialConsiderations.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[9px] text-slate-500 uppercase tracking-wide mr-0.5">Special:</span>
+                    {pt.specialConsiderations.map(f => (
+                      <span key={f} className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">{f}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {task.escortName && (
+              <div className="text-xs text-slate-500">+ escort {task.escortName}</div>
+            )}
+            {(task.pickupTimeNote || task.dropoffTimeNote) && (
+              <div className="flex flex-col gap-0.5 pt-0.5">
+                {task.pickupTimeNote && (
+                  <div className="flex items-center gap-1 text-[10px] text-cyan-300/80">
+                    <span className="text-cyan-500/60">↑</span> {task.pickupTimeNote}
+                  </div>
+                )}
+                {task.dropoffTimeNote && (
+                  <div className="flex items-center gap-1 text-[10px] text-green-300/80">
+                    <span className="text-green-500/60">↓</span> {task.dropoffTimeNote}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Row 5: Hospitals */}
       {(task.referringHospital || task.receivingHospital) && (
@@ -305,6 +376,11 @@ export default function OpsRoomDisplay() {
 
   const { data: rawTasks = [], isLoading, isError, refetch } = useQuery<any[]>({
     queryKey: ["/api/nept-tasks"],
+    refetchInterval: 30_000,
+  });
+
+  const { data: breaks = [] } = useQuery<any[]>({
+    queryKey: ["/api/nept-breaks"],
     refetchInterval: 30_000,
   });
 
@@ -470,23 +546,62 @@ export default function OpsRoomDisplay() {
           </div>
         )}
 
-        {!isLoading && displayTasks.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
-            <CheckCircle2 size={40} className="text-green-400/30" />
-            <div className="text-slate-500 text-lg font-semibold">No active tasks</div>
-            <div className="text-slate-600 text-sm">All NEPT tasks for today are complete or stand-by.</div>
-          </div>
-        )}
+        {!isLoading && (
+          <div className="grid grid-cols-3 gap-6 h-full">
+            {BASES.map(base => {
+              const baseTasks  = displayTasks.filter(t => taskBase(t) === base);
+              const baseBreaks = breaks.filter((b: any) => b.base === base);
+              const hasItems   = baseTasks.length > 0 || baseBreaks.length > 0;
+              return (
+                <div key={base} className="flex flex-col gap-3">
+                  {/* Base header */}
+                  <div className="flex items-center gap-2 pb-1 border-b border-white/10">
+                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{base}</span>
+                    {baseTasks.length > 0 && <span className="px-1.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 text-[10px] font-bold">{baseTasks.length}</span>}
+                    {baseBreaks.length > 0 && <span className="px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400 text-[10px] font-bold">{baseBreaks.length} break{baseBreaks.length > 1 ? "s" : ""}</span>}
+                  </div>
 
-        {!isLoading && displayTasks.length > 0 && (
-          <div className={`grid gap-4 ${
-            displayTasks.length <= 3
-              ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto"
-              : displayTasks.length <= 6
-                ? "grid-cols-2 lg:grid-cols-3"
-                : "grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          }`}>
-            {displayTasks.map(t => <TaskCard key={t.id} task={t} />)}
+                  {!hasItems && (
+                    <div className="flex flex-col items-center justify-center h-32 gap-2 text-center opacity-30">
+                      <CheckCircle2 size={24} className="text-green-400" />
+                      <span className="text-slate-500 text-xs">Clear</span>
+                    </div>
+                  )}
+
+                  {/* Task cards */}
+                  {baseTasks.map(t => <TaskCard key={t.id} task={t} />)}
+
+                  {/* Break cards */}
+                  {baseBreaks.map((b: any) => {
+                    const isMeal = b.category === "Meal Break";
+                    const start  = b.startTime ? new Date(b.startTime).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+                    const end    = b.endTime   ? new Date(b.endTime).toLocaleTimeString("en-AU",   { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+                    return (
+                      <div key={b.id} className={`rounded-xl border p-3 space-y-1.5 ${
+                        isMeal
+                          ? "bg-orange-950/60 border-orange-500/40"
+                          : "bg-purple-950/60 border-purple-500/40"
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide ${
+                            isMeal ? "text-orange-300" : "text-purple-300"
+                          }`}>
+                            <Clock size={11} />
+                            {b.category}
+                          </div>
+                          <span className="text-[10px] text-slate-400 tabular-nums">{start} – {end}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] text-slate-300">
+                          <User size={10} className="text-slate-500 shrink-0" />
+                          <span className="truncate">{b.crewNames}</span>
+                        </div>
+                        {b.notes && <div className="text-[10px] text-slate-500 truncate">{b.notes}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
           </div>
         )}
       </main>

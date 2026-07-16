@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Clock, AlertTriangle, CheckCircle, Shield, RefreshCw,
   Users, Plane, Stethoscope, Truck, Wrench, Briefcase,
-  ChevronRight, Wifi, WifiOff, Calendar
+  ChevronRight, ChevronLeft, Wifi, WifiOff, Calendar
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -99,6 +99,35 @@ const GROUP_ICONS: Record<RosterGroup, React.ReactNode> = {
 };
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function getCurrentMonday(): Date {
+  const today = new Date();
+  const day = today.getDay();
+  const diff = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function addDays(date: Date, amount: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + amount);
+  return d;
+}
+
+function formatWeekRange(weekStart: Date): string {
+  const weekEnd = addDays(weekStart, 6);
+  const sameMonth = weekStart.getMonth() === weekEnd.getMonth();
+  const startStr = `${weekStart.getDate()}`;
+  const endStr = sameMonth
+    ? `${weekEnd.getDate()} ${MONTH_ABBR[weekEnd.getMonth()]} ${weekEnd.getFullYear()}`
+    : `${weekEnd.getDate()} ${MONTH_ABBR[weekEnd.getMonth()]} ${weekEnd.getFullYear()}`;
+  return sameMonth
+    ? `${startStr}–${endStr}`
+    : `${startStr} ${MONTH_ABBR[weekStart.getMonth()]} – ${endStr}`;
+}
 
 const DAY_STYLE: Record<DayCode, string> = {
   ON:    'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
@@ -135,13 +164,27 @@ export default function Roster() {
   const [activeGroup, setActiveGroup] = useState<RosterGroup>('Pilots');
   const [syncing, setSyncing] = useState(false);
   const [lastSync] = useState('09:47 AEST');
+  const [weekStart, setWeekStart] = useState<Date>(getCurrentMonday);
 
   const crew = GROUP_DATA[activeGroup];
   const counts = todayCount(crew);
+  const weekDates = DAYS.map((_, i) => addDays(weekStart, i));
 
   function handleSync() {
     setSyncing(true);
     setTimeout(() => setSyncing(false), 1800);
+  }
+
+  function handlePrevWeek() {
+    setWeekStart(prev => addDays(prev, -7));
+  }
+
+  function handleNextWeek() {
+    setWeekStart(prev => addDays(prev, 7));
+  }
+
+  function handleThisWeek() {
+    setWeekStart(getCurrentMonday());
   }
 
   return (
@@ -154,7 +197,7 @@ export default function Roster() {
             Air Maestro Roster
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            4-on / 4-off cycle · Dubbo &amp; Broken Hill · Week of 2–8 Jun 2026
+            4-on / 4-off cycle · Dubbo &amp; Broken Hill · Week of {formatWeekRange(weekStart)}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -169,6 +212,38 @@ export default function Roster() {
             <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
             {syncing ? 'Syncing…' : `Last sync ${lastSync}`}
           </button>
+        </div>
+      </div>
+
+      {/* Week navigation */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrevWeek}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-card-border text-xs hover:bg-muted/40 transition-colors"
+            aria-label="Previous week"
+          >
+            <ChevronLeft size={14} />
+            Prev Week
+          </button>
+          <button
+            onClick={handleThisWeek}
+            className="px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs hover:bg-cyan-500/20 transition-colors"
+          >
+            This Week
+          </button>
+          <button
+            onClick={handleNextWeek}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-card-border text-xs hover:bg-muted/40 transition-colors"
+            aria-label="Next week"
+          >
+            Next Week
+            <ChevronRight size={14} />
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Calendar size={12} />
+          <span>{formatWeekRange(weekStart)}</span>
         </div>
       </div>
 
@@ -247,9 +322,25 @@ export default function Roster() {
             <tr className="border-b border-border">
               <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[200px]">Name</th>
               <th className="text-center px-2 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
-              {DAYS.map(d => (
-                <th key={d} className="text-center px-1 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[52px]">{d}</th>
-              ))}
+              {DAYS.map((d, i) => {
+                const date = weekDates[i];
+                const isToday = date.toDateString() === new Date().toDateString();
+                return (
+                  <th
+                    key={d}
+                    className={`text-center px-1 py-3 text-xs font-semibold uppercase tracking-wider min-w-[52px] ${
+                      isToday ? 'text-cyan-300' : 'text-muted-foreground'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center leading-tight">
+                      <span className={isToday ? 'text-cyan-300' : ''}>{d}</span>
+                      <span className="text-[10px] font-normal normal-case text-muted-foreground/80 mt-0.5">
+                        {date.getDate()} {MONTH_ABBR[date.getMonth()]}
+                      </span>
+                    </div>
+                  </th>
+                );
+              })}
               {(activeGroup === 'Pilots') && (
                 <th className="text-center px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider min-w-[90px]">Hrs</th>
               )}
@@ -345,7 +436,7 @@ export default function Roster() {
             {Object.values(GROUP_DATA).flat().filter(c => c.week[0] === 'ON').length}
             <span className="text-sm font-normal text-muted-foreground"> / {Object.values(GROUP_DATA).flat().length}</span>
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">All departments · Mon 2 Jun</div>
+          <div className="text-xs text-muted-foreground mt-0.5">All departments · Mon {weekDates[0].getDate()} {MONTH_ABBR[weekDates[0].getMonth()]}</div>
         </div>
       </div>
 

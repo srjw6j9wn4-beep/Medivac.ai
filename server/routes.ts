@@ -3,6 +3,8 @@ import { createServer } from 'node:http';
 import type { Server } from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import os from 'node:os';
 import { storage, seedDefaultRates } from "./storage";
 import { getNotamsForAirport, getNotamsForAirports, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } from "./notam";
 import webpush from "web-push";
@@ -566,7 +568,238 @@ Medivac.ai covers: NEPT Tasking Board, AI Auto-Tasker, Route Planner with ICAO i
     }
   });
 
-  // ── Passenger Manifest API ──────────────────────────────────────────────────
+  // ── Asset Utilisation ──────────────────────────────────────────────────────────────
+
+  // POST /api/asset-utilisation/log  — append today's service statuses (called by morning brief save)
+  app.post("/api/asset-utilisation/log", async (req: Request, res: Response) => {
+    try {
+      const { services, date, recordedBy } = req.body as {
+        services: Array<{ serviceCode: string; base: string; status: string; aircraftReg?: string }>;
+        date: string;
+        recordedBy?: string;
+      };
+      if (!services?.length || !date) return res.status(400).json({ error: "services and date required" });
+      const dow = new Date(date + "T12:00:00").getDay(); // 0=Sun
+      const entries = services.map(s => ({
+        date,
+        dayOfWeek: dow,
+        serviceCode: s.serviceCode,
+        base: s.base,
+        status: s.status,
+        aircraftReg: s.aircraftReg,
+        recordedBy: recordedBy ?? "dispatcher",
+      }));
+      await storage.logServiceStatuses(entries);
+      return res.json({ success: true, logged: entries.length });
+    } catch (err) {
+      console.error("Asset utilisation log error:", err);
+      return res.status(500).json({ error: "Failed to log service statuses" });
+    }
+  });
+
+  // GET /api/asset-utilisation/history?days=90  — return raw history for client-side pattern analysis
+  app.get("/api/asset-utilisation/history", async (req: Request, res: Response) => {
+    try {
+      const days = Math.min(365, Math.max(7, parseInt(req.query.days as string ?? "90", 10) || 90));
+      const history = await storage.getServiceStatusHistory(days);
+      return res.json({ history, days });
+    } catch (err) {
+      console.error("Asset utilisation history error:", err);
+      return res.status(500).json({ error: "Failed to fetch history" });
+    }
+  });
+
+  // GET /api/asset-utilisation/contracts  — load saved contract registry
+  // POST /api/asset-utilisation/contracts — save contract registry
+  app.get("/api/asset-utilisation/contracts", async (_req: Request, res: Response) => {
+    try {
+      const filePath = require("path").join(process.cwd(), "contracts-config.json");
+      const fs = require("fs");
+      if (!fs.existsSync(filePath)) return res.json({ contracts: null }); // null = use defaults
+      const raw = fs.readFileSync(filePath, "utf8");
+      return res.json({ contracts: JSON.parse(raw) });
+    } catch (err) {
+      console.error("Contracts load error:", err);
+      return res.json({ contracts: null });
+    }
+  });
+
+  app.post("/api/asset-utilisation/contracts", async (req: Request, res: Response) => {
+    try {
+      const { contracts } = req.body as { contracts: unknown[] };
+      if (!Array.isArray(contracts)) return res.status(400).json({ error: "contracts must be an array" });
+      const filePath = require("path").join(process.cwd(), "contracts-config.json");
+      const fs = require("fs");
+      fs.writeFileSync(filePath, JSON.stringify(contracts, null, 2), "utf8");
+      return res.json({ success: true, saved: contracts.length });
+    } catch (err) {
+      console.error("Contracts save error:", err);
+      return res.status(500).json({ error: "Failed to save contracts" });
+    }
+  });
+
+  // GET /api/asset-utilisation/aircraft/:reg?days=90  — per-aircraft history
+  app.get("/api/asset-utilisation/aircraft/:reg", async (req: Request, res: Response) => {
+    try {
+      const reg = req.params.reg;
+      const days = Math.min(365, Math.max(7, parseInt(req.query.days as string ?? "90", 10) || 90));
+      const history = await storage.getAircraftStatusHistory(reg, days);
+      return res.json({ reg, history, days });
+    } catch (err) {
+      console.error("Aircraft history error:", err);
+      return res.status(500).json({ error: "Failed to fetch aircraft history" });
+    }
+  });
+
+
+  // ── Shared Anthropic fetch helper for Idea Hub routes ──────────────────
+  async function callAnthropicIdeas(prompt: string, maxTokens: number): Promise<string> {
+    const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy || "";
+    const customUrl   = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL || "";
+    const customToken = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN || "";
+    const proxyBase   = process.env.ANTHROPIC_API_BASE || "";
+    const proxyKey    = process.env.ANTHROPIC_API_KEY  || "";
+    const usingProxy  = !!httpsProxy && httpsProxy.includes("agent-proxy.perplexity.ai");
+    const apiKey      = usingProxy ? "proxy-injected" : (customToken || proxyKey);
+    const baseUrl     = customUrl || proxyBase || "https://api.anthropic.com";
+    if (!apiKey) throw new Error("Anthropic API key not configured");
+    const messagesUrl = baseUrl.endsWith("/v1/messages") ? baseUrl : `${baseUrl}/v1/messages`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "anthropic-version": "2023-06-01",
+    };
+    if (!usingProxy) headers["x-api-key"] = apiKey;
+    const apiRes = await fetch(messagesUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: "claude-opus-4-5",
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!apiRes.ok) {
+      const err = await apiRes.text();
+      throw new Error(`Anthropic ${apiRes.status}: ${err.substring(0, 200)}`);
+    }
+    const data = await apiRes.json() as { content: Array<{ type: string; text?: string }> };
+    return data.content[0]?.type === "text" ? data.content[0].text! : "";
+  }
+
+  // ── Staff Idea Hub ─────────────────────────────────────────────────────────────
+
+  // POST /api/ideas  — submit a new suggestion
+  app.post("/api/ideas", async (req: Request, res: Response) => {
+    try {
+      const { title, description, category, impactArea, submittedBy } = req.body;
+      if (!title || !description || !category || !impactArea || !submittedBy)
+        return res.status(400).json({ error: "All fields required" });
+      const row = await storage.submitSuggestion({ title, description, category, impactArea, submittedBy });
+      return res.json(row);
+    } catch (err) { console.error(err); return res.status(500).json({ error: "Submit failed" }); }
+  });
+
+  // GET /api/ideas?status=pending&limit=50
+  app.get("/api/ideas", async (req: Request, res: Response) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const limit  = parseInt(req.query.limit as string ?? "100", 10);
+      const ideas  = await storage.listSuggestions({ status, limit });
+      return res.json({ ideas });
+    } catch (err) { console.error(err); return res.status(500).json({ error: "List failed" }); }
+  });
+
+  // POST /api/ideas/analyse  — AI scores all pending/unanalysed ideas
+  app.post("/api/ideas/analyse", async (req: Request, res: Response) => {
+    try {
+      const all = await storage.listSuggestions({ limit: 200 });
+      const toAnalyse = all.filter((s: any) => !s.ai_analysed_at && s.status !== "declined");
+      if (toAnalyse.length === 0) return res.json({ analysed: 0, message: "Nothing to analyse" });
+
+      const ideasPayload = toAnalyse.map((s: any) => ({
+        id: s.id, title: s.title, description: s.description,
+        category: s.category, impactArea: s.impact_area,
+      }));
+
+      const prompt = `You are an aviation operations consultant evaluating staff suggestions for RFDS SE (Royal Flying Doctor Service South Eastern Section), an aeromedical and NEPT operator based in NSW/VIC Australia.
+
+Analyse each suggestion below. For each one, return a JSON object with:
+- id (number)
+- aiScore (0-100): viability score considering operational context, regulatory constraints, ROI, effort
+- aiSummary (string): one sentence capturing the core idea
+- aiEffort ("low"|"medium"|"high"): implementation effort
+- aiImpact ("low"|"medium"|"high"): potential organisational impact
+- aiRecommendation (string): 2-3 sentence analysis covering feasibility, potential implementation pathway, and any risks or dependencies
+- clusterTag (string): a short 2-3 word label to group similar ideas (e.g. "fleet scheduling", "crew welfare", "revenue growth", "cost reduction", "safety systems", "digital tooling")
+
+Return ONLY a valid JSON array of objects, no other text.
+
+Suggestions:
+${JSON.stringify(ideasPayload, null, 2)}`;
+
+      const raw = await callAnthropicIdeas(prompt, 4096);
+      const jsonStr = raw.replace(/^```[\w]*\n?/m, "").replace(/\n?```$/m, "").trim();
+      const results: any[] = JSON.parse(jsonStr);
+
+      let count = 0;
+      for (const r of results) {
+        await storage.updateSuggestionAI(r.id, {
+          aiScore: r.aiScore, aiSummary: r.aiSummary,
+          aiEffort: r.aiEffort, aiImpact: r.aiImpact,
+          aiRecommendation: r.aiRecommendation,
+          clusterTag: r.clusterTag,
+        });
+        count++;
+      }
+      return res.json({ analysed: count, results });
+    } catch (err) { console.error("Idea analyse error:", err); return res.status(500).json({ error: "Analysis failed" }); }
+  });
+
+  // POST /api/ideas/brief  — generate a GM-ready executive brief
+  app.post("/api/ideas/brief", async (req: Request, res: Response) => {
+    try {
+      const ideas = await storage.listSuggestions({ limit: 200 });
+      const reviewed = ideas.filter((s: any) => s.ai_analysed_at);
+      if (reviewed.length === 0) return res.json({ brief: "No analysed ideas available yet. Run AI Analysis first.", count: 0 });
+
+      const prompt = `You are briefing the General Manager of RFDS SE on staff innovation submissions. Produce a concise executive brief.
+
+Group ideas by cluster, rank by AI score within each group. For each cluster:
+- State the theme
+- List the top ideas (title, score, recommended action)
+- Highlight any quick wins (high score + low effort)
+- Note any ideas needing immediate safety or compliance review
+
+Close with a "Top 3 Actions" section — the three ideas with best effort-to-impact ratio, each with a one-line suggested next step.
+
+Ideas data:
+${JSON.stringify(reviewed.map((s: any) => ({
+  id: s.id, title: s.title, category: s.category,
+  aiScore: s.ai_score, aiSummary: s.ai_summary,
+  aiEffort: s.ai_effort, aiImpact: s.ai_impact,
+  aiRecommendation: s.ai_recommendation, clusterTag: s.cluster_tag,
+  submittedBy: s.submitted_by,
+})), null, 2)}
+
+Return plain text formatted with markdown headings.`;
+
+      const brief = await callAnthropicIdeas(prompt, 2048);
+      return res.json({ brief, count: reviewed.length });
+    } catch (err) { console.error("Brief error:", err); return res.status(500).json({ error: "Brief generation failed" }); }
+  });
+
+  // PATCH /api/ideas/:id  — GM reviews: update status + note
+  app.patch("/api/ideas/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { status, gmNote } = req.body;
+      if (!status) return res.status(400).json({ error: "status required" });
+      await storage.updateSuggestionGM(id, { status, gmNote });
+      return res.json({ success: true });
+    } catch (err) { console.error(err); return res.status(500).json({ error: "Update failed" }); }
+  });
+
+  // ── Passenger Manifest API ──────────────────────────────────────────────────────────────
 
   // GET /api/manifests?date=yyyy-mm-dd  — list all manifests (optionally by date)
   app.get("/api/manifests", async (req: Request, res: Response) => {
@@ -957,16 +1190,19 @@ Medivac.ai covers: NEPT Tasking Board, AI Auto-Tasker, Route Planner with ICAO i
       return res.status(400).json({ error: "jobSheet, opDate and availableAircraft are required." });
     }
 
-    const httpsProxy  = process.env.HTTPS_PROXY;
-    const customToken = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN;
-    const proxyKey    = process.env.ANTHROPIC_API_KEY;
-    const proxyBase   = process.env.ANTHROPIC_BASE_URL;
+    const httpsProxy  = process.env.HTTPS_PROXY || process.env.https_proxy || "";
+    const customToken = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_TOKEN || "";
+    const customUrl   = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL || "";
+    const proxyKey    = process.env.ANTHROPIC_API_KEY || "";
+    const proxyBase   = process.env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_API_BASE || "";
     const usingProxy  = !!httpsProxy && httpsProxy.includes("agent-proxy.perplexity.ai");
     const apiKey      = usingProxy ? "proxy-injected" : (customToken || proxyKey);
-    const baseUrl     = process.env.CUSTOM_CRED_API_ANTHROPIC_COM_URL || proxyBase || "https://api.anthropic.com";
+    const baseUrl     = customUrl || proxyBase || "https://api.anthropic.com";
+
+    console.log("[auto-task] mode:", usingProxy ? "pplx-proxy" : "direct", "| httpsProxy:", httpsProxy ? "set" : "not set", "| apiKey present:", !!apiKey, "| baseUrl:", baseUrl);
 
     if (!apiKey) {
-      return res.status(503).json({ error: "Anthropic API key not configured." });
+      return res.status(503).json({ error: "Anthropic API key not configured. Proxy: " + (httpsProxy ? "set" : "not set") });
     }
 
     const systemPrompt = `You are an expert RFDS aeromedical operations scheduler for RFDS SE Section (Royal Flying Doctor Service, South Eastern Section) in Australia.
@@ -994,9 +1230,20 @@ EFFICIENCY PRINCIPLES:
 - Avoid deadhead legs unless necessary for patient safety
 - Spread workload evenly across available aircraft
 
+GROUND TRANSPORT (ROAD TRANSFER) PRINCIPLES — critically important:
+- Every NEPT task has road transfer legs: pickup from patient location to aerodrome (Leg 1) and aerodrome to receiving facility (Leg 2). These MUST be assigned to an available driver with the PTV at that location.
+- If a location has a PTV but NO available driver today, you MUST propose a solution in this priority order:
+  1. BORROW from adjacent/nearby location: Check if a driver from Griffith, Narrandera, Orange, Parkes or any nearby town has nil or low tasking and could drive to cover. Name the driver and location explicitly.
+  2. FLY IN a driver from base: A driver from Dubbo or Bankstown can travel as a passenger on the aircraft positioning to that location. Include an explicit "Driver positioning" note in the task sectors and name the driver being repositioned.
+  3. SHARE across multi-patient days: If multiple patients are in the same town, sequence them so one driver handles all legs efficiently — list the sequencing.
+  4. If nil ground transport is possible, flag "NIL GROUND TRANSPORT" and suggest the nearest available alternate (e.g. patient held for next available driver day, or commercial taxi arranged).
+- Always name the specific driver assigned to each road leg in the groundTransport field.
+- A driver flying as a passenger is a perfectly valid operational solution — plan it as a real sector.
+- If a PTV vehicle itself is unavailable, note this separately — a driver alone cannot perform the transfer.
+
 You must return a JSON object ONLY — no prose, no markdown, no code block markers. The JSON must exactly match this schema:
 {
-  "summary": "One paragraph summary of the optimised plan",
+  "summary": "One paragraph summary of the optimised plan including any ground transport solutions proposed",
   "tasks": [
     {
       "aircraft": "VH-XXX",
@@ -1014,13 +1261,31 @@ You must return a JSON object ONLY — no prose, no markdown, no code block mark
           "groundTime": "60 min"
         }
       ],
+      "groundTransport": [
+        {
+          "location": "Wagga Wagga",
+          "vehicleId": "PTV-WAG",
+          "leg": "pickup",
+          "driver": "Wagga Driver 1",
+          "solution": "local",
+          "solutionDetail": "Local driver available"
+        },
+        {
+          "location": "Wagga Wagga",
+          "vehicleId": "PTV-WAG",
+          "leg": "dropoff",
+          "driver": "Griffith Driver",
+          "solution": "borrowed",
+          "solutionDetail": "Griffith Driver repositioned — nil Griffith tasking today, driving to Wagga to cover"
+        }
+      ],
       "dutyStart": "07:00",
       "dutyEnd": "17:00",
       "totalFlightTime": "4:20",
       "notes": "Positioned via Broken Hill to minimise deadhead; return leg combined with afternoon transfer."
     }
   ],
-  "warnings": ["EBA breach alerts go here — e.g. Nurse duty approaches 12hr EBA max, or Nurse rest gap is less than 10hr EBA minimum — as short strings"]
+  "warnings": ["EBA breach alerts and ground transport issues go here as short strings"]
 }
 
 IMPORTANT — EBA mentions in output: keep "notes" plain and operational (routing, timing, positioning) by default. Only reference a specific EBA clause number or limit value inside "notes" for a task when that task is actually at, near (e.g. within 30 min of a duty/rest cap), or in breach of the limit. If every EBA rule is comfortably satisfied with margin, do not mention EBA in the notes at all — leave "warnings" empty and keep notes purely operational. Never restate the full set of EBA limits as boilerplate.`;
@@ -1065,6 +1330,12 @@ Produce the optimised run plan as JSON.`;
           messages: [{ role: "user", content: userMsg }],
         }),
       });
+
+      if (!apiRes.ok) {
+        const errBody = await apiRes.text();
+        console.error("[auto-task] Anthropic API error:", apiRes.status, errBody);
+        return res.status(502).json({ error: `AI service returned ${apiRes.status}: ${errBody.substring(0, 200)}` });
+      }
 
       const data = await apiRes.json() as any;
       const text = data?.content?.[0]?.text ?? "";
@@ -1201,6 +1472,25 @@ Produce the optimised run plan as JSON.`;
       await storage.deleteNeptTask(parseInt(req.params.id));
       res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  // ── NEPT Breaks ────────────────────────────────────────────────────────
+  app.get("/api/nept-breaks", async (_req: Request, res: Response) => {
+    try { res.json(await storage.listNeptBreaks()); }
+    catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+  app.post("/api/nept-breaks", async (req: Request, res: Response) => {
+    try {
+      const { category, base, crewNames, startTime, endTime, notes } = req.body;
+      if (!category || !base || !crewNames || !startTime || !endTime)
+        return res.status(400).json({ error: "category, base, crewNames, startTime and endTime are required" });
+      const b = await storage.createNeptBreak({ category, base, crewNames, startTime, endTime, notes: notes ?? null });
+      res.status(201).json(b);
+    } catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+  app.delete("/api/nept-breaks/:id", async (req: Request, res: Response) => {
+    try { await storage.deleteNeptBreak(parseInt(req.params.id)); res.json({ ok: true }); }
+    catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
   // ── Chest item edits persistence ───────────────────────────────────────────
@@ -1509,6 +1799,83 @@ Produce the optimised run plan as JSON.`;
       const ok = await storage.deleteInvoice(parseInt(req.params.id));
       if (!ok) return res.status(404).json({ error: "Not found" });
       res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  // ── Bulk / Monthly Client Invoice ────────────────────────────────────────────
+  // POST /api/invoices/bulk-search  — find completed NEPT tasks for a client in date range
+  app.post("/api/invoices/bulk-search", async (req: Request, res: Response) => {
+    try {
+      const { payerName, dateFrom, dateTo } = req.body;
+      if (!payerName || !dateFrom || !dateTo) return res.status(400).json({ error: "payerName, dateFrom, dateTo are required" });
+      // Search completed NEPT tasks in the date range
+      const tasks = await storage.listNeptTasks();
+      const from = new Date(dateFrom + "T00:00:00").getTime();
+      const to   = new Date(dateTo   + "T23:59:59").getTime();
+      const matched = tasks.filter(t => {
+        // Use completedAt for Complete, updatedAt for Cancelled (no completedAt stamp on cancel)
+        const dateStr = t.completedAt ?? (t.status === "Cancelled" ? t.updatedAt : null);
+        const dateMs = dateStr ? new Date(dateStr).getTime() : null;
+        // Include Complete or Cancelled tasks within range
+        if (!dateMs || dateMs < from || dateMs > to) return false;
+        if (t.status !== "Complete" && t.status !== "Cancelled") return false;
+        if (payerName === "__ALL__") return true;
+        // Match payer by referringHospital or receivingHospital (case-insensitive contains)
+        const q = payerName.toLowerCase();
+        return (
+          (t.referringHospital ?? "").toLowerCase().includes(q) ||
+          (t.receivingHospital ?? "").toLowerCase().includes(q) ||
+          (t.pickupLocation ?? "").toLowerCase().includes(q) ||
+          (t.destLocation ?? "").toLowerCase().includes(q)
+        );
+      });
+      res.json(matched);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  // POST /api/invoices/bulk-generate — create one consolidated invoice for selected tasks
+  app.post("/api/invoices/bulk-generate", async (req: Request, res: Response) => {
+    try {
+      const { payerName, payerType, dateFrom, dateTo, taskRefs, lineItems, notes } = req.body;
+      if (!payerName || !taskRefs?.length) return res.status(400).json({ error: "payerName and taskRefs required" });
+      const now = new Date().toISOString();
+      const year = new Date().getFullYear();
+      const allInvoices = await storage.listInvoices();
+      const bulkCount = allInvoices.filter(i => i.invoiceNumber?.includes(`BULK-${year}`)).length;
+      const invoiceNumber = `INV-BULK-${year}-${String(bulkCount + 1).padStart(4, "0")}`;
+      const totalAmountCents = (lineItems as any[]).reduce((s: number, l: any) => s + (Number(l.amountCents) || 0), 0);
+      const invoice = await storage.createInvoice({
+        invoiceNumber,
+        invoiceDate: now,
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        serviceDate: dateFrom ?? now,
+        status: "Draft",
+        approvalStatus: null,
+        approvedBy: null, approvedAt: null,
+        rejectedBy: null, rejectedAt: null,
+        approvalNote: null,
+        autoGenerated: 0,
+        sourceType: "bulk",
+        payerType: payerType ?? "nsw_health",
+        payerName,
+        taskRef: taskRefs.join(", "),
+        patientId: null,
+        pickupLocation: null,
+        destination: null,
+        aircraftReg: null,
+        missionType: "Standard NEPT",
+        baseAmount: totalAmountCents / 100,
+        afterHoursSurcharge: 0,
+        additionalCharges: 0,
+        gstAmount: 0,
+        totalAmount: totalAmountCents / 100,
+        notes: notes ?? `Consolidated invoice for ${taskRefs.length} transfer(s) — ${dateFrom} to ${dateTo}`,
+        submittedAt: null,
+        paidAt: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+      res.status(201).json(invoice);
     } catch (e) { res.status(500).json({ error: String(e) }); }
   });
 
@@ -1970,6 +2337,142 @@ Produce the optimised run plan as JSON.`;
       res.json(await storage.listAudit(entityType, entityId));
     } catch (err) { res.status(500).json({ error: String(err) }); }
   });
+
+  // ── Ops Tasks ────────────────────────────────────────────────────────────────
+  app.get('/api/ops-tasks', async (req, res) => {
+    try { res.json(await storage.listOpsTasks()); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get('/api/ops-tasks/:id', async (req, res) => {
+    try {
+      const t = await storage.getOpsTask(Number(req.params.id));
+      t ? res.json(t) : res.status(404).json({ error: 'Not found' });
+    } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/ops-tasks', async (req, res) => {
+    try { res.status(201).json(await storage.createOpsTask(req.body)); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/ops-tasks/:id', async (req, res) => {
+    try { res.json(await storage.updateOpsTask(Number(req.params.id), req.body)); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete('/api/ops-tasks/:id', async (req, res) => {
+    try { res.json({ ok: await storage.deleteOpsTask(Number(req.params.id)) }); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get('/api/ops-tasks/:id/comments', async (req, res) => {
+    try { res.json(await storage.listOpsTaskComments(Number(req.params.id))); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/ops-tasks/:id/comments', async (req, res) => {
+    try { res.status(201).json(await storage.createOpsTaskComment({ ...req.body, task_id: Number(req.params.id) })); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Projects ─────────────────────────────────────────────────────────────────
+  app.get('/api/projects', async (req, res) => {
+    try { res.json(await storage.listProjects()); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/projects', async (req, res) => {
+    try { res.status(201).json(await storage.createProject(req.body)); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/projects/:id', async (req, res) => {
+    try { res.json(await storage.updateProject(Number(req.params.id), req.body)); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete('/api/projects/:id', async (req, res) => {
+    try { res.json({ ok: await storage.deleteProject(Number(req.params.id)) }); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get('/api/projects/:id/tasks', async (req, res) => {
+    try { res.json(await storage.listProjectTasks(Number(req.params.id))); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/projects/:id/tasks', async (req, res) => {
+    try { res.status(201).json(await storage.createProjectTask({ ...req.body, project_id: Number(req.params.id) })); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/project-tasks/:id', async (req, res) => {
+    try { res.json(await storage.updateProjectTask(Number(req.params.id), req.body)); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete('/api/project-tasks/:id', async (req, res) => {
+    try { res.json({ ok: await storage.deleteProjectTask(Number(req.params.id)) }); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Pilot Handover Board ──────────────────────────────────────────────────────
+  app.get('/api/handover', async (_req, res) => {
+    try { res.json(await storage.listHandovers()); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.get('/api/handover/:reg', async (req, res) => {
+    try {
+      const h = await storage.getHandoverByReg(req.params.reg);
+      h ? res.json(h) : res.status(404).json({ error: 'Not found' });
+    } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.post('/api/handover', async (req, res) => {
+    try { res.status(201).json(await storage.upsertHandover(req.body)); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/handover/:id', async (req, res) => {
+    try { res.json(await storage.updateHandover(Number(req.params.id), req.body)); } catch(e:any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // ── Closed Tenders ──────────────────────────────────────────────────────────
+  app.get("/api/closed-tenders", async (_req: Request, res: Response) => {
+    try {
+      const tenders = await storage.listClosedTenders();
+      return res.json({ tenders });
+    } catch (err) { console.error(err); return res.status(500).json({ error: "Failed to list" }); }
+  });
+
+  app.post("/api/closed-tenders", async (req: Request, res: Response) => {
+    try {
+      const { ref, title, agency, closed, awarded_to, contract_value, type, scope,
+              region, fit, missed_reason, lesson, bid_submitted, our_outcome, notes } = req.body;
+      if (!ref || !title || !agency || !closed || !type || !scope || !region)
+        return res.status(400).json({ error: "Missing required fields" });
+      const row = await storage.createClosedTender({
+        ref, title, agency, closed, awarded_to, contract_value, type, scope,
+        region, fit: fit ?? "MEDIUM", missed_reason: missed_reason ?? "",
+        lesson: lesson ?? "", bid_submitted: !!bid_submitted, our_outcome, notes,
+      });
+      return res.json({ tender: row });
+    } catch (err) { console.error(err); return res.status(500).json({ error: "Failed to create" }); }
+  });
+
+
+  app.patch("/api/closed-tenders/:id", async (req: Request, res: Response) => {
+    try {
+      const row = await storage.updateClosedTender(Number(req.params.id), req.body);
+      return res.json({ tender: row });
+    } catch (err) { console.error(err); return res.status(500).json({ error: "Failed to update" }); }
+  });
+
+  app.delete("/api/closed-tenders/:id", async (req: Request, res: Response) => {
+    try {
+      await storage.deleteClosedTender(Number(req.params.id));
+      return res.json({ success: true });
+    } catch (err) { console.error(err); return res.status(500).json({ error: "Failed to delete" }); }
+  });
+
+  // ── Split Duty PDF Export ────────────────────────────────────────────────
+  app.post("/api/split-duty/export", async (req: Request, res: Response) => {
+    try {
+      const payload = JSON.stringify(req.body);
+      const outPath = path.join(os.tmpdir(), `split_duty_${Date.now()}.pdf`);
+      const scriptPath = path.join(process.cwd(), 'server', 'split_duty_pdf.py');
+
+      await new Promise<void>((resolve, reject) => {
+        execFile('python3', [scriptPath, payload, outPath], { timeout: 15000 }, (err) => {
+          if (err) reject(err); else resolve();
+        });
+      });
+
+      const buf = fs.readFileSync(outPath);
+      fs.unlinkSync(outPath);
+
+      const now = new Date();
+      const stamp = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="SplitDuty_${stamp}.pdf"`);
+      res.setHeader('Content-Length', buf.length);
+      return res.send(buf);
+    } catch (err) {
+      console.error('[split-duty/export]', err);
+      return res.status(500).json({ error: 'PDF generation failed' });
+    }
+  });
+
 
   return httpServer;
 }

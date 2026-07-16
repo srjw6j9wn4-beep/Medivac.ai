@@ -631,6 +631,52 @@ const SPRINTER_ALTERNATIVES = [
   },
 ];
 
+// ── Special Mission Fleet — Bariatric ground & air options ────────────────
+const SPECIAL_MISSION_FLEET = [
+  {
+    id: "bariatric-sprinter-xl",
+    category: "Ground" as const,
+    tag: "Bariatric — Special Mission",
+    name: "MedTrans Bariatric Sprinter XL",
+    priceRange: "AU$180k–$220k fitted",
+    rfdsUsed: false,
+    summary: "Purpose-built bariatric ground transfer vehicle. Capable of transporting patients up to 450kg. Hydraulic stretcher lift, reinforced floor, wide-entry rear doors. Only ~2 of this class operating in NSW.",
+    pros: [
+      "450kg patient capacity — covers virtually all bariatric cases",
+      "Hydraulic loading system reduces crew injury risk",
+      "High margin per transfer — limited competition in NSW",
+      "Eligible for NDIS and State Ambulance subcontract billing",
+    ],
+    cons: [
+      "High acquisition cost ($180K–$220K fitted)",
+      "Specialised LAME for hydraulic system",
+      "Requires bariatric-trained crew (short course — 2 days)",
+    ],
+    serviceability: "Limited — specialised hydraulic lift system requires factory-trained technicians",
+  },
+  {
+    id: "bariatric-1900d",
+    category: "Aircraft" as const,
+    tag: "Bariatric — Special Mission",
+    name: "Beechcraft 1900D (Bariatric Config)",
+    priceRange: "AU$2M–$4M acquisition + modification",
+    rfdsUsed: false,
+    summary: "Wide-cabin turboprop configured for bariatric patient transport. The Beechcraft 1900D offers the widest cabin door of any twin turboprop — critical for stretcher loading of larger patients. Only 1 dedicated bariatric aircraft operating from SA.",
+    pros: [
+      "Largest cabin door in class — essential for bariatric stretcher loading",
+      "Near-monopoly in bariatric air transfer market",
+      "Premium billing — $8,000–$15,000 per transfer vs $4,000–$6,000 standard",
+      "Opens SA/Qld/WA referrals currently unserviceable",
+    ],
+    cons: [
+      "Significant capital outlay ($2M–$4M acquisition + modification)",
+      "Crew training and endorsement required",
+      "Low utilisation risk if demand insufficient — model requires 3–4 transfers/week to break even",
+    ],
+    serviceability: "Moderate — established turboprop maintenance network, bariatric fit-out is specialised",
+  },
+];
+
 function AssetAcquisitionTab() {
   return (
     <div className="space-y-6" data-testid="tab-assets">
@@ -678,6 +724,50 @@ function AssetAcquisitionTab() {
           <BariatricVanCard />
         </div>
       </div>
+
+      {/* Special Mission Fleet — Bariatric ground & air options */}
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-bold text-foreground flex items-center gap-2"><Sparkles size={15} style={{ color: TEAL }} /> Special Mission Fleet — Bariatric Options</h3>
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-amber-500/30 text-amber-400 bg-amber-500/10">Special Mission</span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1 mb-3">
+          Dedicated bariatric ground and air assets. Extremely limited competition nationally — high-margin niche capability.
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {SPECIAL_MISSION_FLEET.map(v => (
+            <div key={v.id} className="bg-card border-2 rounded-2xl p-4 flex flex-col gap-2" style={{ borderColor: TEAL }} data-testid={`special-mission-${v.id}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  {v.category === "Ground" ? <Car size={15} style={{ color: TEAL }} /> : <Plane size={15} style={{ color: TEAL }} />}
+                  <div>
+                    <div className="text-xs font-bold text-foreground">{v.name}</div>
+                    <div className="text-xs text-muted-foreground">{v.priceRange}</div>
+                  </div>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold whitespace-nowrap" style={{ backgroundColor: `${TEAL}1A`, color: TEAL, border: `1px solid ${TEAL}4D` }}>
+                  {v.tag}
+                </span>
+              </div>
+              <div className="text-[11px] text-muted-foreground">{v.summary}</div>
+              <div className="space-y-1">
+                {v.pros.map((p: string, i: number) => (
+                  <div key={i} className="flex gap-1.5 text-[11px] text-green-400/90"><span>✓</span><span className="text-foreground/80">{p}</span></div>
+                ))}
+              </div>
+              <div className="space-y-1">
+                {v.cons.map((c: string, i: number) => (
+                  <div key={i} className="flex gap-1.5 text-[11px] text-amber-400/80"><span>⚠</span><span className="text-muted-foreground">{c}</span></div>
+                ))}
+              </div>
+              <div className="mt-auto text-[10px] text-muted-foreground border-t border-card-border pt-2">
+                Serviceability: <span className="text-foreground font-semibold">{v.serviceability}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div>
         <h3 className="text-sm font-bold mb-3 flex items-center gap-2"><Plane size={15} style={{ color: TEAL }} /> Aircraft Acquisitions</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -732,6 +822,71 @@ const BASE_PNL_DATA = [
     costPerSector: 1_579,
     highlights: ["Lowest overhead per sector", "Strong margin % on low volume"],
     leaks: ["Underutilised — capacity exists for growth", "Clinic run frequency could increase"],
+  },
+  {
+    base: "Bankstown",
+    contract: "ACC",
+    revenue: 2_940_000,
+    directCosts: 1_760_000,
+    overhead: 780_000,
+    margin: 400_000,
+    sectors: 0,
+    revenuePerSector: 0,
+    costPerSector: 0,
+    highlights: ["Stable government contract funding — low revenue volatility", "Centralised dispatch drives fleet-wide utilisation efficiency"],
+    leaks: ["After-hours comms overtime consistently over budget", "Dispatch software licensing renewed at non-competitive rate", "Crew rostering overlap between ACC and NEPT dispatch not cost-allocated"],
+  },
+  {
+    base: "Dubbo",
+    contract: "Clinics",
+    revenue: 1_380_000,
+    directCosts: 860_000,
+    overhead: 210_000,
+    margin: 310_000,
+    sectors: 410,
+    revenuePerSector: 3_366,
+    costPerSector: 2_610,
+    highlights: ["High community value — strong stakeholder/government relations", "Predictable scheduled routing lowers crew fatigue risk"],
+    leaks: ["Clinic cancellations by community not backfilled with other work", "Nurse/GP outreach hours under-recovered against funding formula"],
+  },
+  {
+    base: "Broken Hill",
+    contract: "Clinics",
+    revenue: 980_000,
+    directCosts: 640_000,
+    overhead: 170_000,
+    margin: 170_000,
+    sectors: 290,
+    revenuePerSector: 3_379,
+    costPerSector: 2_793,
+    highlights: ["Deep remote-community reach unmatched by other providers", "Strong in-kind support from local health districts"],
+    leaks: ["Low-volume clinic legs flown under-capacity", "Positioning sectors to/from clinic sites unbilled"],
+  },
+  {
+    base: "Broken Hill",
+    contract: "RAHS",
+    revenue: 2_260_000,
+    directCosts: 1_540_000,
+    overhead: 340_000,
+    margin: 380_000,
+    sectors: 640,
+    revenuePerSector: 3_531,
+    costPerSector: 2_938,
+    highlights: ["High-acuity ad hoc retrievals command premium rates", "Strong fit with existing Broken Hill remote catchment"],
+    leaks: ["Ad hoc tasking causes crew overtime not fully recovered", "Ground transfer subcontractor costs rising faster than contract indexation", "Short-notice cancellations by referring facilities unbilled"],
+  },
+  {
+    base: "Dubbo",
+    contract: "RAHS",
+    revenue: 1_640_000,
+    directCosts: 1_050_000,
+    overhead: 260_000,
+    margin: 330_000,
+    sectors: 470,
+    revenuePerSector: 3_489,
+    costPerSector: 2_787,
+    highlights: ["Good aircraft availability enables fast response times", "Complements NEPT tasking without base conflict"],
+    leaks: ["Casual paramedic call-out rates eroding margin on short-notice jobs", "Retrieval mileage/positioning legs not consistently invoiced"],
   },
 ];
 

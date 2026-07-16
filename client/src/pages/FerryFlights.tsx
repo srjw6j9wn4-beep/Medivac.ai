@@ -756,7 +756,7 @@ export default function FerryFlights({ role }: Props) {
             <div className="text-xs text-muted-foreground mb-3">
               All {total} checklist items complete. All critical items signed off. Photo evidence logged.
             </div>
-            <button className="px-6 py-2.5 bg-green-500 hover:bg-green-400 text-white text-sm font-bold rounded-full transition-colors shadow-lg shadow-green-500/30">
+            <button onClick={() => alert(`${activeChecklist === 'out' ? 'Ferry Departure AUTHORISED' : 'Maintenance Release SIGNED'}\n\nAircraft: ${activeMission.registration}\nMission: ${activeMission.callsign}\nTime: ${new Date().toLocaleTimeString('en-AU')}\n\nIn production this would record the sign-off in the tech log and notify Operations Centre.`)} className="px-6 py-2.5 bg-green-500 hover:bg-green-400 text-white text-sm font-bold rounded-full transition-colors shadow-lg shadow-green-500/30">
               {activeChecklist === "out" ? "Authorise Ferry Departure →" : "Sign Maintenance Release →"}
             </button>
           </>

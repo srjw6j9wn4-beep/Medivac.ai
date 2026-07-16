@@ -3,7 +3,7 @@ import {
   Phone, PhoneCall, PhoneOff, PhoneForwarded,
   Clock, MapPin, User, CalendarDays, FileText,
   AlertTriangle, CheckCircle, ChevronDown, ChevronRight,
-  Moon, Download, Mic, ShieldAlert
+  Moon, Download, Mic, ShieldAlert, BellRing
 } from "lucide-react";
 import type { UserRole } from "@/lib/data";
 import { cn } from "@/lib/utils";
@@ -144,11 +144,32 @@ function isAfterHours(iso: string) {
 
 const BASE_OPTIONS = ["All Bases", "Dubbo", "Broken Hill", "Bankstown", "Launceston"] as const;
 
+type AccNotifyState = { notified: boolean; time: string; notes: string };
+
 export default function AfterHours({ role }: AfterHoursProps) {
   const [calls] = useState<CallRecord[]>(DEMO_CALLS);
   const [selectedBase, setSelectedBase] = useState<string>("All Bases");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [tab, setTab] = useState<"calls" | "setup" | "prompt">("calls");
+  const [accPanelOpenId, setAccPanelOpenId] = useState<string | null>(null);
+  const [accNotified, setAccNotified] = useState<Record<string, AccNotifyState>>({});
+  const [accDraftNotes, setAccDraftNotes] = useState<Record<string, string>>({});
+
+  function formatNowTime() {
+    return new Date().toLocaleString("en-AU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  function handleOpenAccPanel(callId: string) {
+    setAccPanelOpenId(accPanelOpenId === callId ? null : callId);
+  }
+
+  function handleSendAccNotification(callId: string) {
+    const time = formatNowTime();
+    setAccNotified(prev => ({
+      ...prev,
+      [callId]: { notified: true, time, notes: accDraftNotes[callId] ?? "" },
+    }));
+  }
 
   const canAccess = ["admin", "senior_management", "dispatcher", "safety", "doctor", "senior_flight_nurse"].includes(role);
   if (!canAccess) {
@@ -339,6 +360,95 @@ export default function AfterHours({ role }: AfterHoursProps) {
                         <span className="text-xs px-3 py-1.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1.5 font-medium">
                           <AlertTriangle size={11} /> Triple Zero Advised
                         </span>
+                      )}
+                    </div>
+
+                    {/* Notify ACC — Start Crew Tasking */}
+                    <div className="space-y-0">
+                      {!accNotified[call.id]?.notified && (
+                        <button
+                          onClick={() => handleOpenAccPanel(call.id)}
+                          className="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl bg-amber-500/15 border-2 border-amber-500/40 text-amber-300 font-semibold text-sm hover:bg-amber-500/25 hover:border-amber-500/60 transition-colors shadow-[0_0_20px_rgba(245,158,11,0.08)]"
+                        >
+                          <BellRing size={18} className="text-amber-400" />
+                          Notify ACC — Start Crew Tasking
+                        </button>
+                      )}
+
+                      {accNotified[call.id]?.notified && (
+                        <div className="flex items-center justify-between gap-3 px-5 py-3.5 rounded-xl bg-green-500/10 border border-green-500/25">
+                          <span className="flex items-center gap-2 text-sm font-semibold text-green-400">
+                            <CheckCircle size={16} />
+                            ACC Notified — Crew Tasking Initiated
+                          </span>
+                          <span className="text-xs text-green-300/80">{accNotified[call.id].time}</span>
+                        </div>
+                      )}
+
+                      {/* Inline confirmation panel */}
+                      {accPanelOpenId === call.id && !accNotified[call.id]?.notified && (
+                        <div className="mt-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.04] p-4 space-y-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20 font-medium flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block animate-pulse" />
+                              ACC Notified · {formatNowTime()}
+                            </span>
+                          </div>
+
+                          <div className="grid md:grid-cols-2 gap-3 text-sm">
+                            <div className="bg-background rounded-lg p-3 space-y-1.5">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Patient</p>
+                              <div className="flex items-center gap-2"><User size={12} className="text-muted-foreground" /><span>{call.patientName ?? call.callerName}</span></div>
+                              <div className="flex items-center gap-2"><MapPin size={12} className="text-muted-foreground" /><span>{call.callerLocation}</span></div>
+                              <div className="flex items-center gap-2"><Phone size={12} className="text-muted-foreground" /><span>{call.callbackNumber}</span></div>
+                            </div>
+                            <div className="bg-background rounded-lg p-3 space-y-1.5">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Brief Description</p>
+                              <p className="text-xs leading-relaxed text-muted-foreground">{call.description}</p>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Additional clinical notes for ACC</label>
+                            <textarea
+                              value={accDraftNotes[call.id] ?? ""}
+                              onChange={e => setAccDraftNotes(prev => ({ ...prev, [call.id]: e.target.value }))}
+                              placeholder="e.g. suspected AMI, GCS 15, vitals stable, request priority tasking..."
+                              className="w-full text-sm bg-background border border-card-border rounded-lg px-3 py-2 min-h-[80px] resize-none focus:outline-none focus:ring-1 focus:ring-amber-500/40"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <p className="text-xs text-cyan-300/80 flex items-center gap-1.5">
+                              <CheckCircle size={12} className="text-cyan-400" />
+                              Dr can continue consultation while crew is pre-positioned
+                            </p>
+                            <button
+                              onClick={() => handleSendAccNotification(call.id)}
+                              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-lg bg-amber-500 text-black hover:bg-amber-400 transition-colors"
+                            >
+                              <BellRing size={14} />
+                              Send Notification
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {accNotified[call.id]?.notified && (
+                        <div className="mt-2 rounded-xl border border-green-500/20 bg-green-500/[0.04] p-4 space-y-3">
+                          <p className="text-sm font-semibold text-green-400 flex items-center gap-2">
+                            ✓ Crew Tasking Initiated — {accNotified[call.id].time}
+                          </p>
+                          {accNotified[call.id].notes && (
+                            <div className="bg-background rounded-lg p-3 text-xs text-muted-foreground leading-relaxed">
+                              <span className="text-muted-foreground/70 font-semibold">Clinical notes sent: </span>{accNotified[call.id].notes}
+                            </div>
+                          )}
+                          <p className="text-xs text-cyan-300/80 flex items-center gap-1.5">
+                            <CheckCircle size={12} className="text-cyan-400" />
+                            Dr can continue consultation while crew is pre-positioned
+                          </p>
+                        </div>
                       )}
                     </div>
 

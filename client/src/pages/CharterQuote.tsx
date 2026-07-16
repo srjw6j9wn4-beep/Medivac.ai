@@ -15,7 +15,7 @@ import { type Airport, distanceNm as calcDistanceNm } from "@/lib/airportData";
 import {
   Plane, Plus, Trash2, Calculator, Save, FileDown, RotateCcw,
   AlertTriangle, ChevronDown, ChevronUp, Users, MapPin, Globe, Building2, AlertCircle, Info, Hotel, Percent, Eye, Edit3,
-  DollarSign, RefreshCw, Pencil, Check, X, ArrowUp, ArrowDown, Loader2,
+  DollarSign, RefreshCw, Pencil, Check, X, ArrowUp, ArrowDown, Loader2, Clock,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1084,6 +1084,11 @@ export default function CharterQuote() {
 
   // ─── Calculate ────────────────────────────────────────────────────────────
   function handleCalculate() {
+    // Guard: need at least one leg with a distance
+    if (legs.every(l => !l.distanceNm || l.distanceNm <= 0)) {
+      alert("Please enter at least one leg with a distance before calculating.");
+      return;
+    }
     // Build per-leg overnight array for the engine
     const ovEntries: LegOvernight[] = Object.entries(legOvernights)
       .map(([idxStr, ov]) => ({
@@ -1234,7 +1239,43 @@ export default function CharterQuote() {
     try {
       const parsedLegs: LegInput[] = JSON.parse(q.legs);
       const parsedCrew: CrewConfig = JSON.parse(q.crew);
-      const parsedCosts: QuoteCostBreakdown = JSON.parse(q.costs);
+      const rawCosts = JSON.parse(q.costs);
+      // Sanitise — old saved quotes may be missing fields added in later schema versions
+      const rawLegs = Array.isArray(rawCosts.legs) ? rawCosts.legs : [];
+      const sanitisedLegs = rawLegs.map((lb: any) => ({
+        ...lb,
+        arrivalTime: lb.arrivalTime ?? "09:00",
+        terminalNavDeparture: lb.terminalNavDeparture ?? 0,
+        terminalNavArrival: lb.terminalNavArrival ?? 0,
+        outOfHoursSurcharge: lb.outOfHoursSurcharge ?? 0,
+        groundTransport: lb.groundTransport ?? 0,
+        isOutOfHoursDeparture: lb.isOutOfHoursDeparture ?? false,
+        isOutOfHoursArrival: lb.isOutOfHoursArrival ?? false,
+        departureDateOffset: lb.departureDateOffset ?? 0,
+      }));
+      const rawSub = rawCosts.subtotals ?? {};
+      const parsedCosts: QuoteCostBreakdown = {
+        ...rawCosts,
+        legs: sanitisedLegs,
+        crewBreakdown: Array.isArray(rawCosts.crewBreakdown) ? rawCosts.crewBreakdown : [],
+        subtotals: {
+          fuel: rawSub.fuel ?? 0,
+          enroute: rawSub.enroute ?? 0,
+          met: rawSub.met ?? 0,
+          terminalNav: rawSub.terminalNav ?? 0,
+          outOfHoursSurcharge: rawSub.outOfHoursSurcharge ?? 0,
+          landingFees: rawSub.landingFees ?? 0,
+          groundTransport: rawSub.groundTransport ?? 0,
+          accommodation: rawSub.accommodation ?? 0,
+          intlCharges: rawSub.intlCharges ?? 0,
+        },
+        totalFdpHours: rawCosts.totalFdpHours ?? 0,
+        totalFlightHours: rawCosts.totalFlightHours ?? 0,
+        aircraftCost: rawCosts.aircraftCost ?? 0,
+        baseCost: rawCosts.baseCost ?? 0,
+        margin: rawCosts.margin ?? 0,
+        finalQuote: rawCosts.finalQuote ?? 0,
+      };
       setClientName(q.clientName);
       setClientContact(q.clientContact || "");
       setPurpose(q.purpose as Purpose);
@@ -1258,7 +1299,18 @@ export default function CharterQuote() {
     try {
       const parsedLegs: LegInput[] = JSON.parse(q.legs);
       const parsedCrew: CrewConfig = JSON.parse(q.crew);
-      const parsedCosts: QuoteCostBreakdown = JSON.parse(q.costs);
+      const rawCosts2 = JSON.parse(q.costs);
+      const rawLegs2 = Array.isArray(rawCosts2.legs) ? rawCosts2.legs : [];
+      const rawSub2 = rawCosts2.subtotals ?? {};
+      const parsedCosts: QuoteCostBreakdown = {
+        ...rawCosts2,
+        legs: rawLegs2.map((lb: any) => ({ ...lb, arrivalTime: lb.arrivalTime ?? "09:00", terminalNavDeparture: lb.terminalNavDeparture ?? 0, terminalNavArrival: lb.terminalNavArrival ?? 0, outOfHoursSurcharge: lb.outOfHoursSurcharge ?? 0, groundTransport: lb.groundTransport ?? 0, isOutOfHoursDeparture: lb.isOutOfHoursDeparture ?? false, isOutOfHoursArrival: lb.isOutOfHoursArrival ?? false, departureDateOffset: lb.departureDateOffset ?? 0 })),
+        crewBreakdown: Array.isArray(rawCosts2.crewBreakdown) ? rawCosts2.crewBreakdown : [],
+        subtotals: { fuel: rawSub2.fuel ?? 0, enroute: rawSub2.enroute ?? 0, met: rawSub2.met ?? 0, terminalNav: rawSub2.terminalNav ?? 0, outOfHoursSurcharge: rawSub2.outOfHoursSurcharge ?? 0, landingFees: rawSub2.landingFees ?? 0, groundTransport: rawSub2.groundTransport ?? 0, accommodation: rawSub2.accommodation ?? 0, intlCharges: rawSub2.intlCharges ?? 0 },
+        totalFdpHours: rawCosts2.totalFdpHours ?? 0, totalFlightHours: rawCosts2.totalFlightHours ?? 0,
+        aircraftCost: rawCosts2.aircraftCost ?? 0, baseCost: rawCosts2.baseCost ?? 0,
+        margin: rawCosts2.margin ?? 0, finalQuote: rawCosts2.finalQuote ?? 0,
+      };
       let parsedLegOvernights: Record<number, { nights: number | ""; hotel: AccomProperty | null; search: string }> | undefined;
       try { parsedLegOvernights = (q as any).legOvernights ? JSON.parse((q as any).legOvernights) : undefined; } catch (_) {}
       // Reconstruct intlLegs from saved costs if available
@@ -1372,6 +1424,7 @@ export default function CharterQuote() {
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">MTOW {a.mtow}t</span>
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">{a.tasKts}kt TAS</span>
                           <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/5 text-muted-foreground">{a.fuelBurnKgHr}kg/hr</span>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 font-semibold">${(a.hourlyRate / 100).toLocaleString()}/hr</span>
                           {key === "PC12" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-bold">DIRT OK</span>}
                           {key === "PC12" && <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400">CLINIC</span>}
                         </div>

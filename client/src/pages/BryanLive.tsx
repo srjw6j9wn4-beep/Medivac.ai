@@ -70,7 +70,7 @@ function Waveform({ active }: { active: boolean }) {
   );
 }
 
-export default function BryanLive({ role }: { role: UserRole }) {
+export default function BryanLive({ role, embedded = false }: { role: UserRole; embedded?: boolean }) {
   const [connState, setConnState]         = useState<ConnState>("idle");
   const [statusMsg, setStatusMsg]         = useState("");
   const [error, setError]                 = useState("");
@@ -633,10 +633,10 @@ export default function BryanLive({ role }: { role: UserRole }) {
   const isConnecting = ["fetching_token","connecting"].includes(connState);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={embedded ? "space-y-6" : "p-6 space-y-6"}>
 
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      {!embedded && (<div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
             Graham — Live Q&amp;A
@@ -654,7 +654,7 @@ export default function BryanLive({ role }: { role: UserRole }) {
           <span className={`w-1.5 h-1.5 rounded-full bg-current ${isConnecting ? "animate-ping" : isLive ? "animate-pulse" : ""}`} />
           {isLive ? (speaking ? "Speaking…" : "LIVE") : isConnecting ? statusMsg : connState === "error" ? "Error" : "Ready to connect"}
         </span>
-      </div>
+      </div>)}
 
       {/* ── Intro Video ───────────────────────────────────────── */}
       {!isLive && (

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { type UserRole } from "@/lib/data";
 import {
   Clock, AlertTriangle, CheckCircle, Plane, Wrench, Moon,
-  ChevronRight, Info, RefreshCw, Shield, Users, Zap
+  ChevronRight, Info, RefreshCw, Shield, Users, Zap,
+  SplitSquareHorizontal, BedDouble, Building2, AlertOctagon, ChevronDown, ChevronUp, FileDown, Loader2
 } from "lucide-react";
 
 interface Props { role: UserRole; }
@@ -322,6 +323,182 @@ function RestCard({ event, onAck }: { event: RestEvent; onAck: (id: string) => v
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SPLIT DUTY CALCULATOR — CAO 48.1 Appendix 4B (Aeromedical / RFDS)
+// EBA 2025 clause 20 defers to CAO 48.1
+//
+// Key rules (Appendix 4B — Medical transport & emergency service operations):
+//   • SDRP ≥ 2 hrs (sleeping accom):
+//     – FDP may be increased by FULL duration of rest period
+//     – Post-break segment ≤ FDP limit for a FRESH FCM at that time
+//     – Total FDP (incl SDRP) must not exceed 16 hours
+//   • SDRP ≥ 2 hrs (resting accom):
+//     – FDP may be increased by HALF the rest period, max +2 hrs
+//     – Total FDP must not exceed 16 hours
+//   • Post-break segment: ≤ standard FDP for fresh FCM at break-end start time
+//   • SDRP between 2300-0529: must be ≥ 7 hrs (sleeping); no ODP reduction
+//   • ODP calculation: full SDRP counts toward next rest calculation
+//     (no 2-hr reduction for Appendix 4B unlike other appendices)
+//   • EBA Cl 18.5: After combined duty, rest = 10 hrs (FDP ≤10h) or 12 hrs (>10h)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Base FDP limits table (Appendix 4B, single-pilot & multi-crew, by departure window)
+// Multi-crew (2+ pilots), acclimatised, no split duty:
+//   05:00-16:59 → 13h, 17:00-21:59 → 12h, 22:00-01:59 → 11h, 02:00-04:59 → 10h
+function baseFDPLimit(departHHMM: string, multiCrew: boolean): number {
+  const m = parseHHMM(departHHMM);
+  if (!multiCrew) {
+    // Single pilot (CAO 48.1 basic / App 4B single)
+    if (m >= 5*60 && m < 17*60) return 10;
+    if (m >= 17*60 && m < 22*60) return 9;
+    return 8;
+  }
+  // Multi-crew
+  if (m >= 5*60 && m < 17*60) return 13;
+  if (m >= 17*60 && m < 22*60) return 12;
+  if (m >= 22*60 || m < 2*60)  return 11;
+  return 10; // 02:00–04:59
+}
+
+interface SplitResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  maxTotalFDP: number;           // hours — maximum allowed total FDP incl. rest
+  maxPreBreak: number;           // hours — maximum pre-break segment allowed
+  maxPostBreak: number;          // hours — maximum post-break segment allowed
+  fdpExtension: number;          // hours added by the SDRP
+  totalFDPUsed: number;          // pre + sdrp + post
+  flightTimeUsed: number;        // pre + post (no rest)
+  requiredODP: number;           // minimum Off Duty Period after total FDP (hours)
+  odpRef: string;                // EBA / CAO reference
+  earliestReturn: string;        // HH:MM
+  nightwindowViolation: boolean;
+  facilityRequired: "sleeping" | "resting" | "either";
+}
+
+function calcSplitDuty(params: {
+  departHHMM: string;        // duty start time (pre-break segment start)
+  preBreakHours: number;     // duty hours before SDRP begins
+  sdrpHours: number;         // split-duty rest period duration (hours)
+  postBreakHours: number;    // planned duty hours after SDRP
+  facility: "sleeping" | "resting";
+  multiCrew: boolean;
+}): SplitResult {
+  const { departHHMM, preBreakHours, sdrpHours: sdropHours, postBreakHours, facility, multiCrew } = params;
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  // Derive break start and break end times
+  const breakStartMins = parseHHMM(departHHMM) + Math.round(preBreakHours * 60);
+  const breakStartHHMM = addMins(departHHMM, Math.round(preBreakHours * 60));
+  const breakEndHHMM   = addMins(breakStartHHMM, Math.round(sdropHours * 60));
+  const dutyEndHHMM    = addMins(breakEndHHMM, Math.round(postBreakHours * 60));
+
+  // ── Night window check (2300-0529) ──────────────────────────────────────────
+  const nightStart = 23 * 60, nightEnd = 5 * 60 + 29;
+  function overlapsNight(startMins: number, durMins: number): boolean {
+    const end = startMins + durMins;
+    for (let m = startMins; m < end; m++) {
+      const tm = m % (24 * 60);
+      if (tm >= nightStart || tm <= nightEnd) return true;
+    }
+    return false;
+  }
+  const breakStartTotalMins = parseHHMM(departHHMM) + Math.round(preBreakHours * 60);
+  const nightwindowViolation = overlapsNight(breakStartTotalMins % (24*60), Math.round(sdropHours * 60));
+
+  // ── Minimum SDRP requirements ────────────────────────────────────────────────
+  let minSdrp = 2;
+  if (nightwindowViolation) minSdrp = 7;
+  if (sdropHours < minSdrp) {
+    errors.push(`SDRP is ${sdropHours.toFixed(1)} hrs but minimum is ${minSdrp} hrs${nightwindowViolation ? " (night window 2300-0529 applies)" : ""}.`);
+  }
+
+  const facilityRequired: "sleeping" | "resting" | "either" = nightwindowViolation || sdropHours >= 4 ? "sleeping" : "either";
+  if (facility === "resting" && (nightwindowViolation || sdropHours >= 4)) {
+    errors.push("Sleeping accommodation is required for this SDRP duration/window. Resting accommodation is insufficient.");
+  }
+
+  // ── Base FDP limit for post-break segment (fresh FCM at break end) ──────────
+  const postBreakBase = baseFDPLimit(breakEndHHMM, multiCrew);
+
+  // ── Extension calculation (Appendix 4B) ─────────────────────────────────────
+  let fdpExtension = 0;
+  if (facility === "sleeping" && sdropHours >= 2) {
+    // Full SDRP duration as extension
+    fdpExtension = sdropHours;
+  } else if (facility === "resting" && sdropHours >= 2) {
+    // Half the SDRP, max 2 hours
+    fdpExtension = Math.min(sdropHours / 2, 2);
+  }
+
+  // ── Max FDP limits ────────────────────────────────────────────────────────────
+  const basePreLimit = baseFDPLimit(departHHMM, multiCrew);
+  const maxTotalFDP = Math.min(basePreLimit + fdpExtension, 16); // hard cap 16 hrs
+
+  // ── Max post-break segment = fresh FCM limit at that time ────────────────────
+  const maxPostBreak = postBreakBase;
+
+  // ── Max pre-break = base FDP - planned post (so combined ≤ maxTotalFDP) ──────
+  // But also CAO 48.1 doesn't explicitly cap pre-break; practical limit is total FDP
+  const maxPreBreak = maxTotalFDP - sdropHours - postBreakHours;
+
+  // ── Validation ────────────────────────────────────────────────────────────────
+  const totalFDPUsed   = preBreakHours + sdropHours + postBreakHours;
+  const flightTimeUsed = preBreakHours + postBreakHours;
+
+  if (postBreakHours > maxPostBreak) {
+    errors.push(`Post-break segment (${postBreakHours.toFixed(1)} hrs) exceeds the FDP limit for a fresh FCM departing at ${breakEndHHMM} (${maxPostBreak} hrs).`);
+  }
+  if (totalFDPUsed > maxTotalFDP) {
+    errors.push(`Total FDP including SDRP (${totalFDPUsed.toFixed(1)} hrs) exceeds the maximum allowed (${maxTotalFDP.toFixed(1)} hrs).`);
+  }
+  if (nightwindowViolation && sdropHours < 7) {
+    errors.push(`SDRP spans the 2300-0529 window — must be at least 7 hours.`);
+  }
+  if (preBreakHours <= 0) errors.push("Pre-break segment must be greater than 0 hours.");
+  if (postBreakHours <= 0) errors.push("Post-break segment must be greater than 0 hours.");
+
+  // ── ODP calculation (Appendix 4B: no reduction allowed) ──────────────────────
+  // EBA Cl 18.5: rest based on total flight time portion (pre + post)
+  const odpBase = flightTimeUsed > 10 ? 12 : 10;
+  const odpRef = flightTimeUsed > 10
+    ? "12 hrs — EBA Cl 18.5 (combined flight time >10h)"
+    : "10 hrs — EBA Cl 18.5 (combined flight time ≤10h)";
+  const requiredODP = multiCrew ? odpBase : 8;
+
+  const earliestReturn = addMins(dutyEndHHMM, requiredODP * 60);
+
+  if (totalFDPUsed <= maxTotalFDP && errors.length === 0) {
+    const headroom = maxTotalFDP - totalFDPUsed;
+    if (headroom < 1) warnings.push(`Only ${(headroom * 60).toFixed(0)} min of FDP headroom remaining.`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    maxTotalFDP,
+    maxPreBreak: Math.max(0, maxPreBreak),
+    maxPostBreak,
+    fdpExtension,
+    totalFDPUsed,
+    flightTimeUsed,
+    requiredODP,
+    odpRef,
+    earliestReturn,
+    nightwindowViolation,
+    facilityRequired,
+  };
+}
+
+// Fix typo in function — sdropHours -> sdropHours is fine as it reads sdropHours which is sdropHours alias
+// Note: the inner function uses sdropHours as alias for sdropHours; TypeScript sees it as sdropHours in scope.
+// We actually used sdropHours as the local alias by accident — let's just use the param name directly in component.
+
 export default function RestCalculatorOps({ role }: Props) {
   const now = new Date();
   const nowHHMM = `${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
@@ -405,6 +582,26 @@ export default function RestCalculatorOps({ role }: Props) {
 
   const canSubmit = arrivalTime.includes(":") && crewNames.length > 0 && fdpHours > 0;
 
+  // ── Split Duty tab state ───────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<"overnight" | "splitduty">("overnight");
+  const [sdDepart, setSdDepart] = useState("06:00");
+  const [sdPreBreak, setSdPreBreak] = useState(6);
+  const [sdSDRP, setSdSDRP] = useState(3);
+  const [sdPostBreak, setSdPostBreak] = useState(4);
+  const [sdFacility, setSdFacility] = useState<"sleeping" | "resting">("sleeping");
+  const [sdMultiCrew, setSdMultiCrew] = useState(true);
+  const [sdShowRules, setSdShowRules] = useState(false);
+  const [sdExporting, setSdExporting] = useState(false);
+
+  const sdResult = calcSplitDuty({
+    departHHMM: sdDepart,
+    preBreakHours: sdPreBreak,
+    sdrpHours: sdSDRP,
+    postBreakHours: sdPostBreak,
+    facility: sdFacility,
+    multiCrew: sdMultiCrew,
+  });
+
   // ── FDP quick-calc ────────────────────────────────────────────────────────────
   const [dutyStart, setDutyStart] = useState("08:00");
   const calcFdp = () => {
@@ -431,6 +628,26 @@ export default function RestCalculatorOps({ role }: Props) {
           <span>CAO 48.1 · EBA Cl 18.5</span>
         </div>
       </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-1 p-1 bg-card border border-card-border rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab("overnight")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === "overnight" ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+          style={activeTab === "overnight" ? { backgroundColor: TEAL } : {}}
+        >
+          <Moon size={13} /> Unplanned Overnight
+        </button>
+        <button
+          onClick={() => setActiveTab("splitduty")}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${activeTab === "splitduty" ? "text-white" : "text-muted-foreground hover:text-foreground"}`}
+          style={activeTab === "splitduty" ? { backgroundColor: TEAL } : {}}
+        >
+          <SplitSquareHorizontal size={13} /> Split Duty
+        </button>
+      </div>
+
+      {activeTab === "overnight" && (<div className="space-y-5">
 
       {/* ── Auto-detected alerts from FRMS ─────────────────────────────────── */}
       {visibleAlerts.length > 0 && (
@@ -713,6 +930,316 @@ export default function RestCalculatorOps({ role }: Props) {
           ))}
         </div>
       </div>
+      </div>)}
+
+      {/* ══ SPLIT DUTY CALCULATOR ══════════════════════════════════════════════ */}
+      {activeTab === "splitduty" && (
+        <div className="space-y-5">
+
+          {/* Info banner */}
+          <div className="flex items-start gap-3 bg-[#01696F]/10 border border-[#01696F]/25 rounded-xl px-4 py-3">
+            <Info size={15} className="mt-0.5 flex-shrink-0" style={{ color: TEAL }} />
+            <div className="text-xs text-muted-foreground leading-relaxed">
+              <span className="font-semibold text-foreground">CAO 48.1 Appendix 4B</span> applies to RFDS aeromedical operations.
+              A split-duty rest period (SDRP) is part of the total FDP. The post-break segment cannot exceed the FDP limit for a fresh FCM departing at the break-end time.
+              Total FDP (including SDRP) must not exceed 16 hours.
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-5 gap-5">
+            {/* ── LEFT — Input form ─────────────────────────────── */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-card border border-card-border rounded-2xl p-4 space-y-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Split Duty Parameters</div>
+
+                {/* Crew type */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setSdMultiCrew(true)}
+                    className={`flex-1 py-2 rounded-lg border text-xs font-semibold transition-all ${sdMultiCrew ? "border-[#01696F] text-white" : "border-card-border text-muted-foreground"}`}
+                    style={sdMultiCrew ? { backgroundColor: TEAL } : {}}
+                  >
+                    <Users size={12} className="inline mr-1" /> Multi-Crew
+                  </button>
+                  <button
+                    onClick={() => setSdMultiCrew(false)}
+                    className={`flex-1 py-2 rounded-lg border text-xs font-semibold transition-all ${!sdMultiCrew ? "bg-orange-600 border-orange-500 text-white" : "border-card-border text-muted-foreground"}`}
+                  >
+                    Single Pilot
+                  </button>
+                </div>
+
+                {/* Duty start */}
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">Duty Start (HHMM local)</label>
+                  <input type="time" value={sdDepart} onChange={e => setSdDepart(e.target.value)}
+                    className="w-full bg-input border border-card-border rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#01696F]" />
+                  <div className="text-[10px] text-muted-foreground mt-1">
+                    Base FDP limit: <span className="font-semibold text-foreground">{baseFDPLimit(sdDepart, sdMultiCrew)} hrs</span>
+                  </div>
+                </div>
+
+                {/* Pre-break */}
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">
+                    Pre-Break Segment — <span className="font-semibold text-foreground">{sdPreBreak} hrs</span>
+                  </label>
+                  <input type="range" min={0.5} max={12} step={0.5} value={sdPreBreak} onChange={e => setSdPreBreak(Number(e.target.value))}
+                    className="w-full accent-[#01696F]" />
+                  <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                    <span>0.5h</span><span>12h</span>
+                  </div>
+                </div>
+
+                {/* SDRP */}
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">
+                    Split-Duty Rest Period (SDRP) — <span className="font-semibold text-foreground">{sdSDRP} hrs</span>
+                    {sdResult.nightwindowViolation && <span className="ml-2 text-[9px] text-orange-400 font-bold">⚠ Night window</span>}
+                  </label>
+                  <input type="range" min={1} max={10} step={0.5} value={sdSDRP} onChange={e => setSdSDRP(Number(e.target.value))}
+                    className="w-full accent-[#01696F]" />
+                  <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                    <span>1h</span><span>10h</span>
+                  </div>
+                </div>
+
+                {/* Post-break */}
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">
+                    Post-Break Segment — <span className="font-semibold text-foreground">{sdPostBreak} hrs</span>
+                  </label>
+                  <input type="range" min={0.5} max={8} step={0.5} value={sdPostBreak} onChange={e => setSdPostBreak(Number(e.target.value))}
+                    className="w-full accent-[#01696F]" />
+                  <div className="flex justify-between text-[9px] text-muted-foreground mt-0.5">
+                    <span>0.5h</span><span>8h</span>
+                  </div>
+                </div>
+
+                {/* Facility */}
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1.5">Rest Facility Available</label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setSdFacility("sleeping")}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-semibold transition-all ${sdFacility === "sleeping" ? "border-[#01696F] text-white" : "border-card-border text-muted-foreground"}`}
+                      style={sdFacility === "sleeping" ? { backgroundColor: TEAL } : {}}
+                    >
+                      <BedDouble size={12} /> Sleeping
+                    </button>
+                    <button
+                      onClick={() => setSdFacility("resting")}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-xs font-semibold transition-all ${sdFacility === "resting" ? "bg-amber-700 border-amber-600 text-white" : "border-card-border text-muted-foreground"}`}
+                    >
+                      <Building2 size={12} /> Resting Only
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground mt-1 leading-relaxed">
+                    Sleeping = hotel/bedroom. Resting = crew lounge/chair. Sleeping gives full SDRP extension; resting gives ½ SDRP (max +2 hrs).
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick reference */}
+              <button
+                onClick={() => setSdShowRules(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-2.5 bg-card border border-card-border rounded-xl text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <span className="flex items-center gap-1.5"><Info size={12} /> CAO 48.1 App. 4B Reference</span>
+                {sdShowRules ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {sdShowRules && (
+                <div className="bg-card border border-card-border rounded-xl p-4 text-[11px] text-muted-foreground space-y-2 leading-relaxed">
+                  <div className="font-bold text-foreground text-xs mb-2">Appendix 4B — Aeromedical / Emergency Operations</div>
+                  <p><span className="text-foreground font-semibold">Sleeping accom (SDRP 2+ hrs):</span> FDP extended by full SDRP duration. Post-break max fresh FCM limit at break-end time. Total max 16 hrs.</p>
+                  <p><span className="text-foreground font-semibold">Resting accom (SDRP 2+ hrs):</span> FDP extended by half SDRP, max +2 hrs. Post-break max fresh FCM limit. Total max 16 hrs.</p>
+                  <p><span className="text-foreground font-semibold">Night window (2300-0529):</span> SDRP must be 7+ hrs with sleeping accom. No ODP reduction allowed.</p>
+                  <p><span className="text-foreground font-semibold">ODP (App 4B):</span> No reduction — full SDRP counts. EBA Cl 18.5 applies: 10+ hrs rest (FDP max 10h combined), 12+ hrs (FDP over 10h combined).</p>
+                  <p><span className="text-foreground font-semibold">EBA Cl 20.3(d):</span> FDP commenced may be extended to CAO 48.1 maximum. Extended rest under EBA 20.3(e) applies if extension occurs.</p>
+                </div>
+              )}
+            </div>
+
+            {/* ── RIGHT — Result panel ──────────────────────────── */}
+            <div className="lg:col-span-3 space-y-4">
+
+              {/* Timeline visual */}
+              <div className="bg-card border border-card-border rounded-2xl p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-4">Duty Timeline</div>
+                <div className="flex items-center gap-1 text-xs mb-3 flex-wrap">
+                  {/* Pre-break block */}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[9px] text-muted-foreground mb-1">{sdDepart}</div>
+                    <div
+                      className="h-8 rounded-l-lg flex items-center justify-center text-[10px] font-bold text-white px-2"
+                      style={{ backgroundColor: TEAL, minWidth: `${Math.max(sdPreBreak * 18, 40)}px` }}
+                    >
+                      {sdPreBreak}h FDP
+                    </div>
+                  </div>
+                  {/* SDRP block */}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[9px] text-muted-foreground mb-1">{addMins(sdDepart, Math.round(sdPreBreak * 60))}</div>
+                    <div
+                      className={`h-8 flex items-center justify-center text-[10px] font-bold px-2 ${sdFacility === "sleeping" ? "bg-slate-600 text-slate-200" : "bg-amber-800/60 text-amber-200"}`}
+                      style={{ minWidth: `${Math.max(sdSDRP * 18, 48)}px` }}
+                    >
+                      {sdSDRP}h {sdFacility === "sleeping" ? "Sleep" : "Rest"}
+                    </div>
+                  </div>
+                  {/* Post-break block */}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[9px] text-muted-foreground mb-1">{addMins(sdDepart, Math.round((sdPreBreak + sdSDRP) * 60))}</div>
+                    <div
+                      className={`h-8 rounded-r-lg flex items-center justify-center text-[10px] font-bold px-2 ${sdResult.valid ? "text-white" : "bg-red-900/60 text-red-200"}`}
+                      style={sdResult.valid ? { backgroundColor: TEAL, minWidth: `${Math.max(sdPostBreak * 18, 40)}px` } : { minWidth: `${Math.max(sdPostBreak * 18, 40)}px` }}
+                    >
+                      {sdPostBreak}h FDP
+                    </div>
+                  </div>
+                  {/* End marker */}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[9px] text-muted-foreground mb-1">{addMins(sdDepart, Math.round((sdPreBreak + sdSDRP + sdPostBreak) * 60))}</div>
+                    <div className="h-8 w-1 bg-card-border" />
+                  </div>
+                </div>
+                {/* Total FDP summary */}
+                <div className="text-[10px] text-muted-foreground mt-2">
+                  Total span: <span className="text-foreground font-semibold">{(sdPreBreak + sdSDRP + sdPostBreak).toFixed(1)} hrs</span>
+                  &nbsp;·&nbsp; Flight time: <span className="text-foreground font-semibold">{(sdPreBreak + sdPostBreak).toFixed(1)} hrs</span>
+                  &nbsp;·&nbsp; Limit: <span className="font-semibold" style={{ color: sdResult.valid ? TEAL : "#ef4444" }}>{sdResult.maxTotalFDP.toFixed(1)} hrs</span>
+                </div>
+              </div>
+
+              {/* Errors */}
+              {sdResult.errors.length > 0 && (
+                <div className="bg-red-950/30 border border-red-800/40 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-red-400 font-semibold text-xs mb-2">
+                    <AlertOctagon size={14} /> CAO 48.1 Violation{sdResult.errors.length > 1 ? "s" : ""}
+                  </div>
+                  {sdResult.errors.map((e, i) => (
+                    <div key={i} className="text-xs text-red-300 flex items-start gap-2">
+                      <span className="mt-0.5 flex-shrink-0 w-4 h-4 rounded-full bg-red-900/60 flex items-center justify-center text-[9px] font-bold">{i+1}</span>
+                      {e}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Warnings */}
+              {sdResult.warnings.length > 0 && sdResult.errors.length === 0 && (
+                <div className="bg-orange-950/30 border border-orange-800/40 rounded-2xl p-4 space-y-1">
+                  {sdResult.warnings.map((w, i) => (
+                    <div key={i} className="text-xs text-orange-300 flex items-center gap-2">
+                      <AlertTriangle size={12} /> {w}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Result cards */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: "FDP Extension", value: `+${sdResult.fdpExtension.toFixed(1)} hrs`, sub: sdFacility === "sleeping" ? "Full SDRP (Sleeping)" : "½ SDRP max +2h (Resting)", ok: sdResult.valid },
+                  { label: "Max Total FDP", value: `${sdResult.maxTotalFDP.toFixed(1)} hrs`, sub: "incl. SDRP, hard cap 16h", ok: sdResult.totalFDPUsed <= sdResult.maxTotalFDP },
+                  { label: "Max Post-Break", value: `${sdResult.maxPostBreak.toFixed(1)} hrs`, sub: `Fresh FCM limit at ${addMins(sdDepart, Math.round((sdPreBreak + sdSDRP) * 60))}`, ok: sdPostBreak <= sdResult.maxPostBreak },
+                  { label: "Required ODP", value: `${sdResult.requiredODP} hrs`, sub: sdResult.odpRef, ok: true },
+                ].map(c => (
+                  <div key={c.label} className={`bg-card border rounded-xl p-3 ${c.ok ? "border-card-border" : "border-red-800/50 bg-red-950/20"}`}>
+                    <div className="text-[9px] uppercase tracking-widest text-muted-foreground mb-1">{c.label}</div>
+                    <div className={`text-lg font-bold ${c.ok ? "" : "text-red-400"}`} style={c.ok ? { color: TEAL } : {}}>{c.value}</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5 leading-snug">{c.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Clearance / earliest return */}
+              <div className={`rounded-2xl p-4 border ${sdResult.valid ? "bg-[#01696F]/10 border-[#01696F]/30" : "bg-red-950/20 border-red-800/30"}`}>
+                <div className="text-[10px] uppercase tracking-widest font-bold mb-2" style={{ color: sdResult.valid ? TEAL : "#ef4444" }}>
+                  {sdResult.valid ? "✓ COMPLIANT — Summary" : "✗ NON-COMPLIANT"}
+                </div>
+                {sdResult.valid ? (
+                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Duty start</span>
+                      <span className="font-semibold text-foreground">{sdDepart}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Break starts</span>
+                      <span className="font-semibold text-foreground">{addMins(sdDepart, Math.round(sdPreBreak * 60))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Resume after SDRP</span>
+                      <span className="font-semibold text-foreground">{addMins(sdDepart, Math.round((sdPreBreak + sdSDRP) * 60))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Duty ends</span>
+                      <span className="font-semibold text-foreground">{addMins(sdDepart, Math.round((sdPreBreak + sdSDRP + sdPostBreak) * 60))}</span>
+                    </div>
+                    <div className="border-t border-card-border my-1 pt-1 flex justify-between">
+                      <span>Required ODP</span>
+                      <span className="font-semibold text-foreground">{sdResult.requiredODP} hrs ({sdResult.odpRef})</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-foreground">
+                      <span>Earliest next duty</span>
+                      <span style={{ color: TEAL }}>{sdResult.earliestReturn}</span>
+                    </div>
+                    {sdResult.nightwindowViolation && (
+                      <div className="mt-2 text-orange-400 text-[10px] leading-snug">
+                        ⚠ SDRP spans 2300-0529 — no ODP reduction applies. Sleeping accommodation is mandatory.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Adjust the parameters to resolve the violation{sdResult.errors.length > 1 ? "s" : ""} shown above.</p>
+                )}
+              </div>
+
+              {/* Export PDF button */}
+              <button
+                onClick={async () => {
+                  setSdExporting(true);
+                  try {
+                    const res = await fetch('/api/split-duty/export', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'X-App-Key': '98dcf87f14cdd94024310478d34915c15867d888a4c5db09e143431a515ffc64' },
+                      body: JSON.stringify({
+                        departHHMM: sdDepart,
+                        preBreakHours: sdPreBreak,
+                        sdrpHours: sdSDRP,
+                        postBreakHours: sdPostBreak,
+                        facility: sdFacility,
+                        multiCrew: sdMultiCrew,
+                        result: sdResult,
+                      }),
+                    });
+                    if (!res.ok) throw new Error('Export failed');
+                    const blob = await res.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `SplitDuty_${new Date().toISOString().slice(0,10)}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (e) {
+                    console.error(e);
+                  } finally {
+                    setSdExporting(false);
+                  }
+                }}
+                disabled={sdExporting}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-semibold transition-all disabled:opacity-50"
+                style={{ borderColor: TEAL, color: TEAL }}
+              >
+                {sdExporting ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                {sdExporting ? 'Generating PDF…' : 'Export to PDF'}
+              </button>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

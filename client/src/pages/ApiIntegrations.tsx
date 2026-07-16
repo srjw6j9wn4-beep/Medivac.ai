@@ -189,6 +189,25 @@ const INTEGRATIONS: Integration[] = [
     latency: "—",
   },
 
+  // ── Project Management ──────────────────────────────────────────────────────
+  {
+    id: "jira",
+    name: "Jira (Atlassian)",
+    logo: "📌",
+    category: "Project Management",
+    description: "Create and track issues, bugs, and feature requests directly from Medivac.ai. Sync NEPT task failures, maintenance flags, and platform defects to your Jira project board.",
+    docsUrl: "https://developer.atlassian.com/cloud/jira/platform/rest/v3/",
+    status: "disconnected",
+    fields: [
+      { key: "jira_base_url",    label: "Jira Base URL",    placeholder: "https://your-org.atlassian.net", hint: "Your Atlassian cloud domain — found in your Jira URL" },
+      { key: "jira_email",       label: "Account Email",    placeholder: "admin@your-org.com",           hint: "The email address of the Atlassian account that owns the API token" },
+      { key: "jira_api_token",   label: "API Token",        placeholder: "ATATT3xFfGF0...", secret: true, hint: "Generate at id.atlassian.com → Security → API tokens" },
+      { key: "jira_project_key", label: "Project Key",      placeholder: "MED",                          hint: "The short key of the Jira project to create issues in (e.g. MED, RFDS, OPS)" },
+    ],
+    lastSync: "—",
+    latency: "—",
+  },
+
   // ── Forms & Workflow ────────────────────────────────────────────────────────
   {
     id: "jotform",

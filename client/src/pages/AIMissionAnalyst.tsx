@@ -236,7 +236,10 @@ export default function AIMissionAnalyst({ role }: Props) {
               >
                 Export Briefing PDF
               </button>
-              <button className="flex-1 py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
+              <button onClick={() => {
+                const next = SAMPLE_ANALYSIS[(SAMPLE_ANALYSIS.indexOf(selectedMission) + 1) % SAMPLE_ANALYSIS.length];
+                setSelectedMission(next);
+              }} className="flex-1 py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
                 Re-analyse
               </button>
             </div>

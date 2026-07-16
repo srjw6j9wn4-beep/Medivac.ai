@@ -180,7 +180,7 @@ export default function SystemSettings({ role }: Props) {
               <div className="flex items-center gap-2">
                 <span className={`badge ${api.status === "Connected" ? "status-green" : "status-red"}`}>{api.status}</span>
                 {isAdmin && (
-                  <button className="px-3 py-1 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
+                  <button onClick={() => alert(`${api.status === "Connected" ? "Configure" : "Connect"}: ${api.label}\nStatus: ${api.status}${api.status === "Connected" ? "\nLatency: " + api.latency + "\nLast sync: " + api.lastSync : ""}\n\nIn production this would open the API configuration panel.`)} className="px-3 py-1 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
                     {api.status === "Connected" ? "Configure" : "Connect"}
                   </button>
                 )}
@@ -215,7 +215,7 @@ export default function SystemSettings({ role }: Props) {
               </div>
             ))}
             {isAdmin && (
-              <button className="mt-2 w-full py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
+              <button onClick={() => alert("Opening Security Policy editor...\n\nIn production this would allow editing session timeouts, JWT expiry, password policy, and lockout settings.")} className="mt-2 w-full py-2 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">
                 Edit Security Policy
               </button>
             )}
@@ -228,7 +228,7 @@ export default function SystemSettings({ role }: Props) {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Recent Activity</div>
-            <button className="px-3 py-1.5 bg-card border border-card-border hover:bg-background text-xs font-semibold rounded-lg transition-colors">
+            <button onClick={() => { const rows = [["Time","User","Action","Type"],...AUDIT_LOG.map(l=>[l.time,l.user,l.action,l.type])]; const csv = rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n"); const url = URL.createObjectURL(new Blob([csv],{type:"text/csv"})); const a = document.createElement("a"); a.href=url; a.download="audit-log.csv"; a.click(); URL.revokeObjectURL(url); }} className="px-3 py-1.5 bg-card border border-card-border hover:bg-background text-xs font-semibold rounded-lg transition-colors">
               Export Full Log
             </button>
           </div>

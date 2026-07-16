@@ -118,6 +118,15 @@ export const neptTasks = sqliteTable("nept_tasks", {
   completedAt:   text("completed_at"),                 // ISO datetime — auto-set when status → Complete
   notes:         text("notes"),
   groundTransportCost: real("ground_transport_cost").default(200),  // van pick/drop — dollars and cents
+  // Patient mobility
+  patientMobility: text("patient_mobility").default("ambulant"),   // "ambulant" | "stretcher"
+  // Multiple patients — JSON array of {name, ref, mobility, specialConsiderations}
+  patients:       text("patients"),
+  // Special considerations — comma-separated flags
+  specialConsiderations: text("special_considerations"),           // e.g. "Cardiac Monitor,Infectious"
+  // Pickup / dropoff time notes (surfaced in Ops Room)
+  pickupTimeNote:  text("pickup_time_note"),
+  dropoffTimeNote: text("dropoff_time_note"),
   createdAt:     text("created_at").notNull(),
   updatedAt:     text("updated_at").notNull(),
 });
@@ -125,6 +134,23 @@ export const neptTasks = sqliteTable("nept_tasks", {
 export const insertNeptTaskSchema = createInsertSchema(neptTasks).omit({ id: true });
 export type InsertNeptTask = z.infer<typeof insertNeptTaskSchema>;
 export type NeptTask = typeof neptTasks.$inferSelect;
+
+// ── NEPT Crew Breaks ────────────────────────────────────────────────────────
+export const neptBreaks = sqliteTable("nept_breaks", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  category:    text("category").notNull(),          // "Meal Break" | "Cleaning Break"
+  base:        text("base").notNull(),              // "Dubbo" | "Bankstown" | "Broken Hill"
+  crewNames:   text("crew_names").notNull(),        // comma-separated crew names
+  startTime:   text("start_time").notNull(),        // ISO datetime
+  endTime:     text("end_time").notNull(),          // ISO datetime
+  notes:       text("notes"),
+  createdAt:   text("created_at").notNull(),
+  updatedAt:   text("updated_at").notNull(),
+});
+
+export const insertNeptBreakSchema = createInsertSchema(neptBreaks).omit({ id: true });
+export type InsertNeptBreak = z.infer<typeof insertNeptBreakSchema>;
+export type NeptBreak = typeof neptBreaks.$inferSelect;
 
 // ── Notifications ────────────────────────────────────────────────────────────
 export const notifications = sqliteTable("notifications", {
@@ -396,3 +422,137 @@ export const fuelReceipts = sqliteTable('fuel_receipts', {
 export const insertFuelReceiptSchema = createInsertSchema(fuelReceipts).omit({ id: true });
 export type InsertFuelReceipt = z.infer<typeof insertFuelReceiptSchema>;
 export type FuelReceipt = typeof fuelReceipts.$inferSelect;
+
+// ── Ops Tasks ─────────────────────────────────────────────────────────────────
+// Operational task management — admin tasks, crew requests, roo runs, fuel orders, etc.
+export const opsTasks = sqliteTable('ops_tasks', {
+  id:            integer('id').primaryKey({ autoIncrement: true }),
+  taskRef:       text('task_ref').notNull(),               // e.g. "OPS-2026-0001"
+  type:          text('type').notNull(),                   // 'admin' | 'fuel_order' | 'roo_run' | 'catering' | 'transport' | 'maintenance_request' | 'crew_request' | 'other'
+  title:         text('title').notNull(),
+  description:   text('description'),
+  requestedBy:   text('requested_by').notNull(),           // name/role of requester
+  requestSource: text('request_source').notNull().default('ops'), // 'ops' | 'crew' | 'pilot' | 'nurse' | 'engineer'
+  assignedTo:    text('assigned_to'),                      // assigned ops staff
+  aircraftReg:   text('aircraft_reg'),                     // linked aircraft if applicable
+  locationIcao:  text('location_icao'),                    // location if applicable
+  priority:      text('priority').notNull().default('normal'), // 'low' | 'normal' | 'high' | 'urgent'
+  status:        text('status').notNull().default('open'), // 'open' | 'in_progress' | 'pending_approval' | 'completed' | 'cancelled'
+  dueDate:       text('due_date'),                         // ISO yyyy-mm-dd
+  dueTime:       text('due_time'),                         // HH:MM local
+  completedAt:   text('completed_at'),
+  completedBy:   text('completed_by'),
+  attachments:   text('attachments'),                      // JSON array of file refs
+  notes:         text('notes'),
+  linkedTaskId:  integer('linked_task_id'),                // link to project task if applicable
+  createdAt:     text('created_at').notNull(),
+  updatedAt:     text('updated_at').notNull(),
+});
+
+export const insertOpsTaskSchema = createInsertSchema(opsTasks).omit({ id: true });
+export type InsertOpsTask = z.infer<typeof insertOpsTaskSchema>;
+export type OpsTask = typeof opsTasks.$inferSelect;
+
+// Ops task comments / updates
+export const opsTaskComments = sqliteTable('ops_task_comments', {
+  id:         integer('id').primaryKey({ autoIncrement: true }),
+  taskId:     integer('task_id').notNull(),
+  author:     text('author').notNull(),
+  body:       text('body').notNull(),
+  createdAt:  text('created_at').notNull(),
+});
+export type OpsTaskComment = typeof opsTaskComments.$inferSelect;
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+// Project management — initiatives, programs, platform projects
+export const projects = sqliteTable('projects', {
+  id:          integer('id').primaryKey({ autoIncrement: true }),
+  projectRef:  text('project_ref').notNull(),              // e.g. "PRJ-2026-001"
+  name:        text('name').notNull(),
+  description: text('description'),
+  category:    text('category').notNull().default('general'), // 'platform' | 'compliance' | 'infrastructure' | 'clinical' | 'general'
+  status:      text('status').notNull().default('active'), // 'planning' | 'active' | 'on_hold' | 'completed' | 'cancelled'
+  priority:    text('priority').notNull().default('normal'), // 'low' | 'normal' | 'high' | 'critical'
+  owner:       text('owner').notNull(),
+  members:     text('members'),                            // JSON array of names
+  startDate:   text('start_date'),
+  targetDate:  text('target_date'),
+  completedAt: text('completed_at'),
+  progress:    integer('progress').notNull().default(0),   // 0-100
+  notes:       text('notes'),
+  createdAt:   text('created_at').notNull(),
+  updatedAt:   text('updated_at').notNull(),
+});
+
+export const insertProjectSchema = createInsertSchema(projects).omit({ id: true });
+export type InsertProject = z.infer<typeof insertProjectSchema>;
+export type Project = typeof projects.$inferSelect;
+
+// Project tasks (tickets/cards within a project)
+export const projectTasks = sqliteTable('project_tasks', {
+  id:          integer('id').primaryKey({ autoIncrement: true }),
+  projectId:   integer('project_id').notNull(),
+  taskRef:     text('task_ref').notNull(),                 // e.g. "PRJ-001-T-04"
+  title:       text('title').notNull(),
+  description: text('description'),
+  type:        text('type').notNull().default('task'),     // 'task' | 'bug' | 'feature' | 'improvement' | 'risk'
+  status:      text('status').notNull().default('todo'),   // 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked'
+  priority:    text('priority').notNull().default('normal'),
+  assignedTo:  text('assigned_to'),
+  dueDate:     text('due_date'),
+  completedAt: text('completed_at'),
+  storyPoints: integer('story_points'),
+  labels:      text('labels'),                             // JSON array
+  notes:       text('notes'),
+  createdAt:   text('created_at').notNull(),
+  updatedAt:   text('updated_at').notNull(),
+});
+
+export const insertProjectTaskSchema = createInsertSchema(projectTasks).omit({ id: true });
+export type InsertProjectTask = z.infer<typeof insertProjectTaskSchema>;
+export type ProjectTask = typeof projectTasks.$inferSelect;
+
+// ── Asset Utilisation — Service Status Log ────────────────────────────────
+// Appended each time the 0845 morning brief is saved. Feeds the
+// Asset Utilisation analytics engine to detect idle patterns and
+// surface charter / maintenance window opportunities.
+export const serviceStatusLog = sqliteTable('service_status_log', {
+  id:          integer('id').primaryKey({ autoIncrement: true }),
+  date:        text('date').notNull(),          // yyyy-mm-dd
+  dayOfWeek:   integer('day_of_week').notNull(), // 0=Sun … 6=Sat
+  serviceCode: text('service_code').notNull(),  // e.g. "BK-CLINIC-AIR"
+  base:        text('base').notNull(),          // BHI | DU | BK | ESS | TAS
+  status:      text('status').notNull(),        // green | amber | offline | not_required
+  aircraftReg: text('aircraft_reg'),            // e.g. "VH-LTQ" — nullable if unassigned
+  recordedAt:  text('recorded_at').notNull(),   // ISO timestamp
+  recordedBy:  text('recorded_by'),             // role string
+});
+
+export const insertServiceStatusLogSchema = createInsertSchema(serviceStatusLog).omit({ id: true });
+export type InsertServiceStatusLog = z.infer<typeof insertServiceStatusLogSchema>;
+export type ServiceStatusLog = typeof serviceStatusLog.$inferSelect;
+
+// ── Staff Idea Hub ─────────────────────────────────────────────────────────
+export const staffSuggestions = sqliteTable('staff_suggestions', {
+  id:               integer('id').primaryKey({ autoIncrement: true }),
+  title:            text('title').notNull(),
+  description:      text('description').notNull(),
+  category:         text('category').notNull(),      // growth|efficiency|safety|culture|technology|other
+  impactArea:       text('impact_area').notNull(),   // operations|finance|people|customer|compliance
+  submittedBy:      text('submitted_by').notNull(),
+  submittedAt:      text('submitted_at').notNull(),
+  status:           text('status').notNull().default('pending'), // pending|reviewing|approved|declined|implemented
+  gmNote:           text('gm_note'),
+  gmReviewedAt:     text('gm_reviewed_at'),
+  aiScore:          integer('ai_score'),             // 0-100
+  aiSummary:        text('ai_summary'),
+  aiEffort:         text('ai_effort'),               // low|medium|high
+  aiImpact:         text('ai_impact'),               // low|medium|high
+  aiRecommendation: text('ai_recommendation'),
+  aiAnalysedAt:     text('ai_analysed_at'),
+  clusterTag:       text('cluster_tag'),
+});
+
+export const insertStaffSuggestionSchema = createInsertSchema(staffSuggestions).omit({ id: true });
+export type InsertStaffSuggestion = z.infer<typeof insertStaffSuggestionSchema>;
+export type StaffSuggestion = typeof staffSuggestions.$inferSelect;

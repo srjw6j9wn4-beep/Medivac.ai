@@ -126,7 +126,7 @@ export default function TelehealthPortal({ role }: Props) {
                 className="flex-1 py-2 bg-green-400/10 hover:bg-green-400/20 border border-green-400/30 text-green-400 text-xs font-semibold rounded-lg transition-colors">
                 Join Session
               </button>
-              <button className="flex-1 py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
+              <button onClick={() => setTab("records")} className="flex-1 py-2 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">
                 View Records
               </button>
             </div>
@@ -199,8 +199,8 @@ export default function TelehealthPortal({ role }: Props) {
             <textarea className="w-full bg-background border border-card-border rounded-lg p-3 text-sm resize-none focus:outline-none focus:border-cyan-400/50 text-muted-foreground"
               rows={3} placeholder="Enter clinical notes, observations, or management plan during the consult..." defaultValue="" />
             <div className="flex gap-2 mt-2">
-              <button className="px-3 py-1.5 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">Save Notes</button>
-              <button className="px-3 py-1.5 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">Add to Record</button>
+              <button onClick={() => { const ta = document.querySelector('textarea[placeholder*="clinical notes"]') as HTMLTextAreaElement; const v = ta?.value?.trim(); if (v) alert(`Notes saved for ${selected?.patient}:\n"${v.substring(0,100)}${v.length>100?"...":""}"\n\nIn production this would persist to the patient record.`); else alert("No notes to save."); }} className="px-3 py-1.5 bg-cyan-400/10 hover:bg-cyan-400/20 border border-cyan-400/30 text-cyan-400 text-xs font-semibold rounded-lg transition-colors">Save Notes</button>
+              <button onClick={() => { const ta = document.querySelector('textarea[placeholder*="clinical notes"]') as HTMLTextAreaElement; const v = ta?.value?.trim(); if (v) { alert(`Added to patient record for ${selected?.patient}.\n\nIn production this would create a clinical note entry.`); if (ta) ta.value = ""; } else alert("Enter notes before adding to record."); }} className="px-3 py-1.5 bg-card hover:bg-background border border-card-border text-xs font-semibold rounded-lg transition-colors">Add to Record</button>
             </div>
           </div>
         </div>
