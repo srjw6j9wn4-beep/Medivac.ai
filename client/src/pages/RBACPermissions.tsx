@@ -542,31 +542,31 @@ export default function RBACPermissions({ role }: Props) {
       {view === "matrix" && (
         <div className="rounded-xl border border-card-border overflow-hidden flex flex-col">
           {/* ── Pinned header — never scrolls ── */}
-          <div className="bg-card border-b-2 border-card-border overflow-x-auto flex-shrink-0">
-            <table className="text-[10px]" style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}>
+          <div className="bg-card border-b-2 border-card-border flex-shrink-0">
+            <table className="text-[9px] w-full" style={{ tableLayout: "fixed" }}>
               <colgroup>
-                <col style={{ width: "11rem" }} />
-                {ROLES.map(r => <col key={r.id} style={{ width: "5.5rem" }} />)}
+                <col style={{ width: "14%" }} />
+                {ROLES.map(r => <col key={r.id} style={{ width: `${86 / ROLES.length}%` }} />)}
               </colgroup>
               <thead>
                 <tr>
-                  <th className="text-left p-2 pl-4 font-semibold text-muted-foreground">Module</th>
+                  <th className="text-left p-2 pl-3 font-semibold text-muted-foreground">Module</th>
                   {ROLES.map(r => (
-                    <th key={r.id} className="p-2 text-center font-semibold">
-                      <div className={r.color}>{r.icon}</div>
-                      <div className="text-muted-foreground text-[9px] leading-tight mt-0.5">{r.label}</div>
+                    <th key={r.id} className="p-1 text-center font-semibold">
+                      <div className={`text-base leading-none ${r.color}`}>{r.icon}</div>
+                      <div className="text-muted-foreground text-[8px] leading-tight mt-0.5 break-words">{r.label}</div>
                     </th>
                   ))}
                 </tr>
               </thead>
             </table>
           </div>
-          {/* ── Scrollable body — own overflow-y ── */}
-          <div className="overflow-auto bg-card" style={{ maxHeight: "65vh" }}>
-            <table className="text-[10px]" style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}>
+          {/* ── Scrollable body — own overflow-y, NO overflow-x ── */}
+          <div className="overflow-y-auto overflow-x-hidden bg-card" style={{ maxHeight: "65vh" }}>
+            <table className="text-[10px] w-full" style={{ tableLayout: "fixed" }}>
               <colgroup>
-                <col style={{ width: "11rem" }} />
-                {ROLES.map(r => <col key={r.id} style={{ width: "5.5rem" }} />)}
+                <col style={{ width: "14%" }} />
+                {ROLES.map(r => <col key={r.id} style={{ width: `${86 / ROLES.length}%` }} />)}
               </colgroup>
               <tbody>
                 {(() => {
@@ -590,8 +590,8 @@ export default function RBACPermissions({ role }: Props) {
                             return (
                               <td key={r.id} className="p-2 text-center">
                                 <button onClick={() => cyclePermission(r.id, m.id)}
-                                  className={`px-2 py-0.5 rounded border font-semibold transition-colors w-14 ${permBg(p)} ${isAdmin ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}>
-                                  {p === "full" ? "F" : p === "read" ? "R" : "—"}
+                                  className={`px-1 py-0.5 rounded border font-semibold transition-colors w-full max-w-[3rem] text-[9px] ${permBg(p)} ${isAdmin ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}>
+                                  {p === "full" ? "Full" : p === "read" ? "Read" : "—"}
                                 </button>
                               </td>
                             );
