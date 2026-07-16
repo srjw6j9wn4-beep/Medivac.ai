@@ -5,9 +5,21 @@ import {
   Plus, X, CheckCircle2, Clock, AlertTriangle, Zap, ChevronDown,
   Fuel, Truck, Wrench, Users, FileText, Coffee, Filter,
   MessageSquare, Send, User, Calendar, MapPin, Plane, RefreshCw,
-  ClipboardList, ChevronRight, MoreHorizontal, Check, Pencil, Rabbit, Lightbulb
+  ClipboardList, ChevronRight, MoreHorizontal, Check, Pencil, Rabbit, Lightbulb,
+  Inbox
 } from "lucide-react";
 import type { UserRole } from "@/lib/data";
+
+// ─── Roles that are "crew" (limited view — Crew Requests tab only by default) ──
+const CREW_ROLES: UserRole[] = [
+  "pilot", "senior_base_pilot", "training_captain",
+  "nurse", "senior_flight_nurse", "ordering_nurse",
+  "doctor",
+];
+// Roles that can see full Ops board
+const OPS_ROLES: UserRole[] = ["dispatcher", "engineer", "safety", "senior_management", "hofo", "hotac", "admin"];
+
+function isCrew(role: UserRole) { return CREW_ROLES.includes(role); }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type OpsTask = {
@@ -22,31 +34,31 @@ type Comment = { id: number; task_id: number; author: string; body: string; crea
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TASK_TYPES = [
-  { id: "admin",               label: "Admin",               icon: <FileText size={13} />,     color: "text-[#797876]"  },
-  { id: "fuel_order",          label: "Fuel Order",          icon: <Fuel size={13} />,         color: "text-amber-400"  },
-  { id: "roo_run",             label: "Roo Run",             icon: <Truck size={13} />,        color: "text-orange-400" },
-  { id: "catering",            label: "Catering",            icon: <Coffee size={13} />,       color: "text-yellow-400" },
-  { id: "transport",           label: "Ground Transport",    icon: <Truck size={13} />,        color: "text-blue-400"   },
-  { id: "maintenance_request", label: "Maintenance Request", icon: <Wrench size={13} />,       color: "text-red-400"    },
-  { id: "crew_request",        label: "Crew Request",        icon: <Users size={13} />,        color: "text-[#4F98A3]"  },
-  { id: "other",               label: "Other",               icon: <MoreHorizontal size={13} />, color: "text-[#797876]" },
+  { id: "admin",               label: "Admin",               icon: <FileText size={13} />,       color: "text-[#797876]"  },
+  { id: "fuel_order",          label: "Fuel Order",          icon: <Fuel size={13} />,           color: "text-amber-400"  },
+  { id: "roo_run",             label: "Roo Run",             icon: <Truck size={13} />,          color: "text-orange-400" },
+  { id: "catering",            label: "Catering",            icon: <Coffee size={13} />,         color: "text-yellow-400" },
+  { id: "transport",           label: "Ground Transport",    icon: <Truck size={13} />,          color: "text-blue-400"   },
+  { id: "maintenance_request", label: "Maintenance Request", icon: <Wrench size={13} />,         color: "text-red-400"    },
+  { id: "crew_request",        label: "Crew Request",        icon: <Users size={13} />,          color: "text-[#4F98A3]"  },
+  { id: "other",               label: "Other",               icon: <MoreHorizontal size={13} />, color: "text-[#797876]"  },
 ];
 const PRIORITIES = ["urgent", "high", "normal", "low"];
 const STATUSES   = ["open", "in_progress", "pending_approval", "completed", "cancelled"];
 const SOURCES    = ["ops", "crew", "pilot", "nurse", "engineer"];
 
 const PRIO_CFG: Record<string, { label: string; cls: string }> = {
-  urgent: { label: "Urgent",  cls: "bg-red-500/15 text-red-400 border-red-500/30"    },
+  urgent: { label: "Urgent",  cls: "bg-red-500/15 text-red-400 border-red-500/30"      },
   high:   { label: "High",    cls: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
-  normal: { label: "Normal",  cls: "bg-[#393836] text-[#CDCCCA] border-[#393836]"   },
-  low:    { label: "Low",     cls: "bg-[#1C1B19] text-[#5A5957] border-[#393836]"   },
+  normal: { label: "Normal",  cls: "bg-[#393836] text-[#CDCCCA] border-[#393836]"     },
+  low:    { label: "Low",     cls: "bg-[#1C1B19] text-[#5A5957] border-[#393836]"     },
 };
 const STATUS_CFG: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
-  open:             { label: "Open",             icon: <Clock size={11} />,        cls: "bg-[#393836] text-[#CDCCCA] border-[#393836]"          },
-  in_progress:      { label: "In Progress",      icon: <RefreshCw size={11} />,    cls: "bg-blue-500/15 text-blue-400 border-blue-500/30"         },
-  pending_approval: { label: "Pending Approval", icon: <AlertTriangle size={11} />, cls: "bg-amber-500/15 text-amber-400 border-amber-500/30"    },
-  completed:        { label: "Completed",        icon: <CheckCircle2 size={11} />, cls: "bg-green-500/15 text-green-400 border-green-500/30"      },
-  cancelled:        { label: "Cancelled",        icon: <X size={11} />,           cls: "bg-[#1C1B19] text-[#5A5957] border-[#393836]"            },
+  open:             { label: "Open",             icon: <Clock size={11} />,         cls: "bg-[#393836] text-[#CDCCCA] border-[#393836]"          },
+  in_progress:      { label: "In Progress",      icon: <RefreshCw size={11} />,     cls: "bg-blue-500/15 text-blue-400 border-blue-500/30"         },
+  pending_approval: { label: "Pending Approval", icon: <AlertTriangle size={11} />, cls: "bg-amber-500/15 text-amber-400 border-amber-500/30"      },
+  completed:        { label: "Completed",        icon: <CheckCircle2 size={11} />,  cls: "bg-green-500/15 text-green-400 border-green-500/30"      },
+  cancelled:        { label: "Cancelled",        icon: <X size={11} />,            cls: "bg-[#1C1B19] text-[#5A5957] border-[#393836]"            },
 };
 
 function typeInfo(id: string) { return TASK_TYPES.find(t => t.id === id) ?? TASK_TYPES[TASK_TYPES.length - 1]; }
@@ -61,8 +73,9 @@ function StatusBadge({ s }: { s: string }) {
 }
 
 // ─── Task Detail Panel ────────────────────────────────────────────────────────
-function TaskDetail({ task, role, onClose, onUpdate }: {
-  task: OpsTask; role: UserRole; onClose: () => void; onUpdate: (id: number, u: any) => void;
+function TaskDetail({ task, role, onClose, onUpdate, crewView = false }: {
+  task: OpsTask; role: UserRole; onClose: () => void;
+  onUpdate: (id: number, u: any) => void; crewView?: boolean;
 }) {
   const qc = useQueryClient();
   const [comment, setComment] = useState("");
@@ -74,6 +87,7 @@ function TaskDetail({ task, role, onClose, onUpdate }: {
   const { data: comments = [] } = useQuery<Comment[]>({
     queryKey: ["/api/ops-tasks", task.id, "comments"],
     queryFn: () => apiRequest("GET", `/api/ops-tasks/${task.id}/comments`).then(r => r.json()),
+    refetchInterval: 15000, // live refresh every 15s
   });
 
   const addComment = useMutation({
@@ -110,15 +124,17 @@ function TaskDetail({ task, role, onClose, onUpdate }: {
               <PriorityBadge p={task.priority} />
               <StatusBadge s={task.status} />
             </div>
-            {editing ? (
+            {!crewView && editing ? (
               <input value={editTitle} onChange={e => setEditTitle(e.target.value)}
                 className="w-full px-3 py-1.5 bg-[#171614] border border-[#393836] rounded-lg text-sm font-bold text-[#CDCCCA] placeholder:text-[#5A5957] focus:outline-none focus:border-[#4F98A3]/50" />
             ) : (
               <div className="flex items-center gap-1.5">
                 <h2 className="text-base font-bold text-[#CDCCCA]" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{task.title}</h2>
-                <button onClick={() => setEditing(true)} className="p-1 rounded-md hover:bg-white/10 text-[#797876] hover:text-[#4F98A3]" data-testid="button-edit-task">
-                  <Pencil size={12} />
-                </button>
+                {!crewView && (
+                  <button onClick={() => setEditing(true)} className="p-1 rounded-md hover:bg-white/10 text-[#797876] hover:text-[#4F98A3]">
+                    <Pencil size={12} />
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -145,15 +161,16 @@ function TaskDetail({ task, role, onClose, onUpdate }: {
           </div>
 
           {/* Description */}
-          {editing ? (
+          {!crewView && editing ? (
             <div>
               <div className="text-[10px] text-[#5A5957] uppercase tracking-wider mb-1.5">Description</div>
-              <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3} placeholder="Detailed instructions or context…"
+              <textarea value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3}
+                placeholder="Detailed instructions or context…"
                 className="w-full px-3 py-2 bg-[#171614] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] placeholder:text-[#5A5957] focus:outline-none focus:border-[#4F98A3]/50 resize-none" />
               <div className="flex gap-2 mt-2">
-                <button onClick={cancelEdit} className="flex-1 py-2 rounded-lg border border-[#393836] text-xs text-[#797876] hover:text-[#CDCCCA] transition-colors" data-testid="button-cancel-edit-task">Cancel</button>
+                <button onClick={cancelEdit} className="flex-1 py-2 rounded-lg border border-[#393836] text-xs text-[#797876] hover:text-[#CDCCCA] transition-colors">Cancel</button>
                 <button onClick={saveEdit} disabled={!editTitle.trim()}
-                  className="flex-1 py-2 rounded-lg bg-[#01696F] text-white text-xs font-semibold hover:bg-[#0C4E54] disabled:opacity-40 transition-colors" data-testid="button-save-edit-task">Save</button>
+                  className="flex-1 py-2 rounded-lg bg-[#01696F] text-white text-xs font-semibold hover:bg-[#0C4E54] disabled:opacity-40 transition-colors">Save</button>
               </div>
             </div>
           ) : task.description && (
@@ -163,8 +180,8 @@ function TaskDetail({ task, role, onClose, onUpdate }: {
             </div>
           )}
 
-          {/* Status actions */}
-          {task.status !== "completed" && task.status !== "cancelled" && (
+          {/* Status actions — ops only */}
+          {!crewView && task.status !== "completed" && task.status !== "cancelled" && (
             <div>
               <div className="text-[10px] text-[#5A5957] uppercase tracking-wider mb-2">Update Status</div>
               <div className="flex gap-2 flex-wrap">
@@ -181,27 +198,44 @@ function TaskDetail({ task, role, onClose, onUpdate }: {
             </div>
           )}
 
-          {/* Comments */}
+          {/* Crew view — status notice */}
+          {crewView && (
+            <div className="bg-[#171614] border border-[#393836] rounded-lg px-3 py-2.5">
+              <div className="text-[10px] text-[#5A5957] mb-0.5">Request Status</div>
+              <StatusBadge s={task.status} />
+              {task.status === "completed" && task.completed_by && (
+                <p className="text-[10px] text-[#5A5957] mt-1.5">Completed by {task.completed_by}</p>
+              )}
+            </div>
+          )}
+
+          {/* Comments — live feed */}
           <div>
-            <div className="text-[10px] text-[#5A5957] uppercase tracking-wider mb-2">
+            <div className="text-[10px] text-[#5A5957] uppercase tracking-wider mb-2 flex items-center gap-2">
               Updates & Comments ({comments.length})
+              {crewView && <span className="text-[#4F98A3]">· live</span>}
             </div>
             <div className="space-y-2 mb-3">
-              {comments.length === 0 && <p className="text-xs text-[#5A5957] italic">No comments yet.</p>}
-              {comments.map(c => (
-                <div key={c.id} className="bg-[#171614] rounded-lg px-3 py-2.5">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold text-[#4F98A3]">{c.author}</span>
-                    <span className="text-[10px] text-[#5A5957]">{new Date(c.created_at).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" })}</span>
+              {comments.length === 0 && <p className="text-xs text-[#5A5957] italic">No updates yet.</p>}
+              {comments.map(c => {
+                const isOps = OPS_ROLES.includes(c.author as UserRole) || c.author === "dispatcher" || c.author === "admin";
+                return (
+                  <div key={c.id} className={`rounded-lg px-3 py-2.5 ${isOps ? "bg-[#01696F]/10 border border-[#01696F]/20" : "bg-[#171614]"}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-[10px] font-semibold ${isOps ? "text-[#4F98A3]" : "text-[#797876]"}`}>
+                        {c.author}{isOps ? " · Ops" : ""}
+                      </span>
+                      <span className="text-[10px] text-[#5A5957]">{new Date(c.created_at).toLocaleString("en-AU", { dateStyle: "short", timeStyle: "short" })}</span>
+                    </div>
+                    <p className="text-xs text-[#CDCCCA] leading-relaxed">{c.body}</p>
                   </div>
-                  <p className="text-xs text-[#CDCCCA] leading-relaxed">{c.body}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="flex gap-2">
               <input value={comment} onChange={e => setComment(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter" && comment.trim()) addComment.mutate(comment.trim()); }}
-                placeholder="Add an update…"
+                placeholder={crewView ? "Add a note to ops…" : "Add an update…"}
                 className="flex-1 px-3 py-2 bg-[#171614] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] placeholder:text-[#5A5957] focus:outline-none focus:border-[#4F98A3]/50" />
               <button onClick={() => comment.trim() && addComment.mutate(comment.trim())}
                 disabled={!comment.trim() || addComment.isPending}
@@ -216,7 +250,7 @@ function TaskDetail({ task, role, onClose, onUpdate }: {
   );
 }
 
-// ─── Form Field Components (top-level, stable identity) ───────────────────────
+// ─── Form Field Components ────────────────────────────────────────────────────
 const Field = ({ label, value, onChange, placeholder, type = "text" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) => (
   <div>
     <label className="text-[10px] text-[#5A5957] uppercase tracking-wider block mb-1">{label}</label>
@@ -234,47 +268,26 @@ const SelectField = ({ label, value, onChange, opts }: { label: string; value: s
   </div>
 );
 
-// ─── Quick Templates (used inside NewTaskForm) ──────────────────────────────────
+// ─── Quick Templates ──────────────────────────────────────────────────────────
 const TEMPLATES = [
   {
-    key: "fuel_order",
-    label: "Fuel Order",
-    icon: <Fuel size={12} />,
+    key: "fuel_order", label: "Fuel Order", icon: <Fuel size={12} />,
     cls: "border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20",
-    data: {
-      title: "Fuel Order",
-      description: "Fuel order required. Please confirm quantity (lb) and uplift location.",
-      type: "fuel_order",
-      priority: "normal",
-    },
+    data: { title: "Fuel Order", description: "Fuel order required. Please confirm quantity (lb) and uplift location.", type: "fuel_order", priority: "normal" },
   },
   {
-    key: "roo_run",
-    label: "Roo Run",
-    icon: <Rabbit size={12} />,
+    key: "roo_run", label: "Roo Run", icon: <Rabbit size={12} />,
     cls: "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20",
-    data: {
-      title: "Roo Run",
-      description: "Kangaroo carcass removal required from runway/taxiway. Contact tower and coordinate with base wildlife officer.",
-      type: "roo_run",
-      priority: "high",
-    },
+    data: { title: "Roo Run", description: "Kangaroo carcass removal required from runway/taxiway. Contact tower and coordinate with base wildlife officer.", type: "roo_run", priority: "high" },
   },
   {
-    key: "portable_lighting",
-    label: "Portable Lighting",
-    icon: <Lightbulb size={12} />,
+    key: "portable_lighting", label: "Portable Lighting", icon: <Lightbulb size={12} />,
     cls: "border-yellow-500/30 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20",
-    data: {
-      title: "Portable Lighting Required",
-      description: "Portable lighting setup requested. Confirm location, duration, and power source availability.",
-      type: "other",
-      priority: "normal",
-    },
+    data: { title: "Portable Lighting Required", description: "Portable lighting setup requested. Confirm location, duration, and power source availability.", type: "other", priority: "normal" },
   },
 ];
 
-// ─── New Task Form ────────────────────────────────────────────────────────────
+// ─── New Task Form (full ops) ─────────────────────────────────────────────────
 function NewTaskForm({ role, onClose, onCreate }: { role: UserRole; onClose: () => void; onCreate: (d: any) => void; }) {
   const [form, setForm] = useState({
     type: "admin", title: "", description: "", requested_by: role as string,
@@ -282,30 +295,11 @@ function NewTaskForm({ role, onClose, onCreate }: { role: UserRole; onClose: () 
     priority: "normal", due_date: "", due_time: "", notes: "",
   });
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
-
-  const applyTemplate = (t: typeof TEMPLATES[number]) => {
-    setForm(f => ({
-      ...f,
-      title: t.data.title,
-      description: t.data.description,
-      type: t.data.type,
-      priority: t.data.priority,
-    }));
-  };
+  const applyTemplate = (t: typeof TEMPLATES[number]) => setForm(f => ({ ...f, ...t.data }));
 
   const submit = () => {
     if (!form.title.trim()) return;
-    onCreate({
-      ...form,
-      assigned_to: form.assigned_to || null,
-      aircraft_reg: form.aircraft_reg || null,
-      location_icao: form.location_icao || null,
-      due_date: form.due_date || null,
-      due_time: form.due_time || null,
-      notes: form.notes || null,
-      description: form.description || null,
-      status: "open",
-    });
+    onCreate({ ...form, assigned_to: form.assigned_to || null, aircraft_reg: form.aircraft_reg || null, location_icao: form.location_icao || null, due_date: form.due_date || null, due_time: form.due_time || null, notes: form.notes || null, description: form.description || null, status: "open" });
     onClose();
   };
 
@@ -317,19 +311,17 @@ function NewTaskForm({ role, onClose, onCreate }: { role: UserRole; onClose: () 
           <h2 className="text-base font-bold text-[#CDCCCA]" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>New Ops Task</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-[#797876]"><X size={15} /></button>
         </div>
-
         <div>
           <label className="text-[10px] text-[#5A5957] uppercase tracking-wider block mb-1.5">Quick Templates</label>
           <div className="flex gap-2 flex-wrap">
             {TEMPLATES.map(t => (
-              <button key={t.key} type="button" onClick={() => applyTemplate(t)} data-testid={`button-template-${t.key}`}
+              <button key={t.key} type="button" onClick={() => applyTemplate(t)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors ${t.cls}`}>
                 {t.icon} {t.label}
               </button>
             ))}
           </div>
         </div>
-
         <div className="grid grid-cols-2 gap-3">
           <SelectField label="Type" value={form.type} onChange={v => set("type", v)} opts={TASK_TYPES.map(t => ({ v: t.id, l: t.label }))} />
           <SelectField label="Priority" value={form.priority} onChange={v => set("priority", v)} opts={PRIORITIES.map(p => ({ v: p, l: PRIO_CFG[p].label }))} />
@@ -353,12 +345,74 @@ function NewTaskForm({ role, onClose, onCreate }: { role: UserRole; onClose: () 
           <Field label="Due Date" value={form.due_date} onChange={v => set("due_date", v)} type="date" />
         </div>
         <Field label="Due Time (local)" value={form.due_time} onChange={v => set("due_time", v)} placeholder="HH:MM" />
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-[#393836] text-xs text-[#797876] hover:text-[#CDCCCA] transition-colors">Cancel</button>
+          <button onClick={submit} disabled={!form.title.trim()} className="flex-1 py-2.5 rounded-xl bg-[#01696F] text-white text-xs font-semibold hover:bg-[#0C4E54] disabled:opacity-40 transition-colors">Create Task</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
+// ─── Crew Request Form (limited — crew roles only) ────────────────────────────
+function CrewRequestForm({ role, onClose, onCreate }: { role: UserRole; onClose: () => void; onCreate: (d: any) => void; }) {
+  const [form, setForm] = useState({
+    title: "", description: "", aircraft_reg: "", location_icao: "", priority: "normal", due_date: "", due_time: "",
+  });
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
+
+  const submit = () => {
+    if (!form.title.trim()) return;
+    onCreate({
+      type: "crew_request",
+      title: form.title,
+      description: form.description || null,
+      requested_by: role as string,
+      request_source: "crew",
+      assigned_to: null,
+      aircraft_reg: form.aircraft_reg || null,
+      location_icao: form.location_icao || null,
+      priority: form.priority,
+      due_date: form.due_date || null,
+      due_time: form.due_time || null,
+      notes: null,
+      status: "open",
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[#1C1B19] border border-[#393836] rounded-t-2xl sm:rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-[#CDCCCA]" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>New Crew Request</h2>
+            <p className="text-[11px] text-[#5A5957] mt-0.5">Submitted to Ops — you'll see updates in real time</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-[#797876]"><X size={15} /></button>
+        </div>
+        <SelectField label="Priority" value={form.priority} onChange={v => set("priority", v)} opts={PRIORITIES.map(p => ({ v: p, l: PRIO_CFG[p].label }))} />
+        <Field label="Request Title *" value={form.title} onChange={v => set("title", v)} placeholder="Brief description of what you need" />
+        <div>
+          <label className="text-[10px] text-[#5A5957] uppercase tracking-wider block mb-1">Details</label>
+          <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={4}
+            placeholder="Provide as much detail as possible to help ops action your request…"
+            className="w-full px-3 py-2 bg-[#171614] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] placeholder:text-[#5A5957] focus:outline-none focus:border-[#4F98A3]/50 resize-none" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Aircraft Reg (if applicable)" value={form.aircraft_reg} onChange={v => set("aircraft_reg", v)} placeholder="e.g. VH-XYJ" />
+          <Field label="Location ICAO" value={form.location_icao} onChange={v => set("location_icao", v)} placeholder="e.g. YWLG" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Required By (date)" value={form.due_date} onChange={v => set("due_date", v)} type="date" />
+          <Field label="Required By (time)" value={form.due_time} onChange={v => set("due_time", v)} placeholder="HH:MM" />
+        </div>
         <div className="flex gap-2 pt-1">
           <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-[#393836] text-xs text-[#797876] hover:text-[#CDCCCA] transition-colors">Cancel</button>
           <button onClick={submit} disabled={!form.title.trim()}
-            className="flex-1 py-2.5 rounded-xl bg-[#01696F] text-white text-xs font-semibold hover:bg-[#0C4E54] disabled:opacity-40 transition-colors">
-            Create Task
+            className="flex-1 py-2.5 rounded-xl bg-[#4F98A3] text-white text-xs font-semibold hover:bg-[#227F8B] disabled:opacity-40 transition-colors">
+            Submit to Ops
           </button>
         </div>
       </div>
@@ -369,9 +423,7 @@ function NewTaskForm({ role, onClose, onCreate }: { role: UserRole; onClose: () 
 // ─── Task Card ────────────────────────────────────────────────────────────────
 function TaskCard({ task, onClick }: { task: OpsTask; onClick: () => void }) {
   const ti = typeInfo(task.type);
-  const isOverdue = task.due_date && task.status !== "completed" && task.status !== "cancelled"
-    && new Date(task.due_date) < new Date();
-
+  const isOverdue = task.due_date && task.status !== "completed" && task.status !== "cancelled" && new Date(task.due_date) < new Date();
   return (
     <button onClick={onClick} className="w-full text-left bg-[#1C1B19] border border-[#393836] rounded-xl p-4 hover:border-[#4F98A3]/40 transition-all group">
       <div className="flex items-start gap-3">
@@ -390,8 +442,7 @@ function TaskCard({ task, onClick }: { task: OpsTask; onClick: () => void }) {
             {task.location_icao && <span className="flex items-center gap-0.5"><MapPin size={9} />{task.location_icao}</span>}
             {task.due_date && (
               <span className={`flex items-center gap-0.5 ${isOverdue ? "text-red-400 font-semibold" : ""}`}>
-                <Clock size={9} />{task.due_date}{task.due_time ? ` ${task.due_time}` : ""}
-                {isOverdue && " · OVERDUE"}
+                <Clock size={9} />{task.due_date}{task.due_time ? ` ${task.due_time}` : ""}{isOverdue && " · OVERDUE"}
               </span>
             )}
           </div>
@@ -399,6 +450,104 @@ function TaskCard({ task, onClick }: { task: OpsTask; onClick: () => void }) {
         <ChevronRight size={14} className="text-[#5A5957] group-hover:text-[#4F98A3] shrink-0 mt-1 transition-colors" />
       </div>
     </button>
+  );
+}
+
+// ─── Crew Requests Tab ────────────────────────────────────────────────────────
+function CrewRequestsTab({ role, tasks, isLoading, onCreate }: {
+  role: UserRole;
+  tasks: OpsTask[];
+  isLoading: boolean;
+  onCreate: (d: any) => void;
+}) {
+  const [selected, setSelected] = useState<OpsTask | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const qc = useQueryClient();
+
+  // Crew roles see only their own requests; ops roles see all crew requests
+  const crewRequests = tasks.filter(t => {
+    if (t.type !== "crew_request") return false;
+    if (isCrew(role)) return t.requested_by === (role as string);
+    return true; // ops sees all
+  });
+
+  const open = crewRequests.filter(t => t.status === "open").length;
+  const inProgress = crewRequests.filter(t => t.status === "in_progress").length;
+  const completed = crewRequests.filter(t => t.status === "completed").length;
+
+  const handleUpdate = (id: number, u: any) => {
+    // ops can update status; crew can only comment (handled in TaskDetail)
+    if (!isCrew(role)) {
+      // optimistic update via apiRequest
+      apiRequest("PATCH", `/api/ops-tasks/${id}`, u).then(() => qc.invalidateQueries({ queryKey: ["/api/ops-tasks"] }));
+    }
+    if (selected?.id === id) setSelected(prev => prev ? { ...prev, ...u } : null);
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-base font-semibold text-[#CDCCCA]" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+            {isCrew(role) ? "My Requests to Ops" : "Crew Requests"}
+          </h2>
+          <p className="text-xs text-[#5A5957] mt-0.5">
+            {isCrew(role)
+              ? "Submit a request to ops — updates appear in real time below"
+              : "All crew-submitted requests — update status and add comments to keep crew informed"}
+          </p>
+        </div>
+        <button onClick={() => setShowForm(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#4F98A3]/15 border border-[#4F98A3]/30 text-[#4F98A3] text-xs font-semibold hover:bg-[#4F98A3]/25 transition-colors">
+          <Plus size={13} /> New Request
+        </button>
+      </div>
+
+      {/* Mini stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "Open",        val: open,       cls: "text-[#CDCCCA]", bg: "bg-[#393836]/40" },
+          { label: "In Progress", val: inProgress,  cls: "text-blue-400",  bg: "bg-blue-500/8"   },
+          { label: "Completed",   val: completed,   cls: "text-green-400", bg: "bg-green-500/8"  },
+        ].map(s => (
+          <div key={s.label} className={`${s.bg} border border-[#393836] rounded-xl p-3 text-center`}>
+            <div className={`text-lg font-bold ${s.cls}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{s.val}</div>
+            <div className="text-[10px] text-[#5A5957] mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Request list */}
+      {isLoading ? (
+        <div className="text-center py-12 text-[#5A5957] text-sm">Loading…</div>
+      ) : crewRequests.length === 0 ? (
+        <div className="text-center py-14 space-y-3">
+          <Inbox size={28} className="text-[#393836] mx-auto" />
+          <p className="text-sm text-[#5A5957]">{isCrew(role) ? "No requests yet." : "No crew requests found."}</p>
+          <button onClick={() => setShowForm(true)} className="text-xs text-[#4F98A3] hover:underline">Submit one now</button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {crewRequests.map(t => (
+            <TaskCard key={t.id} task={t} onClick={() => setSelected(t)} />
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <CrewRequestForm role={role} onClose={() => setShowForm(false)} onCreate={d => { onCreate(d); setShowForm(false); }} />
+      )}
+      {selected && (
+        <TaskDetail
+          task={selected}
+          role={role}
+          onClose={() => setSelected(null)}
+          onUpdate={handleUpdate}
+          crewView={isCrew(role)}
+        />
+      )}
+    </div>
   );
 }
 
@@ -412,6 +561,10 @@ export default function OpsTaskManagement({ role }: { role: UserRole }) {
   const [filterPrio, setFilterPrio] = useState("all");
   const [search, setSearch] = useState("");
 
+  // Crew roles land on "crew-requests" tab; ops roles land on "tasks" tab
+  const defaultTab = isCrew(role) ? "crew-requests" : "tasks";
+  const [activeTab, setActiveTab] = useState<"tasks" | "crew-requests">(defaultTab);
+
   const { data: tasks = [], isLoading } = useQuery<OpsTask[]>({
     queryKey: ["/api/ops-tasks"],
     queryFn: () => apiRequest("GET", "/api/ops-tasks").then(r => r.json()),
@@ -424,10 +577,7 @@ export default function OpsTaskManagement({ role }: { role: UserRole }) {
   });
   const updateTask = useMutation({
     mutationFn: ({ id, u }: { id: number; u: any }) => apiRequest("PATCH", `/api/ops-tasks/${id}`, u),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/ops-tasks"] });
-      if (selected) setSelected(prev => prev ? { ...prev, ...selected } : null);
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/ops-tasks"] }),
   });
 
   const handleUpdate = (id: number, u: any) => {
@@ -435,7 +585,9 @@ export default function OpsTaskManagement({ role }: { role: UserRole }) {
     if (selected?.id === id) setSelected(prev => prev ? { ...prev, ...u } : null);
   };
 
+  // Full board — exclude crew_requests (they live in their own tab)
   const filtered = tasks.filter(t => {
+    if (t.type === "crew_request") return false; // crew requests shown in their own tab
     if (filterType !== "all" && t.type !== filterType) return false;
     if (filterStatus === "active" && (t.status === "completed" || t.status === "cancelled")) return false;
     if (filterStatus !== "all" && filterStatus !== "active" && t.status !== filterStatus) return false;
@@ -444,11 +596,13 @@ export default function OpsTaskManagement({ role }: { role: UserRole }) {
     return true;
   });
 
+  const crewRequestCount = tasks.filter(t => t.type === "crew_request" && t.status === "open").length;
+
   const counts = {
-    open: tasks.filter(t => t.status === "open").length,
-    in_progress: tasks.filter(t => t.status === "in_progress").length,
-    urgent: tasks.filter(t => t.priority === "urgent" && t.status !== "completed" && t.status !== "cancelled").length,
-    overdue: tasks.filter(t => t.due_date && t.status !== "completed" && t.status !== "cancelled" && new Date(t.due_date) < new Date()).length,
+    open: tasks.filter(t => t.type !== "crew_request" && t.status === "open").length,
+    in_progress: tasks.filter(t => t.type !== "crew_request" && t.status === "in_progress").length,
+    urgent: tasks.filter(t => t.type !== "crew_request" && t.priority === "urgent" && t.status !== "completed" && t.status !== "cancelled").length,
+    overdue: tasks.filter(t => t.type !== "crew_request" && t.due_date && t.status !== "completed" && t.status !== "cancelled" && new Date(t.due_date) < new Date()).length,
   };
 
   return (
@@ -462,81 +616,112 @@ export default function OpsTaskManagement({ role }: { role: UserRole }) {
           </div>
           <p className="text-sm text-[#797876] mt-0.5">Admin tasks · Crew requests · Fuel orders · Roo runs</p>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <button onClick={() => { setShowNew(true); }} data-testid="button-crew-request"
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#4F98A3]/30 bg-[#4F98A3]/10 text-[#4F98A3] text-xs font-semibold hover:bg-[#4F98A3]/20 transition-colors">
-            <Users size={13} /> Crew Request
-          </button>
-          <button onClick={() => setShowNew(true)} data-testid="button-new-task"
+        {!isCrew(role) && activeTab === "tasks" && (
+          <button onClick={() => setShowNew(true)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#01696F] text-white text-xs font-semibold hover:bg-[#0C4E54] transition-colors">
             <Plus size={14} /> New Task
           </button>
-        </div>
+        )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-3">
-        {[
-          { label: "Open",       val: counts.open,        color: "text-[#CDCCCA]", bg: "bg-[#393836]/40"      },
-          { label: "In Progress", val: counts.in_progress, color: "text-blue-400",  bg: "bg-blue-500/8"        },
-          { label: "Urgent",     val: counts.urgent,      color: "text-red-400",   bg: "bg-red-500/8"         },
-          { label: "Overdue",    val: counts.overdue,     color: "text-amber-400", bg: "bg-amber-500/8"       },
-        ].map(s => (
-          <div key={s.label} className={`${s.bg} border border-[#393836] rounded-xl p-3 text-center`}>
-            <div className={`text-xl font-bold ${s.color}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{s.val}</div>
-            <div className="text-[10px] text-[#5A5957] mt-0.5">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap items-center">
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks…"
-          className="flex-1 min-w-[160px] px-3 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] placeholder:text-[#5A5957] focus:outline-none focus:border-[#4F98A3]/50" />
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="px-2.5 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] focus:outline-none">
-          <option value="active">Active only</option>
-          <option value="all">All statuses</option>
-          {STATUSES.map(s => <option key={s} value={s}>{STATUS_CFG[s].label}</option>)}
-        </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}
-          className="px-2.5 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] focus:outline-none">
-          <option value="all">All types</option>
-          {TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-        </select>
-        <select value={filterPrio} onChange={e => setFilterPrio(e.target.value)}
-          className="px-2.5 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] focus:outline-none">
-          <option value="all">All priorities</option>
-          {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_CFG[p].label}</option>)}
-        </select>
-      </div>
-
-      {/* Task list */}
-      {isLoading ? (
-        <div className="text-center py-12 text-[#5A5957] text-sm">Loading tasks…</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 space-y-3">
-          <CheckCircle2 size={32} className="text-[#393836] mx-auto" />
-          <p className="text-sm text-[#5A5957]">No tasks found.</p>
-          <button onClick={() => setShowNew(true)} className="text-xs text-[#4F98A3] hover:underline">Create one</button>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {/* Urgent first */}
-          {["urgent", "high", "normal", "low"].map(prio =>
-            filtered.filter(t => t.priority === prio).map(t => (
-              <TaskCard key={t.id} task={t} onClick={() => setSelected(t)} />
-            ))
+      {/* Tabs */}
+      <div className="flex gap-1 bg-[#1C1B19] border border-[#393836] rounded-xl p-1 w-fit">
+        {/* Crew roles only see the Crew Requests tab */}
+        {!isCrew(role) && (
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === "tasks" ? "bg-[#393836] text-[#CDCCCA]" : "text-[#5A5957] hover:text-[#797876]"}`}
+          >
+            All Tasks
+          </button>
+        )}
+        <button
+          onClick={() => setActiveTab("crew-requests")}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeTab === "crew-requests" ? "bg-[#4F98A3]/20 text-[#4F98A3]" : "text-[#5A5957] hover:text-[#797876]"}`}
+        >
+          <Users size={12} /> Crew Requests
+          {crewRequestCount > 0 && (
+            <span className="ml-0.5 min-w-[16px] h-4 rounded-full bg-[#4F98A3] text-white text-[9px] font-bold flex items-center justify-center px-1">{crewRequestCount}</span>
           )}
-        </div>
+        </button>
+      </div>
+
+      {/* ── Crew Requests Tab ── */}
+      {activeTab === "crew-requests" && (
+        <CrewRequestsTab
+          role={role}
+          tasks={tasks}
+          isLoading={isLoading}
+          onCreate={d => createTask.mutate(d)}
+        />
+      )}
+
+      {/* ── All Tasks Tab (ops only) ── */}
+      {activeTab === "tasks" && !isCrew(role) && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-3">
+            {[
+              { label: "Open",        val: counts.open,        color: "text-[#CDCCCA]", bg: "bg-[#393836]/40" },
+              { label: "In Progress", val: counts.in_progress, color: "text-blue-400",  bg: "bg-blue-500/8"   },
+              { label: "Urgent",      val: counts.urgent,      color: "text-red-400",   bg: "bg-red-500/8"    },
+              { label: "Overdue",     val: counts.overdue,     color: "text-amber-400", bg: "bg-amber-500/8"  },
+            ].map(s => (
+              <div key={s.label} className={`${s.bg} border border-[#393836] rounded-xl p-3 text-center`}>
+                <div className={`text-xl font-bold ${s.color}`} style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>{s.val}</div>
+                <div className="text-[10px] text-[#5A5957] mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-2 flex-wrap items-center">
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks…"
+              className="flex-1 min-w-[160px] px-3 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] placeholder:text-[#5A5957] focus:outline-none focus:border-[#4F98A3]/50" />
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+              className="px-2.5 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] focus:outline-none">
+              <option value="active">Active only</option>
+              <option value="all">All statuses</option>
+              {STATUSES.map(s => <option key={s} value={s}>{STATUS_CFG[s].label}</option>)}
+            </select>
+            <select value={filterType} onChange={e => setFilterType(e.target.value)}
+              className="px-2.5 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] focus:outline-none">
+              <option value="all">All types</option>
+              {TASK_TYPES.filter(t => t.id !== "crew_request").map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+            </select>
+            <select value={filterPrio} onChange={e => setFilterPrio(e.target.value)}
+              className="px-2.5 py-2 bg-[#1C1B19] border border-[#393836] rounded-lg text-xs text-[#CDCCCA] focus:outline-none">
+              <option value="all">All priorities</option>
+              {PRIORITIES.map(p => <option key={p} value={p}>{PRIO_CFG[p].label}</option>)}
+            </select>
+          </div>
+
+          {/* Task list */}
+          {isLoading ? (
+            <div className="text-center py-12 text-[#5A5957] text-sm">Loading tasks…</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-16 space-y-3">
+              <CheckCircle2 size={32} className="text-[#393836] mx-auto" />
+              <p className="text-sm text-[#5A5957]">No tasks found.</p>
+              <button onClick={() => setShowNew(true)} className="text-xs text-[#4F98A3] hover:underline">Create one</button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {["urgent", "high", "normal", "low"].map(prio =>
+                filtered.filter(t => t.priority === prio).map(t => (
+                  <TaskCard key={t.id} task={t} onClick={() => setSelected(t)} />
+                ))
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {/* Modals */}
       {showNew && (
-        <NewTaskForm role={role} onClose={() => setShowNew(false)}
-          onCreate={d => createTask.mutate(d)} />
+        <NewTaskForm role={role} onClose={() => setShowNew(false)} onCreate={d => createTask.mutate(d)} />
       )}
-      {selected && (
+      {selected && activeTab === "tasks" && (
         <TaskDetail task={selected} role={role} onClose={() => setSelected(null)} onUpdate={handleUpdate} />
       )}
     </div>

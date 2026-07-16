@@ -115,6 +115,96 @@ const DEFAULT_PERMS: PermMatrix = {
     // Administration
     "idea-hub": "full", "projects": "none", "users": "none", "rbac": "none", "settings": "none", "api-integrations": "none",
   },
+  senior_base_pilot: {
+    // Demo
+    "demo-overview": "read", "demo-mode": "none",
+    // Mission Operations — home + ops display
+    "home": "full", "ops-display": "none",
+    // Mission Operations
+    "nept-tasking": "read", "morning-brief": "full", "passenger-manifest": "full",
+    "missions": "read", "map": "full", "dispatch": "none", "rest-calculator": "full",
+    "charter-quote": "none", "ora": "full", "flight-planning": "full",
+    "mission-optimiser": "read", "special-missions": "read", "ops-tasks": "read", "pilot-handover": "full", "shift-fleet": "full",
+    // Tech & Journey Log
+    "tech-log": "full",
+    // People & Aircraft
+    "org-chart": "read", "roster": "read", "frms": "full", "aircraft": "read",
+    "engineering": "none", "maint-planner": "none", "asset-utilisation": "none",
+    "ferry": "full", "techlog": "full", "check-training": "read", "regulations": "full",
+    "medical-equipment": "none", "stock-usage": "none", "after-hours": "none", "ground-vehicles": "read",
+    // AI & Communications
+    "jennifer": "read", "jennifer-live-qa": "read", "jennifer-live": "read",
+    "ai-analyst": "read", "telehealth": "none", "doc-ai": "read",
+    // Business & Compliance
+    "invoicing": "none", "cost-optimizer": "none", "iso": "none", "contracts": "none",
+    "finance": "none", "audit": "read", "government-tenders": "none", "payroll-leave": "none",
+    // Administration
+    "idea-hub": "full", "projects": "none", "users": "none", "rbac": "none", "settings": "none", "api-integrations": "none",
+  },
+  hofo: {
+    "demo-overview": "full", "demo-mode": "full",
+    // Mission Operations — home + ops display
+    "home": "full", "ops-display": "full",
+    "nept-tasking": "full", "morning-brief": "full", "passenger-manifest": "read",
+    "missions": "full", "map": "full", "dispatch": "read", "rest-calculator": "read",
+    "charter-quote": "full", "ora": "full", "flight-planning": "read",
+    "mission-optimiser": "full", "special-missions": "full", "ops-tasks": "full", "pilot-handover": "read", "shift-fleet": "full",
+    "tech-log": "read",
+    "org-chart": "full", "roster": "full", "frms": "full", "aircraft": "full",
+    "engineering": "read", "maint-planner": "read", "asset-utilisation": "full",
+    "ferry": "full", "techlog": "read", "check-training": "full", "regulations": "full",
+    "medical-equipment": "read", "stock-usage": "read", "after-hours": "none", "ground-vehicles": "read",
+    "jennifer": "full", "jennifer-live-qa": "full", "jennifer-live": "full",
+    "ai-analyst": "full", "telehealth": "read", "doc-ai": "full",
+    "invoicing": "full", "cost-optimizer": "full", "iso": "full", "contracts": "full",
+    "finance": "full", "audit": "full", "government-tenders": "full", "payroll-leave": "full",
+    "idea-hub": "full", "projects": "full", "users": "read", "rbac": "read", "settings": "read", "api-integrations": "none",
+  },
+  hotac: {
+    "demo-overview": "full", "demo-mode": "full",
+    // Mission Operations — home + ops display
+    "home": "full", "ops-display": "full",
+    "nept-tasking": "full", "morning-brief": "full", "passenger-manifest": "read",
+    "missions": "full", "map": "full", "dispatch": "read", "rest-calculator": "read",
+    "charter-quote": "full", "ora": "full", "flight-planning": "read",
+    "mission-optimiser": "full", "special-missions": "full", "ops-tasks": "full", "pilot-handover": "read", "shift-fleet": "full",
+    "tech-log": "read",
+    "org-chart": "full", "roster": "full", "frms": "full", "aircraft": "full",
+    "engineering": "read", "maint-planner": "read", "asset-utilisation": "full",
+    "ferry": "full", "techlog": "read", "check-training": "full", "regulations": "full",
+    "medical-equipment": "read", "stock-usage": "read", "after-hours": "none", "ground-vehicles": "read",
+    "jennifer": "full", "jennifer-live-qa": "full", "jennifer-live": "full",
+    "ai-analyst": "full", "telehealth": "read", "doc-ai": "full",
+    "invoicing": "full", "cost-optimizer": "full", "iso": "full", "contracts": "full",
+    "finance": "full", "audit": "full", "government-tenders": "full", "payroll-leave": "full",
+    "idea-hub": "full", "projects": "full", "users": "read", "rbac": "read", "settings": "read", "api-integrations": "none",
+  },
+  training_captain: {
+    // Demo
+    "demo-overview": "read", "demo-mode": "none",
+    // Mission Operations — home + ops display
+    "home": "full", "ops-display": "none",
+    // Mission Operations
+    "nept-tasking": "read", "morning-brief": "full", "passenger-manifest": "full",
+    "missions": "read", "map": "full", "dispatch": "none", "rest-calculator": "full",
+    "charter-quote": "none", "ora": "full", "flight-planning": "full",
+    "mission-optimiser": "read", "special-missions": "read", "ops-tasks": "read", "pilot-handover": "full", "shift-fleet": "full",
+    // Tech & Journey Log
+    "tech-log": "full",
+    // People & Aircraft
+    "org-chart": "read", "roster": "read", "frms": "full", "aircraft": "read",
+    "engineering": "none", "maint-planner": "none", "asset-utilisation": "none",
+    "ferry": "full", "techlog": "full", "check-training": "read", "regulations": "full",
+    "medical-equipment": "none", "stock-usage": "none", "after-hours": "none", "ground-vehicles": "read",
+    // AI & Communications
+    "jennifer": "read", "jennifer-live-qa": "read", "jennifer-live": "read",
+    "ai-analyst": "read", "telehealth": "none", "doc-ai": "read",
+    // Business & Compliance
+    "invoicing": "none", "cost-optimizer": "none", "iso": "none", "contracts": "none",
+    "finance": "none", "audit": "read", "government-tenders": "none", "payroll-leave": "none",
+    // Administration
+    "idea-hub": "full", "projects": "none", "users": "none", "rbac": "none", "settings": "none", "api-integrations": "none",
+  },
   nurse: {
     "demo-overview": "read", "demo-mode": "none",
     // Mission Operations — home + ops display

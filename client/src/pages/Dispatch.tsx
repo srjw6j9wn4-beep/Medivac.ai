@@ -412,13 +412,13 @@ export default function Dispatch({ role }: Props) {
                     <div className="relative">
                       <button
                         onClick={() => setShiftOpen(o => !o)}
-                        className="w-full flex items-center justify-between px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground hover:border-cyan-500/50 transition-colors"
+                        className="w-full flex items-center justify-between px-3 py-2.5 text-sm bg-background border border-border rounded-lg text-foreground hover:border-cyan-500/50 transition-colors"
                       >
                         <span>{selectedShift || "— Select a shift —"}</span>
                         <ChevronDown size={14} className={`text-muted-foreground transition-transform ${shiftOpen ? "rotate-180" : ""}`} />
                       </button>
                       {shiftOpen && (
-                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto">
+                        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto">
                           {/* Group by base */}
                           {["Broken Hill","Dubbo","Bankstown","Essendon","Launceston"].map(base => {
                             const shifts = DAILY_SHIFTS.filter(s => s.base === base);

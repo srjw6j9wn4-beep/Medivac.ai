@@ -614,6 +614,14 @@ const ROLES = [
   "Other",
 ];
 
+function roleToSigningRole(r: UserRole): string {
+  if (r === 'pilot' || r === 'senior_base_pilot' || r === 'hofo' || r === 'hotac' || r === 'training_captain') return "Pilot in Command";
+  if (r === 'nurse' || r === 'senior_flight_nurse' || r === 'ordering_nurse') return "Flight Nurse / Paramedic";
+  if (r === 'doctor') return "ICU Doctor";
+  if (r === 'dispatcher') return "Dispatching Operator";
+  return "Other";
+}
+
 function nextStage(s: WorkflowStage): WorkflowStage {
   const idx = STAGE_IDX[s];
   return STAGES[Math.min(idx + 1, STAGES.length - 1)].id;
@@ -626,6 +634,7 @@ function genRef(type: MissionType): string {
     ecmo: "ECMO",
     isolation: "ISO",
     telehealth: "TH",
+    "international-transfer": "INTL",
   };
   const y = new Date().getFullYear();
   const n = String(Math.floor(Math.random() * 900) + 100);
@@ -718,10 +727,12 @@ function SessionWorkflow({
   session,
   onClose,
   onUpdate,
+  role,
 }: {
   session: Session;
   onClose: () => void;
   onUpdate: (updates: Partial<Session>) => void;
+  role: UserRole;
 }) {
   const mCfg  = MISSION_TYPES.find(m => m.id === session.missionType)!;
   const stage = session.status as WorkflowStage;
@@ -752,9 +763,14 @@ function SessionWorkflow({
     [session.signoffs]
   );
 
-  const [signingRole, setSigningRole] = useState(ROLES[0]);
+  const [signingRole, setSigningRole] = useState(() => roleToSigningRole(role));
   const [signingNotes, setSigningNotes] = useState("");
   const [showSignoff, setShowSignoff] = useState(false);
+  const [showStandDown, setShowStandDown] = useState(false);
+  const [sdReason, setSdReason] = useState("");
+  const [sdAdvisedBy, setSdAdvisedBy] = useState("");
+  const [sdSignature, setSdSignature] = useState("");
+  const [sdComments, setSdComments] = useState("");
 
   // All checklist sections for this mission type
   const sections = CHECKLISTS[session.missionType] ?? [];
@@ -830,8 +846,105 @@ function SessionWorkflow({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background overflow-hidden">
+      {showStandDown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card border border-red-500/40 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle size={18} className="text-red-400" />
+              <h2 className="text-base font-bold text-red-400" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+                Stand Down — {session.missionRef}
+              </h2>
+            </div>
+            <p className="text-xs text-muted-foreground">This will close the mission as stood down. All fields are required for audit.</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Reason for Stand Down *</label>
+                <textarea
+                  value={sdReason}
+                  onChange={e => setSdReason(e.target.value)}
+                  rows={3}
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground resize-none"
+                  placeholder="Describe the reason for standing down this mission..."
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Advised By *</label>
+                <input
+                  value={sdAdvisedBy}
+                  onChange={e => setSdAdvisedBy(e.target.value)}
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground"
+                  placeholder="Name and role of person who advised stand down"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Timestamp</label>
+                <input
+                  value={new Date().toLocaleString('en-AU')}
+                  readOnly
+                  className="w-full text-sm bg-background/50 border border-border rounded-lg px-3 py-2 text-muted-foreground cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Signature / Full Name *</label>
+                <input
+                  value={sdSignature}
+                  onChange={e => setSdSignature(e.target.value)}
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground"
+                  placeholder="Type your full name as signature"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground block mb-1">Additional Comments</label>
+                <textarea
+                  value={sdComments}
+                  onChange={e => setSdComments(e.target.value)}
+                  rows={2}
+                  className="w-full text-sm bg-background border border-border rounded-lg px-3 py-2 text-foreground resize-none"
+                  placeholder="Any additional notes..."
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => {
+                  if (!sdReason || !sdAdvisedBy || !sdSignature) return;
+                  const standDownData = {
+                    standDown: true,
+                    reason: sdReason,
+                    advisedBy: sdAdvisedBy,
+                    timestamp: new Date().toISOString(),
+                    signature: sdSignature,
+                    comments: sdComments,
+                    role: signingRole,
+                  };
+                  onUpdate({ status: 'complete' as WorkflowStage, notes: JSON.stringify(standDownData) });
+                  onClose();
+                }}
+                disabled={!sdReason || !sdAdvisedBy || !sdSignature}
+                className="flex-1 py-2 bg-red-500/20 border border-red-500/40 text-red-400 rounded-xl text-sm font-bold hover:bg-red-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Confirm Stand Down
+              </button>
+              <button
+                onClick={() => setShowStandDown(false)}
+                className="px-4 py-2 bg-card border border-card-border text-muted-foreground rounded-xl text-sm font-semibold hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-4 px-6 py-4 border-b border-card-border bg-card/80 backdrop-blur-sm shrink-0">
+        <button
+          onClick={() => setShowStandDown(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/15 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold hover:bg-red-500/25 transition-colors"
+        >
+          <AlertTriangle size={13} /> Stand Down
+        </button>
         <button onClick={onClose} className="p-2 rounded-lg border border-card-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/30 transition-colors">
           <X size={16} />
         </button>
@@ -904,13 +1017,19 @@ function SessionWorkflow({
           <User size={13} className="text-muted-foreground" />
           <span className="text-xs text-muted-foreground">Signing as role:</span>
         </div>
-        <select
-          value={signingRole}
-          onChange={e => setSigningRole(e.target.value)}
-          className="bg-card border border-card-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-cyan-400/40"
-        >
-          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
+        {role === 'admin' ? (
+          <select
+            value={signingRole}
+            onChange={e => setSigningRole(e.target.value)}
+            className="bg-card border border-card-border rounded-lg px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-cyan-400/40"
+          >
+            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        ) : (
+          <span className="text-xs font-semibold text-cyan-400 px-2 py-1.5 bg-cyan-400/10 border border-cyan-400/20 rounded-lg">
+            {signingRole}
+          </span>
+        )}
         <span className="text-xs text-muted-foreground ml-2">
           Tick each item as your role verifies it. All operators follow the same procedure.
         </span>
@@ -1197,6 +1316,7 @@ export default function SpecialMissions({ role }: Props) {
   const [activeSession, setActiveSession] = useState<Session | null>(null);
   const [filterType, setFilterType] = useState<MissionType | "all">("all");
   const [filterComplete, setFilterComplete] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
 
   const { data: sessions = [], isLoading } = useQuery<Session[]>({
@@ -1243,7 +1363,12 @@ export default function SpecialMissions({ role }: Props) {
   }
 
   const filtered = sessions.filter(s => {
-    if (!filterComplete && s.status === "complete") return false;
+    // "complete" status includes both normally completed AND stood-down missions
+    const isComplete = s.status === "complete";
+    const isStandDown = isComplete && (() => { try { return JSON.parse(s.notes || '{}').standDown === true; } catch { return false; } })();
+
+    if (!showCancelled && isStandDown) return false;
+    if (!filterComplete && isComplete && !isStandDown) return false;
     if (filterType !== "all" && s.missionType !== filterType) return false;
     return true;
   });
@@ -1258,6 +1383,7 @@ export default function SpecialMissions({ role }: Props) {
           session={activeSession}
           onClose={() => setActiveSession(null)}
           onUpdate={(updates) => handleUpdate(activeSession, updates as Partial<Session>)}
+          role={role}
         />
       );
     } catch (err) {
@@ -1302,6 +1428,22 @@ export default function SpecialMissions({ role }: Props) {
           className="flex items-center gap-2 px-4 py-2 bg-cyan-500/15 border border-cyan-400/40 rounded-xl text-sm text-cyan-300 font-semibold hover:bg-cyan-500/25 transition-colors"
         >
           <Plus size={15} /> New QC Session
+        </button>
+      </div>
+
+      {/* Active / Cancelled toggle */}
+      <div className="flex gap-1 bg-card border border-card-border rounded-xl p-1 w-fit">
+        <button
+          onClick={() => setShowCancelled(false)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${!showCancelled ? "bg-cyan-400/20 text-cyan-400" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Active Missions
+        </button>
+        <button
+          onClick={() => setShowCancelled(true)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${showCancelled ? "bg-red-400/20 text-red-400" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Stood Down / Cancelled
         </button>
       </div>
 

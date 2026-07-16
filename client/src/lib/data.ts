@@ -1,6 +1,6 @@
 // Medivac.ai — Demo data and types
 
-export type UserRole = 'pilot' | 'nurse' | 'senior_flight_nurse' | 'ordering_nurse' | 'doctor' | 'dispatcher' | 'engineer' | 'safety' | 'senior_management' | 'admin';
+export type UserRole = 'pilot' | 'senior_base_pilot' | 'hofo' | 'hotac' | 'training_captain' | 'nurse' | 'senior_flight_nurse' | 'ordering_nurse' | 'doctor' | 'dispatcher' | 'engineer' | 'safety' | 'senior_management' | 'admin';
 
 export interface RoleConfig {
   id: UserRole;
@@ -12,6 +12,10 @@ export interface RoleConfig {
 
 export const ROLES: RoleConfig[] = [
   { id: 'pilot', label: 'Pilot', color: 'text-cyan-400', badge: 'status-blue', icon: '✈' },
+  { id: 'senior_base_pilot',   label: 'Senior Base Pilot',            color: 'text-sky-400',     badge: 'status-blue',   icon: '🛫' },
+  { id: 'hofo',                label: 'Head of Flight Ops (HOFO)',     color: 'text-blue-300',    badge: 'status-blue',   icon: '✈' },
+  { id: 'hotac',               label: 'Head of Training & Checking',   color: 'text-indigo-400',  badge: 'status-blue',   icon: '🎓' },
+  { id: 'training_captain',    label: 'Training Captain',              color: 'text-violet-400',  badge: 'status-blue',   icon: '📋' },
   { id: 'nurse',              label: 'Flight Nurse',            color: 'text-green-400',   badge: 'status-green',  icon: '🏥' },
   { id: 'senior_flight_nurse', label: 'Senior Flight Nurse',     color: 'text-emerald-400', badge: 'status-green',  icon: '🏥' },
   { id: 'ordering_nurse',      label: 'Ordering / Stores Nurse', color: 'text-teal-400',    badge: 'status-green',  icon: '📦' },
