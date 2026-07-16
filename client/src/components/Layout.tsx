@@ -209,6 +209,7 @@ const BASE_NAV: NavItem[] = [
       { label: "Ops Task Management", path: "/ops-tasks" },
       { label: "Pilot Handover Board", path: "/pilot-handover" },
       { label: "Shift & Fleet Status", path: "/shift-fleet" },
+      { label: "Senior Base Pilot Portal", path: "/sbp-portal" },
     ],
   },
   {

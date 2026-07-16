@@ -61,6 +61,7 @@ import CostOptimizer from "@/pages/CostOptimizer";
 import OpsTaskManagement from "@/pages/OpsTaskManagement";
 import ProjectManagement from "@/pages/ProjectManagement";
 import PilotHandover from "@/pages/PilotHandover";
+import SeniorBasePilot from "@/pages/SeniorBasePilot";
 import OrgChart from "@/pages/OrgChart";
 import PayrollLeave from "@/pages/PayrollLeave";
 import { FEATURES } from "@/lib/config";
@@ -136,6 +137,7 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/ops-tasks" component={() => <OpsTaskManagement role={role} />} />
       <Route path="/projects" component={() => <ProjectManagement role={role} />} />
       <Route path="/pilot-handover" component={() => <PilotHandover role={role} />} />
+      <Route path="/sbp-portal" component={() => <SeniorBasePilot role={role} />} />
       <Route path="/org-chart" component={() => <OrgChart role={role} />} />
       <Route path="/payroll-leave" component={() => <PayrollLeave role={role} />} />
       <Route component={NotFound} />

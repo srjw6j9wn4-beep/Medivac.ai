@@ -38,6 +38,7 @@ const MODULES: Module[] = [
   { id: "ops-tasks",           label: "Ops Task Management",        icon: "✅", section: "Mission Operations" },
   { id: "pilot-handover",      label: "Pilot Handover Board",       icon: "🤝", section: "Mission Operations" },
   { id: "shift-fleet",          label: "Shift & Fleet Status",       icon: "📋", section: "Mission Operations" },
+  { id: "sbp-portal",           label: "Senior Base Pilot Portal",   icon: "✈", section: "Mission Operations" },
 
   // ── Tech & Journey Log ────────────────────────────────────────────────────
   { id: "tech-log",            label: "Tech & Journey Log",         icon: "📓", section: "Tech & Journey Log" },
