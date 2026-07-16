@@ -540,33 +540,33 @@ export default function RBACPermissions({ role }: Props) {
 
       {/* Full matrix view */}
       {view === "matrix" && (
-        <div className="rounded-xl border border-card-border overflow-hidden">
-          {/* Sticky header — sits outside any overflow container so it sticks to <main> scroll */}
-          <div className="sticky top-0 z-20 bg-card border-b border-card-border shadow-sm overflow-x-auto">
-            <table className="text-[10px] w-full" style={{ tableLayout: "fixed" }}>
+        <div className="rounded-xl border border-card-border overflow-hidden flex flex-col">
+          {/* ── Pinned header — never scrolls ── */}
+          <div className="bg-card border-b-2 border-card-border overflow-x-auto flex-shrink-0">
+            <table className="text-[10px]" style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}>
               <colgroup>
-                <col style={{ minWidth: "8rem", width: "8rem" }} />
-                {ROLES.map(r => <col key={r.id} style={{ minWidth: "5rem", width: `${100 / ROLES.length}%` }} />)}
+                <col style={{ width: "11rem" }} />
+                {ROLES.map(r => <col key={r.id} style={{ width: "5.5rem" }} />)}
               </colgroup>
               <thead>
                 <tr>
-                  <th className="text-left p-2 pl-4 font-semibold text-muted-foreground bg-card min-w-32">Module</th>
+                  <th className="text-left p-2 pl-4 font-semibold text-muted-foreground">Module</th>
                   {ROLES.map(r => (
-                    <th key={r.id} className="p-2 text-center font-semibold min-w-20 bg-card">
-                      <span className={r.color}>{r.icon}</span>
-                      <div className="text-muted-foreground">{r.label.split(' ')[0]}</div>
+                    <th key={r.id} className="p-2 text-center font-semibold">
+                      <div className={r.color}>{r.icon}</div>
+                      <div className="text-muted-foreground text-[9px] leading-tight mt-0.5">{r.label}</div>
                     </th>
                   ))}
                 </tr>
               </thead>
             </table>
           </div>
-          {/* Scrollable body */}
-          <div className="overflow-x-auto bg-card">
-            <table className="text-[10px] w-full" style={{ tableLayout: "fixed" }}>
+          {/* ── Scrollable body — own overflow-y ── */}
+          <div className="overflow-auto bg-card" style={{ maxHeight: "65vh" }}>
+            <table className="text-[10px]" style={{ tableLayout: "fixed", width: "max-content", minWidth: "100%" }}>
               <colgroup>
-                <col style={{ minWidth: "8rem", width: "8rem" }} />
-                {ROLES.map(r => <col key={r.id} style={{ minWidth: "5rem", width: `${100 / ROLES.length}%` }} />)}
+                <col style={{ width: "11rem" }} />
+                {ROLES.map(r => <col key={r.id} style={{ width: "5.5rem" }} />)}
               </colgroup>
               <tbody>
                 {(() => {
@@ -576,13 +576,13 @@ export default function RBACPermissions({ role }: Props) {
                     const totalCols = ROLES.length + 1;
                     return [
                       <tr key={`section-${section}`} className="bg-background/60">
-                        <td colSpan={totalCols} className="px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-card-border">
+                        <td colSpan={totalCols} className="px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-card-border">
                           {section}
                         </td>
                       </tr>,
                       ...mods.map(m => (
-                        <tr key={m.id} className="border-b border-card-border/50 hover:bg-background/20 transition-colors">
-                          <td className="p-2 pl-4 font-medium text-[10px] truncate">
+                        <tr key={m.id} className="border-b border-card-border/50 hover:bg-background/30 transition-colors">
+                          <td className="p-2 pl-4 font-medium text-[10px]">
                             {m.icon} {m.label}
                           </td>
                           {ROLES.map(r => {
