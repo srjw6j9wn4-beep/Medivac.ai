@@ -306,6 +306,8 @@ const NAV: NavItem[] = [
       { label: "API Integration Hub", path: "/api-integrations" },
       { label: "Project Management",  path: "/projects" },
       { label: "Idea Hub",            path: "/idea-hub" },
+      { label: "Manuals & SOPs",           path: "/docs" },
+      { label: "Regulatory Monitor",       path: "/reg-monitor" },
     ],
   },
 ];
@@ -683,7 +685,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
             <span className="truncate hidden sm:inline">Aeromedical Operations</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={() => setHelpOpen(true)} title="Help" className="p-1.5 rounded-lg text-muted-foreground hover:text-cyan-400 hover:bg-white/10 transition-colors" data-testid="button-help"><HelpCircle size={16} /></button>
+            <button onClick={() => setHelpOpen(true)} title="Help" className="relative p-2 rounded-lg border border-card-border text-muted-foreground hover:text-cyan-400 hover:bg-white/10 hover:border-cyan-400/40 transition-all" data-testid="button-help"><HelpCircle size={15} /></button>
             <NotificationBell role={role} />
             <div className="hidden md:block">
               <EmergencyButton role={role} />

@@ -566,3 +566,29 @@ export const rbacPermissions = sqliteTable('rbac_permissions', {
   updatedAt:   text('updated_at').notNull(),
   updatedBy:   text('updated_by').notNull(),
 });
+
+// ── Regulatory Monitoring ─────────────────────────────────────────────────────
+export const regSources = sqliteTable("reg_sources", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  key:         text("key").notNull().unique(),      // e.g. "casa_part121"
+  label:       text("label").notNull(),
+  url:         text("url").notNull(),
+  lastHash:    text("last_hash"),                   // SHA-256 of last fetched content
+  lastChecked: text("last_checked"),                // ISO datetime
+  lastChanged: text("last_changed"),                // ISO datetime of last detected change
+  status:      text("status").notNull().default("pending"), // pending | ok | changed | error
+});
+
+export const regAlerts = sqliteTable("reg_alerts", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  sourceKey:   text("source_key").notNull(),
+  sourceLabel: text("source_label").notNull(),
+  summary:     text("summary").notNull(),           // AI-generated plain-English change summary
+  impact:      text("impact").notNull(),            // AI-generated operational impact for RFDS SE
+  affectedSops: text("affected_sops").notNull(),    // JSON array of affected SOP codes
+  detectedAt:  text("detected_at").notNull(),       // ISO datetime
+  readAt:      text("read_at"),                     // null = unread
+});
+
+export type RegSource = typeof regSources.$inferSelect;
+export type RegAlert = typeof regAlerts.$inferSelect;

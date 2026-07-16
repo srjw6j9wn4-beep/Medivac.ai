@@ -361,6 +361,62 @@ export const MANUAL: Record<string, { title: string; sections: { heading: string
   },
 };
 
+// ─── Manual PDF page mapping (route → page number in medivac_user_manual.pdf) ─
+// Page numbers extracted from PDF bookmarks.
+export const MANUAL_PAGES: Record<string, number> = {
+  "/": 5,                   // Demo Overview
+  "/morning-brief": 7,      // The 8:45 — Chapter 2: Dashboards
+  "/nept-tasking": 10,      // NEPT Tasking — Chapter 3: Missions
+  "/missions": 11,          // Mission Board
+  "/passenger-manifest": 10,// Passenger Manifest
+  "/map": 11,               // NSW Flight Map
+  "/dispatch": 10,          // Dispatch & Intake
+  "/charter-quote": 14,     // Charter Quote — Chapter 4: Operations
+  "/rest-calculator": 14,   // Crew Rest Calculator
+  "/roster": 22,            // Crew Roster — Chapter 6: Crew & People
+  "/frms": 22,              // Duty & FRMS
+  "/aircraft": 18,          // Aircraft Status — Chapter 5: Assets
+  "/engineering": 19,       // Engineering
+  "/techlog": 18,           // Tech & Journey Log
+  "/medical-equipment": 25, // Medical Equipment — Chapter 7: Clinical
+  "/stock-usage": 25,       // Stock Usage & Orders
+  "/check-training": 23,    // Check & Training
+  "/invoicing": 31,         // Invoicing — Chapter 9: Business
+  "/finance": 31,           // Fuel & Finance
+  "/audit": 31,             // Audit & Reports
+  "/ora": 15,               // Operational Risk Assessment
+  "/mission-optimiser": 14, // Mission Optimiser
+  "/ops-tasks": 15,         // Ops Task Management
+  "/projects": 36,          // Project Management — Chapter 10: Administration
+  "/pilot-handover": 18,    // Pilot Handover Board
+  "/api-integrations": 35,  // API Integration Hub
+  "/users": 35,             // User Management
+  "/rbac": 35,              // RBAC Permissions
+  "/settings": 35,          // System Settings
+  "/after-hours": 25,       // After-Hours AI Med Line
+  "/telehealth": 25,        // Telehealth Portal
+  "/ai-analyst": 28,        // AI Mission Analyst — Chapter 8: AI & Comms
+  "/doc-ai": 29,            // Document AI
+  "/iso": 32,               // ISO Compliance
+  "/contracts": 32,         // Contract Compliance
+  "/special-missions": 12,  // Special Missions
+  "/ferry": 12,             // Ferry Flights
+  "/government-tenders": 32,// Government Tenders
+  "/ground-vehicles": 19,   // Ground Vehicles
+  "/maint-planner": 19,     // Maintenance Planner
+  "/cost-optimizer": 31,    // Cost Optimizer
+  "/flight-planning": 11,   // Flight Planning
+  "/tech-log": 18,          // Tech & Journey Log PWA
+  "/docs": 1,               // Document Library — opens manual at cover
+};
+
+// Build the PDF URL with a page fragment so PDF viewers jump to the right page
+export function manualPageUrl(path: string): string {
+  const page = MANUAL_PAGES[path] ?? 1;
+  return `/medivac_user_manual.pdf#page=${page}`;
+}
+
+
 // Fallback for pages without specific content
 const FALLBACK = {
   title: "Medivac.ai User Manual",
@@ -378,6 +434,8 @@ interface HelpDrawerProps {
 
 export default function HelpDrawer({ path, onClose }: HelpDrawerProps) {
   const content = MANUAL[path] ?? FALLBACK;
+  const manualUrl = manualPageUrl(path);
+  const manualPage = MANUAL_PAGES[path] ?? 1;
   const [open, setOpen] = useState<number[]>([0]); // first section open by default
   const [search, setSearch] = useState("");
 
@@ -400,16 +458,28 @@ export default function HelpDrawer({ path, onClose }: HelpDrawerProps) {
             <div className="w-8 h-8 rounded-lg bg-[#01696F]/20 flex items-center justify-center">
               <BookOpen size={15} className="text-[#4F98A3]" />
             </div>
-            <div>
-              <div className="text-xs text-[#4F98A3] font-semibold uppercase tracking-wider">User Manual</div>
-              <div className="text-sm font-bold text-[#CDCCCA]" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-[#4F98A3] font-semibold uppercase tracking-wider">User Manual · Page {manualPage}</div>
+              <div className="text-sm font-bold text-[#CDCCCA] truncate" style={{ fontFamily: "'Cabinet Grotesk', sans-serif" }}>
                 {content.title}
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-[#797876] hover:text-[#CDCCCA] transition-colors">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <a
+              href={manualUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Open manual at page ${manualPage}`}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#01696F]/20 hover:bg-[#01696F]/35 text-[#4F98A3] hover:text-[#6BBDC8] text-[10px] font-semibold transition-all border border-[#01696F]/30 hover:border-[#4F98A3]/50"
+            >
+              <ExternalLink size={10} />
+              Open PDF · p.{manualPage}
+            </a>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-[#797876] hover:text-[#CDCCCA] transition-colors">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Search */}
@@ -452,12 +522,14 @@ export default function HelpDrawer({ path, onClose }: HelpDrawerProps) {
 
         {/* Footer */}
         <div className="px-4 py-3 border-t border-[#393836] flex items-center justify-between">
-          <span className="text-[10px] text-[#5A5957]">Medivac.ai · Operator Manual v1.0</span>
+          <span className="text-[10px] text-[#5A5957]">Medivac.ai · Operator Manual · Draft 1 · July 2026</span>
           <a
-            href="mailto:support@medivac.ai"
+            href={manualUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-1 text-[10px] text-[#4F98A3] hover:underline"
           >
-            <ExternalLink size={9} /> Contact Support
+            <ExternalLink size={9} /> Open full manual
           </a>
         </div>
       </div>

@@ -172,6 +172,112 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   // Health check for Railway / uptime monitors
+
+
+  // ── Document Library: inline view (no watermark, served with PDF headers) ────
+  app.get("/docs/view/:filename", async (req: Request, res: Response) => {
+    const allowed = [
+      "medivac_user_manual.pdf",
+      "sop_dispatch.pdf", "sop_pilots.pdf", "sop_nurses.pdf",
+      "sop_doctors.pdf", "sop_engineering.pdf", "sop_finance.pdf",
+    ];
+    const filename = req.params.filename;
+    if (!allowed.includes(filename)) return res.status(403).json({ error: "Not allowed" });
+
+    // Try dist/public (production) then client/public (dev)
+    const candidates = [
+      path.resolve(__dirname, "public", filename),
+      path.resolve(__dirname, "..", "client", "public", filename),
+    ];
+    const filePath = candidates.find(p => fs.existsSync(p));
+    if (!filePath) return res.status(404).json({ error: "File not found" });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(filePath);
+  });
+
+  // ── Document Library: watermarked download ─────────────────────────────────
+  // Allowed filenames to prevent path traversal
+  const ALLOWED_DOCS: Record<string, string> = {
+    "medivac_user_manual.pdf":  "MAN-001 — Medivac.ai User Manual",
+    "sop_dispatch.pdf":         "SOP-OPS-001 — Dispatch & Intake Operations",
+    "sop_pilots.pdf":           "SOP-FLT-001 — Pilot Operations",
+    "sop_nurses.pdf":           "SOP-CLN-001 — Flight Nurse Operations",
+    "sop_doctors.pdf":          "SOP-CLN-002 — Flight Doctor Operations",
+    "sop_engineering.pdf":      "SOP-ENG-001 — Engineering & Maintenance",
+    "sop_finance.pdf":          "SOP-BUS-001 — Finance & Business Operations",
+  };
+
+  app.get("/api/docs/download/:filename", async (req: Request, res: Response) => {
+    const { filename } = req.params;
+    if (!ALLOWED_DOCS[filename]) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+    const docLabel = ALLOWED_DOCS[filename];
+    // Source PDF lives next to the built server bundle (dist/public/)
+    const publicDir = path.resolve(__dirname, "public");
+    const inputPath  = path.join(publicDir, filename);
+    const outputPath = path.join("/tmp", `wm_${Date.now()}_${filename}`);
+
+    if (!fs.existsSync(inputPath)) {
+      return res.status(404).json({ error: "PDF not found on server" });
+    }
+
+    const scriptPath = path.resolve(__dirname, "..", "server", "watermark.py");
+    // In production the script is bundled next to index.cjs — try both locations
+    const scriptAlt  = path.resolve(__dirname, "watermark.py");
+    const script     = fs.existsSync(scriptPath) ? scriptPath : scriptAlt;
+
+    execFile("python3", [script, inputPath, outputPath], (err) => {
+      if (err) {
+        console.error("Watermark error:", err);
+        return res.status(500).json({ error: "Failed to generate watermarked PDF" });
+      }
+      const safeLabel = docLabel.replace(/[^a-zA-Z0-9 \-\.]/g, "");
+      res.setHeader("Content-Disposition", `attachment; filename="${safeLabel} (Uncontrolled).pdf"`);
+      res.setHeader("Content-Type", "application/pdf");
+      const stream = fs.createReadStream(outputPath);
+      stream.pipe(res);
+      stream.on("close", () => {
+        fs.unlink(outputPath, () => {}); // clean up temp file
+      });
+    });
+  });
+
+
+  // ── Regulatory Monitoring ──────────────────────────────────────────────────
+  app.get("/api/reg-monitor/sources", async (_req: Request, res: Response) => {
+    try {
+      const { data } = await supabase.from("reg_sources").select("*").order("label");
+      res.json(data ?? []);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.get("/api/reg-monitor/alerts", async (_req: Request, res: Response) => {
+    try {
+      const { data } = await supabase.from("reg_alerts").select("*").order("detected_at", { ascending: false }).limit(50);
+      res.json(data ?? []);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/reg-monitor/alerts/:id/read", async (req: Request, res: Response) => {
+    try {
+      const { data } = await supabase.from("reg_alerts").update({ read_at: new Date().toISOString() }).eq("id", parseInt(req.params.id)).select().single();
+      res.json(data);
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
+  app.post("/api/reg-monitor/alerts/read-all", async (_req: Request, res: Response) => {
+    try {
+      await supabase.from("reg_alerts").update({ read_at: new Date().toISOString() }).is("read_at", null);
+      res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: String(e) }); }
+  });
+
   app.get("/api/health", async (_req: Request, res: Response) => {
     res.json({ status: "ok", ts: new Date().toISOString() });
   });

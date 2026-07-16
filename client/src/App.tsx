@@ -64,6 +64,8 @@ import PilotHandover from "@/pages/PilotHandover";
 import SeniorBasePilot from "@/pages/SeniorBasePilot";
 import OrgChart from "@/pages/OrgChart";
 import PayrollLeave from "@/pages/PayrollLeave";
+import DocumentLibrary from "@/pages/DocumentLibrary";
+import RegulatoryMonitor from "@/pages/RegulatoryMonitor";
 import { FEATURES } from "@/lib/config";
 import type { UserRole } from "@/lib/data";
 
@@ -140,6 +142,8 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/sbp-portal" component={() => <SeniorBasePilot role={role} />} />
       <Route path="/org-chart" component={() => <OrgChart role={role} />} />
       <Route path="/payroll-leave" component={() => <PayrollLeave role={role} />} />
+      <Route path="/docs" component={() => <DocumentLibrary />} />
+      <Route path="/reg-monitor" component={() => <RegulatoryMonitor />} />
       <Route component={NotFound} />
     </Switch>
   );
