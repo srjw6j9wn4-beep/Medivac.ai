@@ -66,11 +66,12 @@ export const PATH_TO_MODULE: Record<string, string> = {
 };
 
 export function useRbacPerms() {
-  const { data } = useQuery<PermMatrix | null>({
+  const { data } = useQuery<{ matrix: PermMatrix } | null>({
     queryKey: ["/api/rbac-permissions"],
     staleTime: 30_000,
   });
-  return data ?? null;
+  // API returns { matrix: {...} } — unwrap it
+  return data?.matrix ?? null;
 }
 
 /** Returns true if the role can see this path (read or full), false if none */
