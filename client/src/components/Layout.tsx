@@ -549,14 +549,17 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
               <div key={section.label} className="mb-0.5">
                 <button
                   onClick={() => toggleSection(section.label)}
-                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-xs font-semibold text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-semibold transition-colors
+                    ${isOpen
+                      ? `${section.color} bg-sidebar-accent/60`
+                      : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
                 >
-                  {section.icon}
-                  <span className="flex-1 text-left">{section.label}</span>
-                  {isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                  <span className={isOpen ? section.color : ''}>{section.icon}</span>
+                  <span className="flex-1 text-left tracking-wide uppercase text-[10px]">{section.label}</span>
+                  {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                 </button>
                 {isOpen && section.children && (
-                  <div className="ml-2 mt-0.5 space-y-px">
+                  <div className="ml-1 mt-0.5 space-y-px border-l-2 pl-2" style={{ borderColor: section.accent }}>
                     {section.children.map(item => {
                       if (isRestricted(item.restricted)) return null;
                       if (isHiddenByRbac(item.path)) return null;
@@ -565,7 +568,8 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                         <Link key={item.path} href={item.path!}>
                           <a
                             className={`flex items-center gap-2 px-3 py-1 rounded-md text-xs transition-colors
-                              ${isActive ? 'bg-cyan-500/15 text-cyan-400 font-medium' : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
+                              ${isActive ? `${section.color} font-semibold` : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
+                            style={isActive ? { backgroundColor: section.accent + '55' } : undefined}
                             onClick={() => setMobileOpen(false)}
                           >
                             {item.label}
