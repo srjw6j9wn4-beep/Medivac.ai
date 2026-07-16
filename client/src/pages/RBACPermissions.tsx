@@ -540,54 +540,70 @@ export default function RBACPermissions({ role }: Props) {
 
       {/* Full matrix view */}
       {view === "matrix" && (
-        <div className="bg-card border border-card-border rounded-xl overflow-x-auto">
-          <table className="text-[10px] w-full">
-            <thead>
-              <tr className="border-b border-card-border sticky top-0 z-20 bg-card shadow-sm">
-                <th className="text-left p-2 pl-4 font-semibold text-muted-foreground sticky left-0 bg-card z-30 min-w-32">Module</th>
-                {ROLES.map(r => (
-                  <th key={r.id} className="p-2 text-center font-semibold min-w-20 bg-card">
-                    <span className={r.color}>{r.icon}</span>
-                    <div className="text-muted-foreground">{r.label.split(' ')[0]}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const sections = Array.from(new Set(MODULES.map(m => m.section)));
-                return sections.flatMap(section => {
-                  const mods = MODULES.filter(m => m.section === section);
-                  const totalCols = ROLES.length + 1;
-                  return [
-                    <tr key={`section-${section}`} className="bg-background/60">
-                      <td colSpan={totalCols} className="px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-card-border sticky left-0 bg-background/60">
-                        {section}
-                      </td>
-                    </tr>,
-                    ...mods.map(m => (
-                      <tr key={m.id} className="border-b border-card-border/50 hover:bg-background/20 transition-colors">
-                        <td className="p-2 pl-4 font-medium sticky left-0 bg-card z-10 text-[10px]">
-                          {m.icon} {m.label}
+        <div className="rounded-xl border border-card-border overflow-hidden">
+          {/* Sticky header — sits outside any overflow container so it sticks to <main> scroll */}
+          <div className="sticky top-0 z-20 bg-card border-b border-card-border shadow-sm overflow-x-auto">
+            <table className="text-[10px] w-full" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ minWidth: "8rem", width: "8rem" }} />
+                {ROLES.map(r => <col key={r.id} style={{ minWidth: "5rem", width: `${100 / ROLES.length}%` }} />)}
+              </colgroup>
+              <thead>
+                <tr>
+                  <th className="text-left p-2 pl-4 font-semibold text-muted-foreground bg-card min-w-32">Module</th>
+                  {ROLES.map(r => (
+                    <th key={r.id} className="p-2 text-center font-semibold min-w-20 bg-card">
+                      <span className={r.color}>{r.icon}</span>
+                      <div className="text-muted-foreground">{r.label.split(' ')[0]}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+            </table>
+          </div>
+          {/* Scrollable body */}
+          <div className="overflow-x-auto bg-card">
+            <table className="text-[10px] w-full" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ minWidth: "8rem", width: "8rem" }} />
+                {ROLES.map(r => <col key={r.id} style={{ minWidth: "5rem", width: `${100 / ROLES.length}%` }} />)}
+              </colgroup>
+              <tbody>
+                {(() => {
+                  const sections = Array.from(new Set(MODULES.map(m => m.section)));
+                  return sections.flatMap(section => {
+                    const mods = MODULES.filter(m => m.section === section);
+                    const totalCols = ROLES.length + 1;
+                    return [
+                      <tr key={`section-${section}`} className="bg-background/60">
+                        <td colSpan={totalCols} className="px-4 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground border-b border-card-border">
+                          {section}
                         </td>
-                        {ROLES.map(r => {
-                          const p = (perms[r.id]?.[m.id] ?? "none") as PermLevel;
-                          return (
-                            <td key={r.id} className="p-2 text-center">
-                              <button onClick={() => cyclePermission(r.id, m.id)}
-                                className={`px-2 py-0.5 rounded border font-semibold transition-colors w-14 ${permBg(p)} ${isAdmin ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}>
-                                {p === "full" ? "F" : p === "read" ? "R" : "—"}
-                              </button>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    )),
-                  ];
-                });
-              })()}
-            </tbody>
-          </table>
+                      </tr>,
+                      ...mods.map(m => (
+                        <tr key={m.id} className="border-b border-card-border/50 hover:bg-background/20 transition-colors">
+                          <td className="p-2 pl-4 font-medium text-[10px] truncate">
+                            {m.icon} {m.label}
+                          </td>
+                          {ROLES.map(r => {
+                            const p = (perms[r.id]?.[m.id] ?? "none") as PermLevel;
+                            return (
+                              <td key={r.id} className="p-2 text-center">
+                                <button onClick={() => cyclePermission(r.id, m.id)}
+                                  className={`px-2 py-0.5 rounded border font-semibold transition-colors w-14 ${permBg(p)} ${isAdmin ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}>
+                                  {p === "full" ? "F" : p === "read" ? "R" : "—"}
+                                </button>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      )),
+                    ];
+                  });
+                })()}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
