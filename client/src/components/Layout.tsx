@@ -605,8 +605,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         <nav className="flex-1 flex flex-col items-center gap-1 py-3 w-full">
           {NAV.map(section => {
             const hasActivePage = section.children?.some(c => c.path === location) ?? false;
-            const isOpen = expanded.includes(section.label);
-            const isActive = hasActivePage || isOpen;
+            const isActive = hasActivePage;
             return (
               <button
                 key={section.label}
