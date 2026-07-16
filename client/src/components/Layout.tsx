@@ -186,7 +186,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   // ── Demo ──────────────────────────────────────────────────────────
   {
-    label: "Demo",  color: "text-slate-400",  accent: "#1e293b",
+    label: "Demo",  color: "text-slate-300",  accent: "#334155",
     icon: <PlayCircle size={16} />, iconLg: <PlayCircle size={28} />,
     children: [
       { label: "Demo Overview",    path: "/" },
@@ -195,7 +195,7 @@ const NAV: NavItem[] = [
   },
   // ── Dashboards ────────────────────────────────────────────────────
   {
-    label: "Dashboards", color: "text-violet-400", accent: "#2e1065",
+    label: "Dashboards", color: "text-violet-400", accent: "#4c1d95",
     icon: <LayoutDashboard size={16} />, iconLg: <LayoutDashboard size={28} />,
     children: [
       { label: "The 8:45",             path: "/morning-brief" },
@@ -205,7 +205,7 @@ const NAV: NavItem[] = [
   },
   // ── Missions ──────────────────────────────────────────────────────
   {
-    label: "Missions", color: "text-cyan-400", accent: "#083344",
+    label: "Missions", color: "text-cyan-400", accent: "#155e75",
     icon: <Plane size={16} />, iconLg: <Plane size={28} />,
     children: [
       { label: "Dispatch & Intake",   path: "/dispatch" },
@@ -220,7 +220,7 @@ const NAV: NavItem[] = [
   },
   // ── Operations ────────────────────────────────────────────────────
   {
-    label: "Operations", color: "text-emerald-400", accent: "#052e16",
+    label: "Operations", color: "text-emerald-400", accent: "#065f46",
     icon: <Zap size={16} />, iconLg: <Zap size={28} />,
     children: [
       { label: "Crew Rest Calculator",        path: "/rest-calculator" },
@@ -234,7 +234,7 @@ const NAV: NavItem[] = [
   },
   // ── Assets ────────────────────────────────────────────────────────
   {
-    label: "Assets", color: "text-orange-400", accent: "#431407",
+    label: "Assets", color: "text-orange-400", accent: "#9a3412",
     icon: <Wrench size={16} />, iconLg: <Wrench size={28} />,
     children: [
       { label: "Pilot Handover Board", path: "/pilot-handover" },
@@ -248,7 +248,7 @@ const NAV: NavItem[] = [
   },
   // ── Crew & People ─────────────────────────────────────────────────
   {
-    label: "Crew & People", color: "text-blue-400", accent: "#172554",
+    label: "Crew & People", color: "text-blue-400", accent: "#1e40af",
     icon: <Users size={16} />, iconLg: <Users size={28} />,
     children: [
       { label: "Crew Roster",             path: "/roster" },
@@ -259,7 +259,7 @@ const NAV: NavItem[] = [
   },
   // ── Clinical ──────────────────────────────────────────────────────
   {
-    label: "Clinical", color: "text-pink-400", accent: "#500724",
+    label: "Clinical", color: "text-pink-400", accent: "#9d174d",
     icon: <HeartPulse size={16} />, iconLg: <HeartPulse size={28} />,
     children: [
       { label: "Medical Equipment",       path: "/medical-equipment" },
@@ -270,7 +270,7 @@ const NAV: NavItem[] = [
   },
   // ── AI & Comms ────────────────────────────────────────────────────
   {
-    label: "AI & Comms", color: "text-purple-400", accent: "#3b0764",
+    label: "AI & Comms", color: "text-purple-400", accent: "#6b21a8",
     icon: <Bot size={16} />, iconLg: <Bot size={28} />,
     children: [
       { label: "Jennifer — Presenter", path: "/jennifer" },
@@ -282,7 +282,7 @@ const NAV: NavItem[] = [
   },
   // ── Business ──────────────────────────────────────────────────────
   {
-    label: "Business", color: "text-amber-400", accent: "#451a03",
+    label: "Business", color: "text-amber-400", accent: "#92400e",
     icon: <Briefcase size={16} />, iconLg: <Briefcase size={28} />,
     children: [
       { label: "Invoicing",           path: "/invoicing" },
@@ -297,7 +297,7 @@ const NAV: NavItem[] = [
   },
   // ── Administration ────────────────────────────────────────────────
   {
-    label: "Administration", color: "text-slate-300", accent: "#1e293b",
+    label: "Administration", color: "text-slate-300", accent: "#475569",
     icon: <Settings size={16} />, iconLg: <Settings size={28} />,
     children: [
       { label: "User Management",     path: "/users" },
@@ -463,7 +463,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                             ${isActive
                               ? `${section.color} font-semibold`
                               : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
-                          style={isActive ? { backgroundColor: section.accent + '99' } : undefined}
+                          style={isActive ? { backgroundColor: section.accent + '55' } : undefined}
                           data-testid={`nav-${item.path?.replace(/\//g, '') || 'home'}`}
                           onClick={() => setMobileOpen(false)}
                         >
@@ -604,7 +604,9 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         {/* Section icons */}
         <nav className="flex-1 flex flex-col items-center gap-1 py-3 w-full">
           {NAV.map(section => {
-            const isActive = section.children?.some(c => c.path === location);
+            const hasActivePage = section.children?.some(c => c.path === location) ?? false;
+            const isOpen = expanded.includes(section.label);
+            const isActive = hasActivePage || isOpen;
             return (
               <button
                 key={section.label}
@@ -617,13 +619,18 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                 onMouseLeave={() => {
                   tooltipTimer.current = setTimeout(() => setTooltip(null), 150);
                 }}
-                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150
+                className={`relative w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-150
                   ${isActive
-                    ? `${section.color}`
-                    : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
-                style={isActive ? { backgroundColor: section.accent + '55', boxShadow: `0 0 12px ${section.accent}99` } : undefined}
+                    ? `${section.color} ring-1`
+                    : `text-muted-foreground hover:${section.color} hover:bg-sidebar-accent`}`}
+                style={isActive
+                  ? { backgroundColor: section.accent, boxShadow: `0 0 14px ${section.accent}` }
+                  : undefined}
               >
                 {section.iconLg}
+                {hasActivePage && (
+                  <span className="absolute bottom-1 right-1 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'currentColor' }} />
+                )}
               </button>
             );
           })}
