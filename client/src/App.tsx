@@ -53,6 +53,14 @@ import ManifestSign from "@/pages/ManifestSign";
 import TechLogEmbed from "@/pages/TechLogEmbed";
 import NEPTTasking from "@/pages/NEPTTasking";
 import GovernmentTenders from "@/pages/GovernmentTenders";
+import DevelopmentRoadmap from "@/pages/DevelopmentRoadmap";
+import HospitalReferralPortal from "@/pages/HospitalReferralPortal";
+import FTLCompliance from "@/pages/FTLCompliance";
+import ADSBTracking from "@/pages/ADSBTracking";
+import PatientCareRecord from "@/pages/PatientCareRecord";
+import ComponentLifeTracking from "@/pages/ComponentLifeTracking";
+import AvianodeMarketplace from "@/pages/AvianodeMarketplace";
+import DemandForecasting from "@/pages/DemandForecasting";
 import Invoicing from "@/pages/Invoicing";
 import OpsRoomDisplay from "@/pages/OpsRoomDisplay";
 import ShiftFleetStatus from "@/pages/ShiftFleetStatus";
@@ -122,6 +130,14 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/fuel-finance" component={() => <FuelFinance role={role} />} />
       <Route path="/audit" component={() => <AuditReports role={role} />} />
       <Route path="/government-tenders" component={() => <GovernmentTenders />} />
+      <Route path="/dev-roadmap" component={() => <DevelopmentRoadmap />} />
+      <Route path="/hospital-referral" component={() => <HospitalReferralPortal />} />
+      <Route path="/ftl-compliance" component={() => <FTLCompliance />} />
+      <Route path="/adsb-tracking" component={() => <ADSBTracking />} />
+      <Route path="/patient-care-record" component={() => <PatientCareRecord />} />
+      <Route path="/component-life" component={() => <ComponentLifeTracking />} />
+      <Route path="/avinode" component={() => <AvianodeMarketplace />} />
+      <Route path="/demand-forecasting" component={() => <DemandForecasting />} />
       <Route path="/check-training" component={() => <CheckTraining role={role} />} />
       <Route path="/regulations" component={() => <Regulations />} />
       <Route path="/medical-equipment" component={() => <MedicalEquipment role={role} />} />

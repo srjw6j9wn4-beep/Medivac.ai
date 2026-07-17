@@ -56,6 +56,8 @@ interface ClosedTender {
   bid_submitted?: boolean;
   our_outcome?: string;
   notes?: string;
+  portalUrl?: string;
+  portalName?: string;
   winnerAnalysis?: {
     likely_reasons: string[];
     strengths: string;
@@ -96,11 +98,13 @@ const BLANK_TENDER = {
 // ─── Recently Closed (last 6 months) ────────────────────────────────────────
 const RECENTLY_CLOSED: ClosedTender[] = [
   {
-    ref: "AusTender CN4179501",
+    ref: "Buy.NSW — not publicly indexed",
     title: "NSW Ambulance — Aeromedical Fixed-Wing Services (IHT Panel Refresh)",
     agency: "NSW Ambulance Service",
     closed: "March 2026",
     awarded_to: "Pel-Air Aviation (incl. 2-year extension option)",
+    portalUrl: "https://buy.nsw.gov.au",
+    portalName: "Buy.NSW",
         winnerAnalysis: {
       likely_reasons: ["Incumbent advantage", "Established NSW Ambulance relationship", "Fleet already configured for route", "CAD integration existing"],
       strengths: "Pel-Air held the prior contract with 5+ years of mission history on western NSW LHDs. Zero transition risk for the agency.",
@@ -117,11 +121,13 @@ const RECENTLY_CLOSED: ClosedTender[] = [
     lesson: "Renew as primary forward target — contract likely up for re-tender 2027. Register now on Buy.NSW, establish relationship with NSW Ambulance Aviation Manager.",
   },
   {
-    ref: "AusTender CN4165872",
+    ref: "QTenders — contract not publicly indexed",
     title: "QLD Government Air Charter Services — QGAir Wet Lease Renewal",
     agency: "Queensland Police Service / QGAir",
     closed: "February 2026",
     awarded_to: "Charter panel — multiple operators retained",
+    portalUrl: "https://qtenders.epw.qld.gov.au",
+    portalName: "QTenders",
         winnerAnalysis: {
       likely_reasons: ["Queensland-based operations", "Existing QGAir panel relationships", "ITAR compliance for law enforcement variant", "Local government preference for QLD operators"],
       strengths: "Panel arrangements favour operators already registered and known to the agency. QLD operators had local base infrastructure and existing crew networks.",
@@ -137,11 +143,13 @@ const RECENTLY_CLOSED: ClosedTender[] = [
     lesson: "Register on QTenders immediately. Next SOA refresh expected 2028 — begin capability mapping and consider a QLD base expansion case.",
   },
   {
-    ref: "UNGM Ref 1073442",
+    ref: "UNGM — LTA not publicly listed",
     title: "UNICEF Pacific — Standing Offer for Air Charter Services (Samoa, Vanuatu, Solomon Islands)",
     agency: "UNICEF Pacific Region Office (Suva)",
     closed: "January 2026",
-    awarded_to: "Air Vanuatu (domestic legs) + Pacific Flying Service (inter-island)",
+    awarded_to: "Pacific regional operators (not publicly disclosed)",
+    portalUrl: "https://www.ungm.org",
+    portalName: "UN Global Marketplace",
         winnerAnalysis: {
       likely_reasons: ["Pre-positioned Pacific infrastructure", "UNGM vendor registration", "ICAO international operator certificate", "Local Pacific crew knowledge", "Rapid response — 4hr requirement"],
       strengths: "Pacific operators have physical presence, local LAME support, and existing relationships with national aviation authorities. Response time requirement of 4hrs from Fiji to outer islands is only achievable with pre-positioned aircraft.",
@@ -158,11 +166,13 @@ const RECENTLY_CLOSED: ClosedTender[] = [
     lesson: "Register on UNGM immediately — it is a prerequisite for all UN tenders. Lodge ICAO international ops documentation. Map PC-24 range against Pacific island network.",
   },
   {
-    ref: "WA Health RFT-2026-084",
+    ref: "WA Tenders — contract not publicly indexed",
     title: "WA Country Health Service — Fixed-Wing Aeromedical Patient Transport",
     agency: "WA Country Health Service / St John WA",
     closed: "April 2026",
     awarded_to: "Royal Flying Doctor Service WA",
+    portalUrl: "https://www.tenders.wa.gov.au",
+    portalName: "WA Tenders",
         winnerAnalysis: {
       likely_reasons: ["WA-based infrastructure (Perth + regional bases)", "Indigenous Procurement Policy compliance", "35+ year incumbent relationship", "Kimberley/Pilbara operational experience", "WA Government community benefit preference"],
       strengths: "RFDS WA has 35+ years of operational history in the exact regions, existing base infrastructure at Derby, Broome, Port Hedland, Kalgoorlie and Meekatharra. Night capability and IFR approvals already current for WA outback operations.",
@@ -179,11 +189,13 @@ const RECENTLY_CLOSED: ClosedTender[] = [
     lesson: "Build a WA subcontractor network. An Indigenous Procurement Policy document and WA community benefit statement are prerequisites. Target the 2031 re-tender.",
   },
   {
-    ref: "Buy.NSW SOL-0001847",
+    ref: "Buy.NSW — contract not publicly indexed",
     title: "NSW Health Pathology — Urgent Specimen Air Transport (STAT) Panel",
     agency: "NSW Health Pathology",
     closed: "May 2026",
     awarded_to: "Rex Airlines + Inland Aviation (split panel)",
+    portalUrl: "https://buy.nsw.gov.au",
+    portalName: "Buy.NSW",
         winnerAnalysis: {
       likely_reasons: ["Existing Sydney route frequency (Rex)", "Low-cost per-sector pricing", "IFR turboprop on trunk routes", "Inland Aviation regional coverage filling gaps"],
       strengths: "Rex Airlines' Sydney–regional NSW scheduled services provided a built-in specimen courier network at marginal cost. Inland Aviation covered the sub-regional routes not on Rex's network.",
@@ -199,11 +211,13 @@ const RECENTLY_CLOSED: ClosedTender[] = [
     lesson: "Set keyword alerts on Buy.NSW: 'specimen', 'pathology', 'urgent courier', 'biological sample'. Panel refreshes every 3 years — next opportunity ~2029.",
   },
   {
-    ref: "AusTender CN4188203",
+    ref: "AusTender — contract not publicly indexed",
     title: "AMSA Aerial Maritime Surveillance — Fixed-Wing Tasking (East Coast)",
     agency: "Australian Maritime Safety Authority",
     closed: "June 2026",
     awarded_to: "Cobham Aviation Services",
+    portalUrl: "https://www.tenders.gov.au/Search/KeywordSearch?keyword=AMSA+aerial+surveillance",
+    portalName: "AusTender",
         winnerAnalysis: {
       likely_reasons: ["Purpose-built surveillance aircraft (Dash 8 with FLIR/EO/radar)", "Defence-grade security clearances", "Existing AMSA relationship from prior contract", "Maritime radar and pollution sensor suite", "Long-endurance capability beyond King Air range"],
       strengths: "Cobham operates a dedicated maritime patrol fleet with integrated sensor suites, cleared crew, and an AMSA-specific SOPs library. Their aircraft can sustain 8+ hour patrols, covering Torres Strait outer sectors unreachable by King Air without fuel stops.",
@@ -319,14 +333,16 @@ const LIVE: LiveOpportunity[] = [
     ref: "RFI-2015603",
     title: "NSW Health — Rural & Regional Air Transport RFI",
     agency: "NSW Ministry of Health",
-    closes: "16 Jul 2026",
+    closes: "30 Jul 2026",
     urgent: true,
     type: "Request for Information",
-    scope: "Fixed-wing IHT across regional NSW — Far West, Western NSW, New England, Orana, Riverina. 24/7 operations.",
+    scope: "Fixed-wing IHT across regional NSW — Far West, Western NSW, New England, Orana, Riverina. 24/7 operations. Published 18 Jun 2026, extended via amendment 6 Jul 2026.",
     fit: "VERY HIGH",
-    action: "Respond immediately — RFI responses shape the upcoming RFT specification. Responding now puts you in the room when the RFT is written.",
+    action: "Respond by 30 July 2026 3:00 PM — RFI responses shape the upcoming RFT specification. Responding now puts you in the room when the RFT is written.",
     contact: "michael.donnolley@health.nsw.gov.au",
     region: "NSW",
+    portalUrl: "https://buy.nsw.gov.au/prcOpportunity/D765D0EB-F970-4337-B0A9FE964C0B015E",
+    portalName: "Buy.NSW",
   },
   {
     ref: "CASA 26/106",
@@ -335,11 +351,13 @@ const LIVE: LiveOpportunity[] = [
     closes: "3 Aug 2026",
     urgent: true,
     type: "Panel Arrangement (RFT)",
-    scope: "Aircraft hire for CASA officer transport, NAVAID flight checking, simulator hire, flight training (Part 141/142). All states + overseas.",
+    scope: "Aircraft hire for CASA officer transport, NAVAID flight checking, simulator hire, flight training (Part 141/142). All states + overseas. Published 7 Jul 2026.",
     fit: "HIGH",
-    action: "Lodge response by 3 August 2026.",
+    action: "Lodge response by 3 August 2026 at 2:00 PM AEST.",
     contact: "ashadmin@casa.gov.au",
     region: "AU Federal",
+    portalUrl: "https://www.tenders.gov.au/Atm/Show/851f2c08-da28-40d6-8c15-bdd9fc21932d",
+    portalName: "AusTender",
   },
 ];
 
@@ -376,7 +394,7 @@ const PIPELINE: PipelineItem[] = [
 
 // ─── Calendar ─────────────────────────────────────────────────────────────────
 const CALENDAR: CalendarAction[] = [
-  { month: "July 2026",      action: "Respond to NSW Health RFI-2015603 (closes 16 July)",                          priority: "URGENT"   },
+  { month: "July 2026",      action: "Respond to NSW Health RFI-2015603 — closes 30 July 2026 3:00 PM (Buy.NSW portal)",    priority: "URGENT"   },
   { month: "August 2026",    action: "Lodge CASA HASS Panel application (closes 3 Aug)",                            priority: "URGENT"   },
   { month: "August 2026",    action: "Register on Buy.NSW, QTenders, NT Tenders, WA Tenders portals",              priority: "HIGH"     },
   { month: "August 2026",    action: "Register on UN Global Marketplace (UNGM) — required for all UN tenders",     priority: "HIGH"     },
@@ -1258,12 +1276,21 @@ function pickRelevantPortal(region: string): string {
 }
 
 function austenderSearchUrl(title: string): string {
-  return `https://www.tenders.gov.au/search?keyword=${encodeURIComponent(title)}`;
+  // AusTender uses /Search/KeywordSearch — the /search?keyword= path returns 404
+  return `https://www.tenders.gov.au/Search/KeywordSearch?keyword=${encodeURIComponent(title)}`;
 }
 
 // ─── Source / portal link resolver for the detail modal ───────────────────
 function resolveSourceLink(tender: any, kind: "closed" | "live" | "pipeline"): { label: string; sub: string; href: string } {
   if (kind === "closed") {
+    // If a direct portal URL is provided, use it; otherwise fall back to keyword search
+    if (tender.portalUrl) {
+      return {
+        label: tender.portalName ? `View on ${tender.portalName}` : "View original tender notice",
+        sub: tender.portalUrl.replace(/^https?:\/\//, ""),
+        href: tender.portalUrl,
+      };
+    }
     return {
       label: "Search AusTender for this contract",
       sub: "tenders.gov.au",
