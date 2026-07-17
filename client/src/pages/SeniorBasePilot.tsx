@@ -852,7 +852,9 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
               const dueHH = Math.floor((startMins + maxMins) / 60) % 24;
               const dueMM = (startMins + maxMins) % 60;
               const dueStr = `${String(dueHH).padStart(2,'0')}:${String(dueMM).padStart(2,'0')}`;
-              const isCritical = remainMins < 60 && remainMins > 0;
+              const isWarning3h = remainMins <= 180 && remainMins > 120;
+              const isWarning2h = remainMins <= 120 && remainMins > 60;
+              const isCritical = remainMins <= 60 && remainMins > 0;
               const isExpired = remainMins === 0;
               // Max CAO 48.1 extension = 2 hrs (s.48.1.12) when approved by Company
               const canExtend = !pilot.extended && !isExpired && remainMins < 120 && (role === "admin" || role === "senior_management" || role === "dispatcher");
@@ -870,7 +872,7 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
                       </div>
                       <div className="text-[10px] text-[#5A5957] mt-0.5">FDP start: {pilot.startTime} · Max: {pilot.maxFDP}h{pilot.extensionMins > 0 ? ` + ${pilot.extensionMins}m ext` : ""} · Due off: {dueStr}</div>
                     </div>
-                    <div className={`text-right shrink-0 ${isExpired ? "text-red-400" : isCritical ? "text-amber-400" : "text-green-400"}`}>
+                    <div className={`text-right shrink-0 ${isExpired ? "text-red-400" : isCritical ? "text-red-400" : isWarning2h ? "text-amber-400" : isWarning3h ? "text-yellow-400" : "text-green-400"}`}>
                       <div className="text-xl font-bold font-mono" style={HF}>
                         {isExpired ? "EXPIRED" : `${remainH}h ${String(remainM).padStart(2,'0')}m`}
                       </div>
@@ -879,11 +881,20 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
                   </div>
 
                   {/* Progress bar */}
-                  <div className="h-2.5 bg-[#171614] rounded-full overflow-hidden mb-3">
+                  <div className="h-2.5 bg-[#171614] rounded-full overflow-hidden mb-2">
                     <div
-                      className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : isCritical ? "bg-amber-500" : "bg-[#4F98A3]"}`}
+                      className={`h-full rounded-full transition-all ${isExpired ? "bg-red-500" : isCritical ? "bg-red-500" : isWarning2h ? "bg-amber-500" : isWarning3h ? "bg-yellow-500" : "bg-[#4F98A3]"}`}
                       style={{ width: `${pct}%` }}
                     />
+                  </div>
+
+                  {/* Warning milestone markers */}
+                  <div className="flex justify-between text-[9px] text-[#5A5957] mb-3 px-0.5">
+                    <span>Start</span>
+                    <span className={isWarning3h || isWarning2h || isCritical || isExpired ? "text-yellow-500 font-semibold" : ""}>3hr warn</span>
+                    <span className={isWarning2h || isCritical || isExpired ? "text-amber-500 font-semibold" : ""}>2hr warn</span>
+                    <span className={isCritical || isExpired ? "text-red-400 font-semibold" : ""}>1hr warn</span>
+                    <span className={isExpired ? "text-red-400 font-semibold" : ""}>FDP end</span>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -892,7 +903,13 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
                         <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold"><AlertTriangle size={11} />FDP LIMIT REACHED — crew must be rested</span>
                       )}
                       {isCritical && !isExpired && (
-                        <span className="flex items-center gap-1 text-[10px] text-amber-400"><AlertTriangle size={11} />Under 1 hour remaining</span>
+                        <span className="flex items-center gap-1 text-[10px] text-red-400 font-bold"><AlertTriangle size={11} />1 HOUR WARNING — begin mission wind-down</span>
+                      )}
+                      {isWarning2h && (
+                        <span className="flex items-center gap-1 text-[10px] text-amber-400 font-semibold"><AlertTriangle size={11} />2 HOUR WARNING — no new long missions</span>
+                      )}
+                      {isWarning3h && (
+                        <span className="flex items-center gap-1 text-[10px] text-yellow-400"><AlertTriangle size={11} />3 HOUR WARNING — plan for handover</span>
                       )}
                     </div>
 

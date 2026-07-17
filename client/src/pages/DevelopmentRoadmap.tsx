@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CheckCircle2, Circle, Clock, AlertTriangle, ChevronDown, ChevronUp, Zap, Shield, Wifi, Hospital, BarChart3, Stethoscope, Wrench, Filter } from "lucide-react";
 
 type Priority = "P1" | "P2" | "P3";
@@ -161,8 +161,29 @@ export default function DevelopmentRoadmap() {
   const [filterPriority, setFilterPriority] = useState<"All" | Priority>("All");
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterStatus, setFilterStatus] = useState<"All" | Status>("All");
-  // track local status overrides
+  // Supabase config
+  const SUPA_URL = "https://fbstcyegnzufiebnktrx.supabase.co";
+  const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZic3RjeWVnbnp1ZmllYm5rdHJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1OTQ3MDUsImV4cCI6MjA5OTE3MDcwNX0.GfiAmBe66R64dISvV0Dzg0BNV9p5wsw5dps0RGRSmJY";
+
+  // Persistent status from Supabase (overrides hardcoded defaults)
   const [statusOverrides, setStatusOverrides] = useState<Record<string, Status>>({});
+  const [saving, setSaving] = useState<string | null>(null);
+
+  // Load statuses from Supabase on mount
+  useEffect(() => {
+    fetch(`${SUPA_URL}/rest/v1/roadmap_items?select=id,status`, {
+      headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` },
+    })
+      .then(r => r.json())
+      .then((rows: { id: string; status: Status }[]) => {
+        if (Array.isArray(rows)) {
+          const map: Record<string, Status> = {};
+          rows.forEach(r => { map[r.id] = r.status; });
+          setStatusOverrides(map);
+        }
+      })
+      .catch(() => {/* use hardcoded defaults if offline */});
+  }, []);
 
   const getStatus = (id: string, base: Status): Status => statusOverrides[id] ?? base;
 
@@ -180,9 +201,36 @@ export default function DevelopmentRoadmap() {
     completed: ITEMS.filter(i => getStatus(i.id, i.status) === "completed").length,
   };
 
-  const cycleStatus = (id: string, current: Status) => {
+  const cycleStatus = async (id: string, current: Status) => {
     const next: Record<Status, Status> = { planned: "in_progress", in_progress: "completed", completed: "planned" };
-    setStatusOverrides(prev => ({ ...prev, [id]: next[current] }));
+    const newStatus = next[current];
+    // Optimistic update
+    setStatusOverrides(prev => ({ ...prev, [id]: newStatus }));
+    setSaving(id);
+    try {
+      await fetch(
+        `${SUPA_URL}/rest/v1/roadmap_items?id=eq.${id}`,
+        {
+          method: "PATCH",
+          headers: {
+            apikey: SUPA_KEY,
+            Authorization: `Bearer ${SUPA_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            status: newStatus,
+            completed_at: newStatus === "completed" ? new Date().toISOString() : null,
+            updated_at: new Date().toISOString(),
+          }),
+        }
+      );
+    } catch {
+      // Revert on error
+      setStatusOverrides(prev => ({ ...prev, [id]: current }));
+    } finally {
+      setSaving(null);
+    }
   };
 
   return (
@@ -286,11 +334,16 @@ export default function DevelopmentRoadmap() {
                 {/* Status chip — click to cycle */}
                 <button
                   onClick={e => { e.stopPropagation(); cycleStatus(item.id, st); }}
-                  className={`flex items-center gap-1 text-[11px] font-medium ${sc.color} bg-slate-800/60 border border-slate-700/50 rounded-full px-2.5 py-1 hover:bg-slate-700/60 transition-colors shrink-0`}
+                  disabled={saving === item.id}
+                  className={`flex items-center gap-1 text-[11px] font-medium ${sc.color} bg-slate-800/60 border border-slate-700/50 rounded-full px-2.5 py-1 hover:bg-slate-700/60 transition-colors shrink-0 disabled:opacity-60 disabled:cursor-wait`}
                   title="Click to update status"
                 >
-                  {sc.icon}
-                  {sc.label}
+                  {saving === item.id ? (
+                    <svg className="animate-spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                    </svg>
+                  ) : sc.icon}
+                  {saving === item.id ? "Saving…" : sc.label}
                 </button>
 
                 {/* Expand chevron */}
