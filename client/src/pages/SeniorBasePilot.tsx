@@ -741,6 +741,81 @@ export default function SeniorBasePilot({ role }: { role: UserRole }) {
             </div>
           </div>
 
+          {/* FTL Compliance Summary */}
+          {(() => {
+            const now = new Date();
+            const baseFdp = fdpPilots.filter(p => p.base === selectedBase);
+            const atRisk = baseFdp.filter(pilot => {
+              const [sh, sm] = pilot.startTime.split(':').map(Number);
+              const startMs = sh * 60 + sm;
+              const nowMs = now.getHours() * 60 + now.getMinutes();
+              const elapsedMins = nowMs >= startMs ? nowMs - startMs : (1440 - startMs) + nowMs;
+              const maxMins = (pilot.maxFDP * 60) + pilot.extensionMins;
+              const remainMins = Math.max(0, maxMins - elapsedMins);
+              return remainMins <= 180; // warning (≤3h) or hard block (expired)
+            });
+            return (
+              <div className={`${CARD} p-4`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Timer size={13} className="text-amber-400" />
+                    <span className="text-xs font-semibold text-[#CDCCCA]" style={HF}>FTL Compliance — Subordinates at Risk</span>
+                  </div>
+                  <button onClick={() => navigate("/ftl-compliance")}
+                    className="flex items-center gap-1 text-[10px] text-[#4F98A3] hover:underline">
+                    FTL Engine <ExternalLink size={10} />
+                  </button>
+                </div>
+                {atRisk.length === 0 ? (
+                  <div className="flex items-center gap-2 py-3 px-3 rounded-lg bg-green-500/8 border border-green-500/20">
+                    <CheckCircle2 size={14} className="text-green-400 shrink-0" />
+                    <span className="text-xs text-green-300">All {selectedBase} pilots within FTL limits — no warnings or blocks</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {atRisk.map(pilot => {
+                      const [sh, sm] = pilot.startTime.split(':').map(Number);
+                      const startMs = sh * 60 + sm;
+                      const nowMs = now.getHours() * 60 + now.getMinutes();
+                      const elapsedMins = nowMs >= startMs ? nowMs - startMs : (1440 - startMs) + nowMs;
+                      const maxMins = (pilot.maxFDP * 60) + pilot.extensionMins;
+                      const remainMins = Math.max(0, maxMins - elapsedMins);
+                      const remainH = Math.floor(remainMins / 60);
+                      const remainM = remainMins % 60;
+                      const isHardBlock = remainMins <= 60;
+                      const isWarning2h = remainMins <= 120 && remainMins > 60;
+                      const isWarning3h = remainMins <= 180 && remainMins > 120;
+                      const severity = isHardBlock ? { bg: "bg-red-500/10 border-red-500/30", badge: "bg-red-500/20 text-red-400 border-red-500/40", label: "HARD BLOCK", dot: "bg-red-400" }
+                        : isWarning2h ? { bg: "bg-amber-500/8 border-amber-500/25", badge: "bg-amber-500/20 text-amber-400 border-amber-500/40", label: "2HR WARN", dot: "bg-amber-400" }
+                        : { bg: "bg-yellow-500/6 border-yellow-500/20", badge: "bg-yellow-500/15 text-yellow-400 border-yellow-500/35", label: "3HR WARN", dot: "bg-yellow-400" };
+                      return (
+                        <div key={pilot.id} className={`flex items-center justify-between px-3 py-2.5 rounded-lg border ${severity.bg}`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${severity.dot}`} />
+                            <div>
+                              <div className="text-xs font-semibold text-[#CDCCCA]">{pilot.name}</div>
+                              <div className="text-[10px] text-[#797876]">{pilot.aircraft} · Started {pilot.startTime}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${severity.badge}`}>{severity.label}</span>
+                            <span className="text-xs font-mono text-[#CDCCCA]">
+                              {remainMins === 0 ? 'EXPIRED' : `${remainH}h ${String(remainM).padStart(2,'0')}m`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <button onClick={() => setActiveTab("fdp")}
+                      className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-[#171614] border border-[#393836] text-[11px] text-[#4F98A3] hover:border-[#4F98A3]/40 transition-colors">
+                      <Timer size={11} /> View full FDP / Duty tab
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Quick links to related pages */}
           <div className={`${CARD} p-4`}>
             <div className="text-[10px] text-[#5A5957] uppercase tracking-wider mb-3">Quick Links to Existing Pages</div>

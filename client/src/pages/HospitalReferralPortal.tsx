@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useState, useRef, type ReactNode } from "react";
 import {
   ClipboardList, Send, CheckCircle2, ShieldCheck, Plane, Clock,
   UserRound, Stethoscope, ChevronRight, ChevronLeft, FileText,
+  Upload, Paperclip, X as XIcon,
 } from "lucide-react";
 
 const REFERRING_HOSPITALS = [
@@ -68,6 +69,15 @@ export default function HospitalReferralPortal() {
   const [transport, setTransport] = useState<TransportDetails>(initialTransport);
   const [submitted, setSubmitted] = useState(false);
   const [refNumber, setRefNumber] = useState("");
+  const [uploadedPdf, setUploadedPdf] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === "application/pdf") {
+      setUploadedPdf(file);
+    }
+  };
 
   const toggleEquipment = (item: string) => {
     setTransport(t => ({
@@ -87,6 +97,7 @@ export default function HospitalReferralPortal() {
     setTransport(initialTransport);
     setSubmitted(false);
     setStep(1);
+    setUploadedPdf(null);
   };
 
   const steps = [
@@ -166,6 +177,50 @@ export default function HospitalReferralPortal() {
           {/* Step 1 */}
           {!submitted && step === 1 && (
             <div className="space-y-4">
+
+              {/* PDF Upload Banner */}
+              <div className="flex items-start gap-3 p-4 bg-cyan-400/5 border border-cyan-400/20 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Paperclip size={13} className="text-cyan-400 shrink-0" />
+                    <span className="text-xs font-semibold text-cyan-300">Attach Referral PDF</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-400/10 border border-cyan-400/20 text-cyan-400">Optional</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Upload a referral document (e.g. clinical summary, patient notes). AI-assisted field pre-population coming soon.
+                  </p>
+                  {uploadedPdf && (
+                    <div className="mt-2 flex items-center gap-2 px-2.5 py-1.5 bg-background/50 border border-green-400/30 rounded-lg w-fit">
+                      <FileText size={12} className="text-green-400 shrink-0" />
+                      <span className="text-[11px] text-green-300 font-medium truncate max-w-[200px]">{uploadedPdf.name}</span>
+                      <button
+                        onClick={() => { setUploadedPdf(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                        className="text-muted-foreground hover:text-red-400 transition-colors"
+                      >
+                        <XIcon size={11} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-shrink-0">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    onChange={handlePdfUpload}
+                    className="hidden"
+                    id="referral-pdf-upload"
+                  />
+                  <label
+                    htmlFor="referral-pdf-upload"
+                    className="flex items-center gap-1.5 cursor-pointer px-3 py-2 rounded-lg bg-cyan-400/15 border border-cyan-400/30 text-cyan-400 text-xs font-semibold hover:bg-cyan-400/25 transition-colors"
+                  >
+                    <Upload size={13} />
+                    {uploadedPdf ? "Replace" : "Upload PDF"}
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Patient Name"><input className={inputCls} value={patient.name} onChange={e => setPatient({ ...patient, name: e.target.value })} placeholder="e.g. Jane Pemberton" /></Field>
                 <Field label="Date of Birth"><input type="date" className={inputCls} value={patient.dob} onChange={e => setPatient({ ...patient, dob: e.target.value })} /></Field>

@@ -9,10 +9,11 @@ import {
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
   Moon, Sun, SunMoon, Menu, X, PanelLeftClose, PanelLeftOpen,
   Bell, BellRing, CheckCheck, ExternalLink, TrendingUp, HelpCircle,
-  LayoutDashboard, Plane, Zap, Wrench, HeartPulse, Bot, Briefcase,
+  LayoutDashboard, Plane, Zap, Wrench, HeartPulse, Bot, Briefcase, Bug,
 } from "lucide-react";
 import EmergencyButton from "@/components/EmergencyButton";
 import HelpDrawer from "@/components/HelpDrawer";
+import BugReportModal from "@/components/BugReportModal";
 import { FEATURES } from "@/lib/config";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -216,7 +217,8 @@ const NAV: NavItem[] = [
       { label: "ADS-B Live Tracking",  path: "/adsb-tracking" },
       { label: "Flight Planning",     path: "/flight-planning" },
       { label: "Special Missions",    path: "/special-missions" },
-      { label: "Ferry Flights",       path: "/ferry" },
+      { label: "Ferry Flights",        path: "/ferry" },
+      { label: "Demand Forecasting",   path: "/demand-forecasting" },
     ],
   },
   // ── Operations ────────────────────────────────────────────────────
@@ -232,7 +234,6 @@ const NAV: NavItem[] = [
       { label: "Regulations Reference",       path: "/regulations" },
       { label: "Senior Base Pilot Portal",    path: "/sbp-portal" },
       { label: "Hospital Referral Portal",     path: "/hospital-referral" },
-      { label: "FBO & Handling",               path: "/fbo-handling" },
     ],
   },
   // ── Assets ────────────────────────────────────────────────────────
@@ -247,8 +248,10 @@ const NAV: NavItem[] = [
       { label: "Engineering",          path: "/engineering" },
       { label: "Component Life & AD/SB", path: "/component-life" },
       { label: "AI Maintenance Assistant", path: "/ai-maintenance" },
-      { label: "Maintenance Planner",  path: "/maint-planner" },
-      { label: "Asset Utilisation",    path: "/asset-utilisation" },
+      { label: "Maintenance Planner",      path: "/maint-planner" },
+      { label: "Asset Utilisation",        path: "/asset-utilisation" },
+      { label: "FBO & Handling",           path: "/fbo-handling" },
+      { label: "Airborne EFB",             path: "/airborne-efb" },
     ],
   },
   // ── Crew & People ─────────────────────────────────────────────────
@@ -301,10 +304,8 @@ const NAV: NavItem[] = [
       { label: "Audit & Reports",     path: "/audit" },
       { label: "Government Tenders",  path: "/government-tenders" },
       { label: "Medicare & DVA Billing", path: "/medicare-billing" },
-      { label: "Airborne EFB",          path: "/airborne-efb" },
-      { label: "Avinode Marketplace",   path: "/avinode" },
-      { label: "Demand Forecasting",    path: "/demand-forecasting" },
-      { label: "Contract Compliance", path: "/contracts" },
+      { label: "Avinode Marketplace",    path: "/avinode" },
+      { label: "Contract Compliance",    path: "/contracts" },
       { label: "ISO Compliance",      path: "/iso" },
       { label: "Payroll & Leave",     path: "/payroll-leave" },
     ],
@@ -381,6 +382,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
   const [mobileOpen, setMobileOpen]   = useState(false);
   const [panelOpen, setPanelOpen]     = useState(false);
   const [helpOpen, setHelpOpen]       = useState(false);
+  const [bugOpen, setBugOpen]         = useState(false);
   const [tooltip, setTooltip]         = useState<{ label: string; y: number } | null>(null);
   const tooltipTimer                  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -466,7 +468,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                     ? `${section.color} bg-sidebar-accent/60`
                     : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
               >
-                <span className={isOpen ? section.color : ''}>{section.icon}</span>
+                <span className={section.color}>{section.icon}</span>
                 <span className="flex-1 text-left whitespace-nowrap tracking-wide uppercase text-[10px]">{section.label}</span>
                 {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
               </button>
@@ -574,7 +576,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
                       ? `${section.color} bg-sidebar-accent/60`
                       : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent'}`}
                 >
-                  <span className={isOpen ? section.color : ''}>{section.icon}</span>
+                  <span className={section.color}>{section.icon}</span>
                   <span className="flex-1 text-left tracking-wide uppercase text-[10px]">{section.label}</span>
                   {isOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
                 </button>
@@ -704,6 +706,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button onClick={() => setHelpOpen(true)} title="Help" className="relative p-2 rounded-lg border border-card-border text-muted-foreground hover:text-cyan-400 hover:bg-white/10 hover:border-cyan-400/40 transition-all" data-testid="button-help"><HelpCircle size={15} /></button>
+            <button onClick={() => setBugOpen(true)} title="Report a Bug" className="relative p-2 rounded-lg border border-card-border text-muted-foreground hover:text-red-400 hover:bg-white/10 hover:border-red-400/40 transition-all" data-testid="button-bug"><Bug size={15} /></button>
             <NotificationBell role={role} />
             <div className="hidden md:block">
               <EmergencyButton role={role} />
@@ -717,6 +720,7 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         <main className="flex-1 overflow-y-auto">
           {children}
           {helpOpen && <HelpDrawer path={location} onClose={() => setHelpOpen(false)} />}
+          {bugOpen && <BugReportModal path={location} onClose={() => setBugOpen(false)} />}
           <footer className="px-4 py-2 border-t border-border text-center">
             <p className="text-[10px] text-muted-foreground">
               © 2026 Medivac.ai. Medivac.ai is proprietary software. All intellectual property, design, and functionality rights are reserved. Confidential — not for distribution.

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Wrench, Send, Sparkles, ShieldAlert, ChevronDown, Search, FileSearch,
-  Clock, Wind, Gauge, Wind as OxygenIcon, Bot, User, AlertTriangle,
+  Clock, Wind, Gauge, Wind as OxygenIcon, Bot, User, AlertTriangle, BookOpen, ExternalLink,
 } from "lucide-react";
 
 const HF = { fontFamily: "'Cabinet Grotesk', sans-serif" };
@@ -243,6 +243,37 @@ export default function AIMaintenance() {
         </div>
       </div>
 
+      {/* Manual Quick Links */}
+      <div className="bg-[#1C1B19] border border-[#393836] rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <BookOpen size={15} className="text-[#4F98A3]" />
+          <h2 className="text-xs font-semibold text-[#CDCCCA] uppercase tracking-wider" style={HF}>Approved Manuals — Quick Access</h2>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {MANUAL_LINKS.map(m => (
+            <a
+              key={m.label}
+              href={m.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 px-3 py-2.5 bg-[#0f1117] border border-[#393836] rounded-lg hover:border-[#4F98A3]/50 hover:bg-[#4F98A3]/5 transition-colors group"
+            >
+              <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={{ backgroundColor: m.color + '22', border: `1px solid ${m.color}44` }}>
+                <span className="text-[9px] font-bold" style={{ color: m.color }}>{m.badge}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-semibold text-[#CDCCCA] truncate group-hover:text-[#4F98A3] transition-colors">{m.label}</div>
+                <div className="text-[10px] text-[#5A5957] truncate">{m.system}</div>
+              </div>
+              <ExternalLink size={11} className="text-[#5A5957] group-hover:text-[#4F98A3] shrink-0 transition-colors" />
+            </a>
+          ))}
+        </div>
+        <p className="text-[10px] text-[#5A5957] mt-3">
+          Always verify manual revision currency against the Controlled Document Register before use.
+        </p>
+      </div>
+
       {/* Safety disclaimer */}
       <div className="bg-red-950/20 border border-red-400/30 rounded-xl p-4 flex items-start gap-3">
         <AlertTriangle size={18} className="text-red-400 shrink-0 mt-0.5" />
@@ -253,3 +284,15 @@ export default function AIMaintenance() {
     </div>
   );
 }
+
+const MANUAL_LINKS = [
+  { label: "B200 / B200C QRH",         system: "King Air B200 — Quick Reference",  badge: "B200", color: "#4F98A3", url: "#" },
+  { label: "B350 QRH",                  system: "King Air B350 — Quick Reference",  badge: "B350", color: "#4F98A3", url: "#" },
+  { label: "B200 Pilot Training Manual",system: "KA B200/GT/250 PL21",              badge: "PTM",  color: "#7C6FCD", url: "#" },
+  { label: "B200 Pilot Checklist",      system: "King Air B200 & B200C",            badge: "CL",   color: "#7C6FCD", url: "#" },
+  { label: "FMS Raisbeck POH",          system: "B200/B200C/B200T Performance",     badge: "POH",  color: "#4F98A3", url: "#" },
+  { label: "Collins TCAS-4000",         system: "TCAS II — Collision Avoidance",    badge: "TCAS", color: "#DA7101", url: "#" },
+  { label: "Memory Flash Cards",        system: "B200/B200C Late Model",            badge: "FLASH",color: "#4F98A3", url: "#" },
+  { label: "DMM Quick Reference",       system: "Dispatch Maintenance Manual",      badge: "DMM",  color: "#DA7101", url: "#" },
+  { label: "FRSM Practices & Tech",     system: "Flight Risk & Safety Management",  badge: "FRSM", color: "#A84B2F", url: "#" },
+];
