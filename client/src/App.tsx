@@ -54,6 +54,16 @@ import TechLogEmbed from "@/pages/TechLogEmbed";
 import NEPTTasking from "@/pages/NEPTTasking";
 import GovernmentTenders from "@/pages/GovernmentTenders";
 import DevelopmentRoadmap from "@/pages/DevelopmentRoadmap";
+import VitalSignsMonitor from "@/pages/VitalSignsMonitor";
+import SMSModule from "@/pages/SMSModule";
+import EHRScoping from "@/pages/EHRScoping";
+import AirborneEFB from "@/pages/AirborneEFB";
+import CrewMobileApp from "@/pages/CrewMobileApp";
+import MedicareBilling from "@/pages/MedicareBilling";
+import CompetencyTracking from "@/pages/CompetencyTracking";
+import MultiTenantAdmin from "@/pages/MultiTenantAdmin";
+import AIMaintenance from "@/pages/AIMaintenance";
+import FBOHandling from "@/pages/FBOHandling";
 import HospitalReferralPortal from "@/pages/HospitalReferralPortal";
 import FTLCompliance from "@/pages/FTLCompliance";
 import ADSBTracking from "@/pages/ADSBTracking";
@@ -131,6 +141,16 @@ function AppRouter({ role }: { role: UserRole }) {
       <Route path="/audit" component={() => <AuditReports role={role} />} />
       <Route path="/government-tenders" component={() => <GovernmentTenders />} />
       <Route path="/dev-roadmap" component={() => <DevelopmentRoadmap />} />
+      <Route path="/vital-signs-monitor" component={() => <VitalSignsMonitor />} />
+      <Route path="/sms-module" component={() => <SMSModule />} />
+      <Route path="/ehr-scoping" component={() => <EHRScoping />} />
+      <Route path="/airborne-efb" component={() => <AirborneEFB />} />
+      <Route path="/crew-mobile-app" component={() => <CrewMobileApp />} />
+      <Route path="/medicare-billing" component={() => <MedicareBilling />} />
+      <Route path="/competency-tracking" component={() => <CompetencyTracking />} />
+      <Route path="/multi-tenant" component={() => <MultiTenantAdmin />} />
+      <Route path="/ai-maintenance" component={() => <AIMaintenance />} />
+      <Route path="/fbo-handling" component={() => <FBOHandling />} />
       <Route path="/hospital-referral" component={() => <HospitalReferralPortal />} />
       <Route path="/ftl-compliance" component={() => <FTLCompliance />} />
       <Route path="/adsb-tracking" component={() => <ADSBTracking />} />
