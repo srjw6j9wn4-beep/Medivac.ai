@@ -431,6 +431,36 @@ class DatabaseStorage {
     await supabase.from('nept_breaks').delete().eq('id', id);
   }
 
+  // ── Bug Reports ──────────────────────────────────────────────────────
+  async createBugReport(report: {
+    page: string; pagePath: string; category: string;
+    severity: string; description: string; steps: string;
+  }): Promise<{ id: number } | null> {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.from('bug_reports').insert({
+      created_at: now, page: report.page, page_path: report.pagePath,
+      category: report.category, severity: report.severity,
+      description: report.description, steps: report.steps, status: 'open',
+    }).select('id').single();
+    if (error) {
+      console.error('[BugReport] Supabase insert error:', error.message);
+      return null;
+    }
+    return data;
+  }
+  async getBugReports(status?: string): Promise<any[]> {
+    let q = supabase.from('bug_reports').select('*').order('created_at', { ascending: false });
+    if (status) q = (q as any).eq('status', status);
+    const { data } = await q;
+    return data ?? [];
+  }
+  async updateBugReportStatus(id: number, status: string, resolvedBy?: string): Promise<void> {
+    const now = new Date().toISOString();
+    await supabase.from('bug_reports').update({
+      status, resolved_at: status === 'resolved' ? now : null, resolved_by: resolvedBy ?? null,
+    }).eq('id', id);
+  }
+
   // ── Notifications ─────────────────────────────────────────────────────────
   async createNotification(d: { type: string; title: string; body: string; taskRef?: string; taskId?: number }): Promise<Notification> {
     const { data } = await supabase.from('notifications').insert({ type: d.type, title: d.title, body: d.body, task_ref: d.taskRef ?? null, task_id: d.taskId ?? null, read_at: null, created_at: new Date().toISOString() }).select().single();

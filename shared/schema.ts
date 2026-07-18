@@ -592,3 +592,21 @@ export const regAlerts = sqliteTable("reg_alerts", {
 
 export type RegSource = typeof regSources.$inferSelect;
 export type RegAlert = typeof regAlerts.$inferSelect;
+
+export const bugReports = sqliteTable("bug_reports", {
+  id:          integer("id").primaryKey({ autoIncrement: true }),
+  createdAt:   text("created_at").notNull().default(""),
+  page:        text("page").notNull(),
+  pagePath:    text("page_path").notNull(),
+  category:    text("category").notNull(),
+  severity:    text("severity").notNull(),
+  description: text("description").notNull(),
+  steps:       text("steps").notNull().default(""),
+  status:      text("status").notNull().default("open"),
+  resolvedAt:  text("resolved_at"),
+  resolvedBy:  text("resolved_by"),
+});
+
+export const insertBugReportSchema = createInsertSchema(bugReports).omit({ id: true, createdAt: true, status: true, resolvedAt: true, resolvedBy: true });
+export type InsertBugReport = z.infer<typeof insertBugReportSchema>;
+export type BugReport = typeof bugReports.$inferSelect;

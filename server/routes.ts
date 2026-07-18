@@ -1552,6 +1552,54 @@ Produce the optimised run plan as JSON.`;
     } catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
+
+  // ── Bug Reports ───────────────────────────────────────────────────────────
+  app.post("/api/bug-reports", async (req: Request, res: Response) => {
+    try {
+      const { page, pagePath, category, severity, description, steps } = req.body;
+      if (!page || !category || !severity || !description) {
+        return res.status(400).json({ error: "page, category, severity and description are required" });
+      }
+      const result = await storage.createBugReport({
+        page:        String(page),
+        pagePath:    String(pagePath ?? ""),
+        category:    String(category),
+        severity:    String(severity),
+        description: String(description),
+        steps:       String(steps ?? ""),
+      });
+      if (!result) return res.status(500).json({ error: "Failed to save bug report" });
+      res.status(201).json({ id: result.id, message: "Bug report submitted" });
+    } catch (err: any) {
+      console.error("[POST /api/bug-reports]", err.message);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/bug-reports", async (req: Request, res: Response) => {
+    try {
+      const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+      const reports = await storage.getBugReports(status);
+      res.json(reports);
+    } catch (err: any) {
+      console.error("[GET /api/bug-reports]", err.message);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/bug-reports/:id/status", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status, resolvedBy } = req.body;
+      if (!status) return res.status(400).json({ error: "status is required" });
+      await storage.updateBugReportStatus(id, status, resolvedBy);
+      res.json({ ok: true });
+    } catch (err: any) {
+      console.error("[PATCH /api/bug-reports]", err.message);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // ── Notifications ─────────────────────────────────────────────────────────
   app.get("/api/notifications", async (_req: Request, res: Response) => {
     try {

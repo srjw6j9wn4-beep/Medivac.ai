@@ -720,7 +720,11 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         <main className="flex-1 overflow-y-auto">
           {children}
           {helpOpen && <HelpDrawer path={location} onClose={() => setHelpOpen(false)} />}
-          {bugOpen && <BugReportModal path={location} onClose={() => setBugOpen(false)} />}
+          {bugOpen && <BugReportModal
+            path={location}
+            pages={NAV.flatMap(s => s.children ?? []).map(c => ({ label: c.label, path: c.path }))}
+            onClose={() => setBugOpen(false)}
+          />}
           <footer className="px-4 py-2 border-t border-border text-center">
             <p className="text-[10px] text-muted-foreground">
               © 2026 Medivac.ai. Medivac.ai is proprietary software. All intellectual property, design, and functionality rights are reserved. Confidential — not for distribution.
