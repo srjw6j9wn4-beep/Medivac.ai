@@ -479,7 +479,7 @@ function toPipelineTender(item: PipelineItem) {
     _kind: "pipeline" as const,
     title: item.opportunity,
     fit: PRIORITY_TO_FIT[item.priority] ?? "MEDIUM",
-    type: "Upcoming RFT",
+    type: "Internal Opportunity Thesis — Not Yet Published",
     action: item.notes ?? `Monitor ${item.agency} for release of this opportunity and prepare a capability statement ahead of time.`,
   };
 }
@@ -789,9 +789,9 @@ export default function GovernmentTenders() {
         <section>
           <div className="flex items-center gap-2 mb-1">
             <TrendingUp size={18} className="text-cyan-400" />
-            <h2 className="text-base font-bold text-white">Forward Pipeline — Monitor Closely</h2>
+            <h2 className="text-base font-bold text-white">Internal Opportunity Theses — Monitor Closely</h2>
           </div>
-          <p className="text-xs text-slate-500 mb-4">Australian and international opportunities not yet open but expected within the planning horizon</p>
+          <p className="text-xs text-slate-500 mb-4">Internal analyst forecasts of likely future demand, based on market gaps and agency signals. These are NOT published government tenders, RFIs, or RFTs — no agency has issued a notice for any item below. Verify against AusTender / Buy.NSW / state portals before treating as a live opportunity.</p>
 
           {/* AU Pipeline */}
           <div className="mb-2 flex items-center gap-2">
@@ -1203,7 +1203,7 @@ function PipelineTiles({ rows, onSelect }: { rows: PipelineItem[]; onSelect: (it
           className="rounded-xl border border-slate-700 bg-slate-900 p-4 flex flex-col gap-3 cursor-pointer hover:border-cyan-600/60 hover:bg-slate-900/80 transition-colors">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] font-bold bg-cyan-900/60 text-cyan-300 border border-cyan-700/40 px-2 py-0.5 rounded uppercase tracking-wide">
-              Upcoming
+              Internal Thesis
             </span>
             <RegionBadge region={row.region} />
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${PRIORITY_COLORS[row.priority] ?? "bg-slate-500 text-white"}`}>{row.priority}</span>
@@ -1337,7 +1337,8 @@ function TenderDetailModal({ tender, onClose }: { tender: any; onClose: () => vo
   const guidance: string[] = [];
   if (isPipeline) {
     const portal = tender.portalName ?? pickRelevantPortal(tender.region);
-    guidance.push(`Monitor ${portal} for RFT release — set a keyword alert.`);
+    guidance.push("This is an internal opportunity thesis based on market analysis — no agency has published an RFI or RFT for this yet.");
+    guidance.push(`Monitor ${portal} for an actual RFT release — set a keyword alert.`);
     guidance.push(`Prepare capability statement addressing: ${tender.notes ?? tender.agency}.`);
     guidance.push(`Expected timeline: ${tender.est_date} — begin internal review now.`);
     guidance.push(tender.priority === "CRITICAL" || tender.priority === "HIGH"
@@ -1382,7 +1383,7 @@ function TenderDetailModal({ tender, onClose }: { tender: any; onClose: () => vo
           <div className="flex-1">
             <div className="flex items-center gap-2 flex-wrap mb-2">
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${isClosed ? "bg-rose-900/60 text-rose-300 border border-rose-700/40" : isPipeline ? "bg-emerald-900/60 text-emerald-300 border border-emerald-700/40" : "bg-cyan-900/60 text-cyan-300 border border-cyan-700/40"}`}>
-                {isClosed ? "Closed" : isPipeline ? "Pipeline" : "Live Opportunity"}
+                {isClosed ? "Closed" : isPipeline ? "Opportunity Thesis (Unpublished)" : "Live Opportunity"}
               </span>
               <RegionBadge region={tender.region} />
               {isPipeline ? (
@@ -1425,15 +1426,15 @@ function TenderDetailModal({ tender, onClose }: { tender: any; onClose: () => vo
             ) : isPipeline ? (
               <>
                 <div className="bg-slate-900 px-4 py-2.5">
-                  <div className="text-[10px] uppercase tracking-widest text-cyan-500/80 font-semibold mb-0.5">Type</div>
+                  <div className="text-[10px] uppercase tracking-widest text-cyan-500/80 font-semibold mb-0.5">Status</div>
                   <div className="text-sm text-slate-200">{tender.type}</div>
                 </div>
                 <div className="bg-slate-900 px-4 py-2.5">
-                  <div className="text-[10px] uppercase tracking-widest text-cyan-500/80 font-semibold mb-0.5">Value Estimate</div>
+                  <div className="text-[10px] uppercase tracking-widest text-cyan-500/80 font-semibold mb-0.5">Value Estimate (Analyst Forecast)</div>
                   <div className="text-sm text-slate-200">{tender.value ?? "Not disclosed"}</div>
                 </div>
                 <div className="bg-slate-900 px-4 py-2.5">
-                  <div className="text-[10px] uppercase tracking-widest text-cyan-500/80 font-semibold mb-0.5">Expected Release</div>
+                  <div className="text-[10px] uppercase tracking-widest text-cyan-500/80 font-semibold mb-0.5">Estimated Timing (Unconfirmed)</div>
                   <div className="text-sm text-slate-200">{tender.est_date}</div>
                 </div>
               </>
