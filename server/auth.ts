@@ -1,20 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 
-// ── Admin credentials ─────────────────────────────────────────────────────────
-const ADMINS: { email: string; hash: string }[] = [];
-
-function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password + 'medivac_salt_2026').digest('hex');
-}
-
-function addAdmin(email: string, password: string) {
-  ADMINS.push({ email: email.trim().toLowerCase(), hash: hashPassword(password) });
-}
-
-addAdmin('andy@awlabs.com.au', 'Andy@awl2026');
-
-// ── Session type extension ────────────────────────────────────────────────────
 declare module 'express-session' {
   interface SessionData {
     authenticated: boolean;
@@ -23,41 +9,76 @@ declare module 'express-session' {
   }
 }
 
-// ── Auth middleware ───────────────────────────────────────────────────────────
+const ADMIN_EMAIL    = 'andy@awlabs.com.au';
+const ADMIN_PASSWORD = 'Andy@awl2026';
+
+// In-memory token store — survives as long as the server process is running
+const validTokens = new Map<string, { email: string; created: number }>();
+
+function generateToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Clean up tokens older than 8 hours
+function cleanTokens() {
+  const cutoff = Date.now() - 8 * 60 * 60 * 1000;
+  for (const [token, data] of validTokens.entries()) {
+    if (data.created < cutoff) validTokens.delete(token);
+  }
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Check Authorization header first
+  const authHeader = req.headers['authorization'];
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    if (validTokens.has(token)) return next();
+  }
+  // Also check session as fallback
   if (req.session?.authenticated) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
 
-// ── Login handler ─────────────────────────────────────────────────────────────
 export function loginHandler(req: Request, res: Response) {
   const { email, password } = req.body as { email?: string; password?: string };
-  if (!email || !password) return res.status(400).json({ error: 'Email and password are required' });
+  if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
-  const admin = ADMINS.find(a => a.email === email.trim().toLowerCase());
-  const hash  = hashPassword(password);
+  const emailOk    = email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const passwordOk = password === ADMIN_PASSWORD;
 
-  if (!admin || hash !== admin.hash) {
+  if (!emailOk || !passwordOk) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
+  cleanTokens();
+  const token = generateToken();
+  validTokens.set(token, { email: ADMIN_EMAIL, created: Date.now() });
+
+  // Also set session as backup
   req.session.authenticated = true;
-  req.session.email         = email.trim().toLowerCase();
-  req.session.loginTime     = new Date().toISOString();
+  req.session.email = ADMIN_EMAIL;
 
-  res.json({ success: true, email: req.session.email, loginTime: req.session.loginTime });
+  res.json({ success: true, email: ADMIN_EMAIL, token });
 }
 
-// ── Logout handler ────────────────────────────────────────────────────────────
 export function logoutHandler(req: Request, res: Response) {
-  req.session.destroy(() => res.json({ success: true }));
+  const authHeader = req.headers['authorization'];
+  if (authHeader?.startsWith('Bearer ')) {
+    validTokens.delete(authHeader.slice(7));
+  }
+  req.session.destroy(() => {});
+  res.json({ success: true });
 }
 
-// ── Session check ─────────────────────────────────────────────────────────────
 export function sessionCheckHandler(req: Request, res: Response) {
-  if (req.session?.authenticated) {
-    res.json({ authenticated: true, email: req.session.email, loginTime: req.session.loginTime });
-  } else {
-    res.json({ authenticated: false });
+  const authHeader = req.headers['authorization'];
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.slice(7);
+    const data = validTokens.get(token);
+    if (data) return res.json({ authenticated: true, email: data.email });
   }
+  if (req.session?.authenticated) {
+    return res.json({ authenticated: true, email: req.session.email });
+  }
+  res.json({ authenticated: false });
 }

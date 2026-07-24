@@ -47,7 +47,7 @@ app.use(express.urlencoded({ extended: false }));
 
 // ── Session middleware ─────────────────────────────────────────────────────────
 app.use(session({
-  name: '__Host-medivac-sid',
+  name: 'medivac-sid',
   secret: 'medivac_session_secret_2026_secure',
   resave: false,
   saveUninitialized: false,
@@ -55,7 +55,7 @@ app.use(session({
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     maxAge: 8 * 60 * 60 * 1000, // 8 hours
-    sameSite: 'lax',
+    sameSite: 'none',
     path: '/',
   },
 }));

@@ -193,51 +193,19 @@ function AppRouter({ role }: { role: UserRole }) {
   );
 }
 
-function AuthenticatedApp({ role, setRole }: { role: UserRole; setRole: (r: UserRole) => void }) {
-  const { data: session, isLoading } = useQuery({
-    queryKey: ["/api/auth/session"],
-    queryFn: async () => {
-      const base = window.location.hostname.endsWith(".pplx.app") ? "/port/5000" : "";
-      const APP_KEY = "98dcf87f14cdd94024310478d34915c15867d888a4c5db09e143431a515ffc64";
-      // Retry to handle cold-start 404/503 from pplx.app proxy
-      for (let i = 0; i <= 8; i++) {
-        try {
-          const res = await fetch(`${base}/api/auth/session`, {
-            headers: { "X-App-Key": APP_KEY },
-            credentials: "include",
-          });
-          if ((res.status === 503 || res.status === 404) && i < 8) {
-            await new Promise(r => setTimeout(r, Math.min((i + 1) * 2000, 8000)));
-            continue;
-          }
-          return await res.json();
-        } catch {
-          if (i === 8) return { authenticated: false };
-          await new Promise(r => setTimeout(r, 2000));
-        }
-      }
-      return { authenticated: false };
-    },
-    retry: false,
-    staleTime: 5 * 60 * 1000,
-  });
+// Global in-memory token — persists across navigation, clears on tab close
+let _authToken: string | null = null;
 
-  if (isLoading) {
-    return (
-      <div style={{
-        minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-        background: "#0a1628",
-      }}>
-        <div style={{ textAlign: "center", fontFamily: "'Cabinet Grotesk', sans-serif" }}>
-          <div style={{ color: "white", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Medivac.ai</div>
-          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Starting up — please wait…</div>
-        </div>
-      </div>
-    );
+function AuthenticatedApp({ role, setRole }: { role: UserRole; setRole: (r: UserRole) => void }) {
+  const [authed, setAuthed] = useState<boolean | null>(_authToken ? true : null);
+
+  function handleLogin(token: string) {
+    _authToken = token;
+    setAuthed(true);
   }
 
-  if (!session?.authenticated) {
-    return <Login />;
+  if (authed === null || !authed) {
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
