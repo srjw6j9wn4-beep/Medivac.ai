@@ -1061,6 +1061,105 @@ class DatabaseStorage {
     if (error) throw error;
   }
 
+  // ── INNOVATION PLATFORM ───────────────────────────────────────────────────────
+
+  // Scout
+  async listScout(status?: string): Promise<any[]> {
+    let q = supabase.from('inno_scout').select('*').order('added_at', { ascending: false });
+    if (status && status !== 'all') q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+  async upsertScoutItem(item: any): Promise<any> {
+    const { data, error } = await supabase.from('inno_scout').insert(item).select().single();
+    if (error) throw error;
+    return data;
+  }
+  async updateScoutStatus(id: number, status: string, notes?: string): Promise<any> {
+    const patch: any = { status, reviewed_at: new Date().toISOString() };
+    if (notes !== undefined) patch.notes = notes;
+    const { data, error } = await supabase.from('inno_scout').update(patch).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  // Demands
+  async listDemands(status?: string): Promise<any[]> {
+    let q = supabase.from('inno_demands').select('*').order('created_at', { ascending: false });
+    if (status && status !== 'all') q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+  async createDemand(d: any): Promise<any> {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.from('inno_demands').insert({ ...d, created_at: now, updated_at: now }).select().single();
+    if (error) throw error;
+    return data;
+  }
+  async updateDemand(id: number, patch: any): Promise<any> {
+    const { data, error } = await supabase.from('inno_demands').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+  async deleteDemand(id: number): Promise<void> {
+    const { error } = await supabase.from('inno_demands').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  // Partners
+  async listPartners(status?: string): Promise<any[]> {
+    let q = supabase.from('inno_partners').select('*').order('created_at', { ascending: false });
+    if (status && status !== 'all') q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+  async createPartner(p: any): Promise<any> {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.from('inno_partners').insert({ ...p, created_at: now, updated_at: now }).select().single();
+    if (error) throw error;
+    return data;
+  }
+  async updatePartner(id: number, patch: any): Promise<any> {
+    const { data, error } = await supabase.from('inno_partners').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  // Trials
+  async listTrials(status?: string): Promise<any[]> {
+    let q = supabase.from('inno_trials').select('*').order('created_at', { ascending: false });
+    if (status && status !== 'all') q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+  async createTrial(t: any): Promise<any> {
+    const now = new Date().toISOString();
+    const { data, error } = await supabase.from('inno_trials').insert({ ...t, created_at: now, updated_at: now }).select().single();
+    if (error) throw error;
+    return data;
+  }
+  async updateTrial(id: number, patch: any): Promise<any> {
+    const { data, error } = await supabase.from('inno_partners').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  // Briefings
+  async listBriefings(): Promise<any[]> {
+    const { data, error } = await supabase.from('inno_briefings').select('*').order('generated_at', { ascending: false }).limit(20);
+    if (error) throw error;
+    return data || [];
+  }
+  async createBriefing(b: any): Promise<any> {
+    const { data, error } = await supabase.from('inno_briefings').insert(b).select().single();
+    if (error) throw error;
+    return data;
+  }
+
 }
 
 export const storage = new DatabaseStorage();

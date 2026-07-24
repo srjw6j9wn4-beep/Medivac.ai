@@ -1,5 +1,5 @@
 import { MISSIONS, AIRCRAFT, CREW, type UserRole } from "@/lib/data";
-import { Activity, Plane, Users, AlertTriangle, CheckCircle, Clock, Radio, TrendingUp, Shield } from "lucide-react";
+import { Activity, Plane, Users, AlertTriangle, CheckCircle, Clock, Radio, TrendingUp, Shield, UserPlus, Star, ArrowRight } from "lucide-react";
 
 interface Props { role: UserRole; }
 
@@ -83,8 +83,29 @@ export default function Dashboard({ role }: Props) {
               <QuickAction href="/#/roster" icon={<Users size={14} />} label="Crew Roster" />
               <QuickAction href="/#/aircraft" icon={<Plane size={14} />} label="Fleet Status" />
               <QuickAction href="/#/audit" icon={<Shield size={14} />} label="Audit Log" />
+              <QuickAction href="/#/recruitment" icon={<UserPlus size={14} />} label="Recruitment" className="col-span-2 border-cyan-500/20 hover:border-cyan-500/50 hover:bg-cyan-500/8" />
             </div>
           </div>
+
+          {/* Recruitment banner */}
+          <a href="/#/recruitment" className="block rounded-xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/8 to-blue-600/5 p-4 hover:border-cyan-500/40 transition-colors group">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center">
+                  <UserPlus size={13} className="text-cyan-400" />
+                </div>
+                <span className="text-xs font-bold text-cyan-300">Recruitment Portal</span>
+              </div>
+              <ArrowRight size={13} className="text-muted-foreground group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all" />
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
+              Pilots · Nurses · Doctors · LAMEs · Operations Officers
+            </p>
+            <div className="flex items-center gap-1.5">
+              <Star size={10} className="text-amber-400" />
+              <span className="text-[10px] text-amber-300/80 font-medium">Apprentice Program open — regional Australia</span>
+            </div>
+          </a>
         </div>
       </div>
     </div>
@@ -174,9 +195,9 @@ function ComplianceRow({ label, score }: { label: string; score: number }) {
   );
 }
 
-function QuickAction({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+function QuickAction({ href, icon, label, className = "" }: { href: string; icon: React.ReactNode; label: string; className?: string }) {
   return (
-    <a href={href} className="flex items-center gap-2 p-2.5 bg-card rounded-lg border border-card-border hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-colors text-xs font-medium text-foreground">
+    <a href={href} className={`flex items-center gap-2 p-2.5 bg-card rounded-lg border border-card-border hover:border-cyan-500/40 hover:bg-cyan-500/5 transition-colors text-xs font-medium text-foreground ${className}`}>
       <span className="text-cyan-400">{icon}</span>
       {label}
     </a>

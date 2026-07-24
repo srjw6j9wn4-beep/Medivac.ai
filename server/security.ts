@@ -92,7 +92,14 @@ export function apiKeyGuard(req: Request, res: Response, next: NextFunction) {
   // Skip OPTIONS preflight and health check
   // Note: when mounted as app.use("/api", apiKeyGuard), req.path is the suffix
   // e.g. /api/health → req.path === "/health"
-  if (req.method === "OPTIONS" || req.path === "/health" || req.originalUrl === "/api/health") {
+  // Auth routes must be exempt — they are the login mechanism itself
+  if (
+    req.method === "OPTIONS" ||
+    req.path === "/health" ||
+    req.originalUrl === "/api/health" ||
+    req.path.startsWith("/auth/") ||
+    req.originalUrl.startsWith("/api/auth/")
+  ) {
     return next();
   }
 

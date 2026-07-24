@@ -1,11 +1,14 @@
 import "dotenv/config";
 import express, { Response, NextFunction } from 'express';
 import type { Request } from 'express';
+import session from 'express-session';
+import { loginHandler, logoutHandler, sessionCheckHandler } from './auth';
 import { registerRoutes } from "./routes";
 import { seedDefaultRates } from "./storage";
 import { serveStatic } from "./static";
 import { createServer } from "node:http";
 import { helmetMiddleware, apiRateLimiter, corsMiddleware, apiKeyGuard } from "./security";
+import { threatDetection, getThreatLog, getThreatStats } from "./threat-detection";
 
 const app = express();
 const httpServer = createServer(app);
@@ -22,6 +25,15 @@ app.use(helmetMiddleware);           // HTTP security headers
 app.use(corsMiddleware);             // CORS whitelist
 app.use("/api", apiRateLimiter);    // rate limit all /api/* routes
 app.use("/api", apiKeyGuard);       // API key guard — blocks bots/scrapers
+app.use("/api", threatDetection);   // threat detection — payload, file, anomaly, IP
+
+// ── Security monitor API ──────────────────────────────────────────────────────
+app.get("/api/security/threats", (_req, res) => {
+  res.json(getThreatLog());
+});
+app.get("/api/security/stats", (_req, res) => {
+  res.json(getThreatStats());
+});
 
 app.use(
   express.json({
@@ -32,6 +44,26 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+// ── Session middleware ─────────────────────────────────────────────────────────
+app.use(session({
+  name: '__Host-medivac-sid',
+  secret: 'medivac_session_secret_2026_secure',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 8 * 60 * 60 * 1000, // 8 hours
+    sameSite: 'lax',
+    path: '/',
+  },
+}));
+
+// ── Auth routes (public — no auth required) ───────────────────────────────────
+app.post('/api/auth/login',   loginHandler);
+app.post('/api/auth/logout',  logoutHandler);
+app.get('/api/auth/session',  sessionCheckHandler);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

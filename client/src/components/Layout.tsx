@@ -5,11 +5,11 @@ import { apiRequest } from "@/lib/queryClient";
 import { ROLES, type UserRole } from "@/lib/data";
 import { useRbacPerms, canView } from "@/hooks/useRbacPerms";
 import {
-  ChevronDown, ChevronRight, Activity, Users, Shield, Settings,
+  ChevronDown, ChevronRight, Activity, Users, Shield, Settings, LogOut,
   Radio, PlayCircle, AlertTriangle, Navigation, BookOpen,
   Moon, Sun, SunMoon, Menu, X, PanelLeftClose, PanelLeftOpen,
   Bell, BellRing, CheckCheck, ExternalLink, TrendingUp, HelpCircle,
-  LayoutDashboard, Plane, Zap, Wrench, HeartPulse, Bot, Briefcase, Bug,
+  LayoutDashboard, Plane, Zap, Wrench, HeartPulse, Bot, Briefcase, Bug, UserPlus, Telescope,
 } from "lucide-react";
 import EmergencyButton from "@/components/EmergencyButton";
 import HelpDrawer from "@/components/HelpDrawer";
@@ -266,6 +266,7 @@ const NAV: NavItem[] = [
       { label: "Check & Training",        path: "/check-training" },
       { label: "Competency & Credentials", path: "/competency-tracking" },
       { label: "Crew Mobile App",          path: "/crew-mobile-app" },
+      { label: "Recruitment Portal",       path: "/recruitment" },
     ],
   },
   // ── Clinical ──────────────────────────────────────────────────────
@@ -326,6 +327,8 @@ const NAV: NavItem[] = [
       { label: "SMS Module",                path: "/sms-module" },
       { label: "EHR Integration Scoping",   path: "/ehr-scoping" },
       { label: "Multi-Tenant Platform",     path: "/multi-tenant" },
+      { label: "Innovation Hub",             path: "/innovation" },
+      { label: "Security Monitor",            path: "/security" },
       { label: "Development Roadmap",       path: "/dev-roadmap" },
     ],
   },
@@ -356,6 +359,13 @@ function getDefaultSections(r: UserRole): string[] {
 export default function Layout({ children, role, onRoleChange }: LayoutProps) {
   const [location] = useLocation();
   const [expanded, setExpanded]       = useState<string[]>(() => getDefaultSections(role));
+
+  async function handleLogout() {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } catch {}
+    window.location.reload();
+  }
   const [theme, setTheme] = useState<'dark' | 'light' | 'auto'>('dark');
   // darkMode derived from theme + system preference
   const [systemDark, setSystemDark] = useState(() =>
@@ -515,6 +525,14 @@ export default function Layout({ children, role, onRoleChange }: LayoutProps) {
         >
           <ThemeIcon size={12} />
           <span className="text-[10px] font-semibold">{themeLabel}</span>
+        </button>
+        <button
+          onClick={handleLogout}
+          title="Sign out"
+          className="flex items-center gap-1 px-2 py-1 rounded-lg border border-border bg-muted/30 hover:bg-red-900/40 hover:border-red-800/50 transition-colors text-muted-foreground hover:text-red-400 flex-shrink-0"
+        >
+          <LogOut size={12} />
+          <span className="text-[10px] font-semibold">OUT</span>
         </button>
       </div>
     </>

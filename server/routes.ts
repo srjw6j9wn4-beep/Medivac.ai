@@ -2660,5 +2660,181 @@ Produce the optimised run plan as JSON.`;
     }
   });
 
+  // ── INNOVATION PLATFORM ──────────────────────────────────────────────────
+
+  // Scout
+  app.get('/api/innovation/scout', async (req, res) => {
+    try { res.json(await storage.listScout(req.query.status as string)); }
+    catch (e: any) {
+      if (e.message?.includes('does not exist')) return res.json([]);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app.post('/api/innovation/scout', async (req, res) => {
+    try { res.json(await storage.upsertScoutItem({ ...req.body, added_at: new Date().toISOString(), added_by: 'manual' })); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/innovation/scout/:id', async (req, res) => {
+    try { res.json(await storage.updateScoutStatus(Number(req.params.id), req.body.status, req.body.notes)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // AI Scout trigger — runs a search and seeds results
+  app.post('/api/innovation/scout/run-ai', async (req, res) => {
+    try {
+      const { Anthropic } = await import('@anthropic-ai/sdk');
+      const client = new Anthropic();
+      const prompt = `You are an innovation scout for RFDS (Royal Flying Doctor Service) Australia and aeromedical operators globally.
+
+Search your knowledge for the latest (2023-2026) innovations, products, research and manufacturer announcements in these categories:
+1. Medical devices & equipment suited to aircraft/remote use (compact, vibration-tolerant, extreme temperature rated)
+2. Fixed-wing aircraft suitable for aeromedical use from 800m unprepared strips in 58°C ambient conditions
+3. eVTOL and VTOL aircraft with medical cabin capability for remote/outback operations
+4. Ground vehicles designed for extreme heat, dust, and remote access
+5. Digital health / AI diagnostics / telemedicine for remote operations
+
+For each item, return a JSON array of up to 15 items. Each item:
+{
+  "title": "short title",
+  "category": "medical_device|aircraft|ground_vehicle|digital_health|other",
+  "manufacturer": "company name",
+  "manufacturer_country": "country",
+  "source": "FDA|TGA|CE|Conference|News|Research",
+  "summary": "2-3 sentence plain English description of what it is and why it matters for remote aeromedical operations",
+  "aeromedical_fit_score": 0-100,
+  "fit_rationale": "specific reason this suits RFDS/aeromedical: heat tolerance, size, weight, certification status, co-development interest"
+}
+
+Focus on items that: (a) work in extreme heat 40-58°C, (b) are compact/lightweight for aircraft cabins, (c) manufacturers who have expressed interest in aeromedical/remote medicine partnership programs, or (d) represent genuine breakthroughs in remote diagnostics or treatment capability.
+
+Return ONLY valid JSON array, no other text.`;
+
+      const msg = await client.messages.create({
+        model: 'claude-opus-4-5',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const text = msg.content[0].type === 'text' ? msg.content[0].text : '[]';
+      let items: any[] = [];
+      try {
+        const match = text.match(/\[.*\]/s);
+        if (match) items = JSON.parse(match[0]);
+      } catch { items = []; }
+
+      const now = new Date().toISOString();
+      const results: any[] = [];
+      for (const item of items) {
+        try {
+          const saved = await storage.upsertScoutItem({ ...item, status: 'new', added_at: now, added_by: 'ai_scout' });
+          results.push(saved);
+        } catch { /* skip duplicates */ }
+      }
+      res.json({ seeded: results.length, items: results });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Demands
+  app.get('/api/innovation/demands', async (req, res) => {
+    try { res.json(await storage.listDemands(req.query.status as string)); }
+    catch (e: any) {
+      if (e.message?.includes('does not exist')) return res.json([]);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app.post('/api/innovation/demands', async (req, res) => {
+    try { res.json(await storage.createDemand(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/innovation/demands/:id', async (req, res) => {
+    try { res.json(await storage.updateDemand(Number(req.params.id), req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.delete('/api/innovation/demands/:id', async (req, res) => {
+    try { await storage.deleteDemand(Number(req.params.id)); res.json({ ok: true }); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Partners
+  app.get('/api/innovation/partners', async (req, res) => {
+    try { res.json(await storage.listPartners(req.query.status as string)); }
+    catch (e: any) {
+      if (e.message?.includes('does not exist')) return res.json([]);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app.post('/api/innovation/partners', async (req, res) => {
+    try { res.json(await storage.createPartner(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/innovation/partners/:id', async (req, res) => {
+    try { res.json(await storage.updatePartner(Number(req.params.id), req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Trials
+  app.get('/api/innovation/trials', async (req, res) => {
+    try { res.json(await storage.listTrials(req.query.status as string)); }
+    catch (e: any) {
+      if (e.message?.includes('does not exist')) return res.json([]);
+      res.status(500).json({ error: e.message });
+    }
+  });
+  app.post('/api/innovation/trials', async (req, res) => {
+    try { res.json(await storage.createTrial(req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+  app.patch('/api/innovation/trials/:id', async (req, res) => {
+    try { res.json(await storage.updateTrial(Number(req.params.id), req.body)); }
+    catch (e: any) { res.status(500).json({ error: e.message }); }
+  });
+
+  // Briefings
+  app.get('/api/innovation/briefings', async (_req, res) => {
+    try { res.json(await storage.listBriefings()); }
+    catch (e: any) {
+      if (e.message?.includes('does not exist')) return res.json([]);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // AI Briefing generator
+  app.post('/api/innovation/briefings/generate', async (req, res) => {
+    try {
+      const { Anthropic } = await import('@anthropic-ai/sdk');
+      const client = new Anthropic();
+      const [scout, demands, partners, trials] = await Promise.all([
+        storage.listScout(),
+        storage.listDemands(),
+        storage.listPartners(),
+        storage.listTrials(),
+      ]);
+      const context = JSON.stringify({ scout: scout.slice(0,10), demands: demands.slice(0,10), partners: partners.slice(0,10), trials: trials.slice(0,10) }, null, 2);
+      const msg = await client.messages.create({
+        model: 'claude-opus-4-5',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: `You are the Chief Innovation Officer for RFDS Australia's aeromedical innovation program. Write a concise executive briefing (max 400 words) summarising the current innovation pipeline. Use the data below. Highlight the top 3 Scout items, any active partner negotiations, trial outcomes, and critical unmet demands. Tone: direct, professional, action-oriented. Data: ${context}` }],
+      });
+      const commentary = msg.content[0].type === 'text' ? msg.content[0].text : '';
+      const now = new Date().toISOString();
+      const briefing = await storage.createBriefing({
+        title: `Innovation Briefing — ${new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+        period_label: `Week of ${new Date().toLocaleDateString('en-AU')}`,
+        scout_highlights: scout.filter(s => s.status === 'new').slice(0, 5),
+        partner_updates: partners.filter(p => ['eoi_received','mou','active'].includes(p.status)).slice(0, 5),
+        trial_updates: trials.filter(t => t.status === 'active' || t.status === 'completed').slice(0, 5),
+        demand_updates: demands.filter(d => d.status === 'open' && d.priority === 'critical').slice(0, 5),
+        ai_commentary: commentary,
+        generated_at: now,
+        status: 'draft',
+      });
+      res.json(briefing);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   return httpServer;
 }

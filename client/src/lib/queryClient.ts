@@ -44,6 +44,7 @@ export async function apiRequest(
       method,
       headers: buildHeaders(data ? { "Content-Type": "application/json" } : {}),
       body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
     });
     // 503 = sandbox cold-starting — wait and retry
     if (res.status === 503 && attempt < maxRetries) {
@@ -76,6 +77,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
       headers: buildHeaders(),
+      credentials: "include",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
